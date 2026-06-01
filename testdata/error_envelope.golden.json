@@ -1,0 +1,1 @@
+{"error_code":"validation_error","message":"bad input","trace_id":"00000000000000000000000000000000","tool":"app","version":"v0.1.0","schema_version":"1.0.0","actionable_fix":"fix the input","context":{"field":"name"},"suggestions":["retry with --help"]}

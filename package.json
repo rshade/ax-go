@@ -1,0 +1,19 @@
+{
+  "name": "ax-go",
+  "version": "0.0.0",
+  "description": "Tooling devDependencies (commitlint, markdownlint) for the ax-go library",
+  "private": true,
+  "scripts": {
+    "lint:md": "markdownlint-cli AGENTS.md README.md IMPLEMENTATION_PROMPT.md \"docs/**/*.md\"",
+    "commitlint": "commitlint"
+  },
+  "devDependencies": {
+    "@commitlint/cli": "^20.1.0",
+    "@commitlint/config-conventional": "^20.2.0",
+    "markdownlint-cli": "^0.45.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "Apache-2.0"
+}

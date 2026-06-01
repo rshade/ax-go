@@ -1,0 +1,8 @@
+# Normalize line endings to LF for all text files (POSIX standard).
+* text=auto eol=lf
+
+# Go tooling output and fixtures are always LF.
+*.go text eol=lf
+*.golden text eol=lf
+go.mod text eol=lf
+go.sum text eol=lf
