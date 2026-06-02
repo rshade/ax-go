@@ -7,18 +7,25 @@
 and still ergonomic for human engineers.
 
 The module is `github.com/rshade/ax-go`, the package name should be `ax`, and
-the project currently targets Go `1.25.8`. This repository is still in the
-design/early implementation phase: treat the ADRs in `docs/adr/` as the source
-of truth for behavior and public API decisions.
+the project currently targets Go `1.25.8`. The canonical source of truth for
+behavior and public API decisions is the constitution at
+`.specify/memory/constitution.md`. The ADRs in `docs/adr/` are a FROZEN legacy
+decision log being retired through the Spec Kit feature workflow; where an ADR
+conflicts with the constitution, the constitution wins.
 
 ## Repository Layout
 
 - `go.mod` declares the module and Go version.
 - `README.md` explains the project mission, standards, and roadmap.
-- `docs/adr/` contains accepted Architecture Decision Records. Read the
-  relevant ADR before implementing behavior it governs.
+- `.specify/memory/constitution.md` is the canonical, supreme governance
+  document; `docs/adr/`, this file, `CONTEXT.md`, `GEMINI.md`, and `CLAUDE.md`
+  are derived and reconciled to it.
+- `docs/adr/` contains a FROZEN legacy log of Architecture Decision Records. Do
+  not create or edit ADRs. When a Spec Kit feature is governed by one, absorb its
+  decisions into the feature's `research.md` and delete it as the final task.
 - `internal/` contains private implementation packages behind the public
-  package `ax`. Do not move code into public subpackages without an ADR.
+  package `ax`. Do not move code into public subpackages without a Spec Kit
+  feature or constitution amendment.
 - `testdata/` contains golden fixtures for stable public JSON contracts.
 - `cmd/` is reserved for runnable support binaries such as the future
   `ax-go mcp-server`; do not create placeholder commands before behavior
@@ -100,8 +107,10 @@ of truth for behavior and public API decisions.
 
 ## Development Workflow
 
-1. Start by checking `git status --short` and reading the relevant ADRs.
-2. Keep changes scoped to the requested behavior and the ADR-defined contract.
+1. Start by checking `git status --short` and reading the constitution
+   (`.specify/memory/constitution.md`) plus any governing (frozen) ADRs.
+2. Keep changes scoped to the requested behavior and the constitution-defined
+   contract.
 3. Prefer idiomatic, small Go packages. Avoid speculative abstractions.
 4. Keep `README.md` and `examples/integration/` current with public API,
    command behavior, flags, output shapes, and roadmap changes. If a change
@@ -231,8 +240,15 @@ follows them.
 - **Never read unbounded user input.** Hujson config files MUST be
   size-capped at the read boundary (default 1 MiB, configurable). An
   oversized config is a validation error, not an OOM.
-- Do not bypass ADRs for public API or behavior changes. Add or update an
-  ADR first when the decision surface changes. Even a renamed exported
-  identifier is a breaking change.
+- Public API or runtime-behavior changes are specified through the Spec Kit
+  feature workflow (GitHub issue → spec → plan → tasks), NOT new ADRs — ADRs are
+  frozen. Record the decision in the feature's `research.md` and, when
+  cross-cutting, amend the constitution. Even a renamed exported identifier is a
+  breaking change.
 - Keep `GEMINI.md` and `CLAUDE.md` as thin imports of this file so all
   agent guidance stays synchronized.
+
+<!-- SPECKIT START -->
+For additional context about technologies to be used, project structure,
+shell commands, and other important information, read the current plan
+<!-- SPECKIT END -->

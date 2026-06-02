@@ -1,11 +1,12 @@
 # ax-go Context & Boundaries
 
-> This file is the project constitution. Every roadmap decision, feature, and
-> ADR must respect the boundaries defined here. When an idea would cross a
-> boundary, the answer is "delegate it to the adopting CLI," not "relax the
-> boundary." The canonical agent-instruction file is `AGENTS.md`; this document
+> This file is a DERIVED expansion of the canonical project constitution at
+> `.specify/memory/constitution.md`; on any conflict the constitution wins. It
 > distills the durable *identity and limits* that `/roadmap` and contributors
-> reason against.
+> reason against. Every roadmap decision and feature must respect both the
+> constitution and the boundaries defined here. When an idea would cross a
+> boundary, the answer is "delegate it to the adopting CLI," not "relax the
+> boundary." The canonical agent-instruction file is `AGENTS.md`.
 
 ## Core Architectural Identity
 
@@ -25,9 +26,12 @@ adopting tool inherits them for free:
 - Observability wiring (OpenTelemetry trace context, structured logging) that
   short-lived CLI processes usually get wrong.
 
-The authoritative behavioral contracts live in `docs/adr/` (ADR-0001 through
-ADR-0011). An ADR is the source of truth; code that disagrees with an accepted
-ADR is a bug in the code, not the ADR.
+The canonical behavioral authority is the constitution at
+`.specify/memory/constitution.md`. The ADRs in `docs/adr/` are a FROZEN legacy
+decision log being retired through the Spec Kit feature workflow — each ADR's
+decisions are absorbed into a feature's `research.md` and the ADR is deleted as
+that feature's final task. Where an ADR conflicts with the constitution, the
+constitution wins.
 
 ## Technical Boundaries ("Hard No's")
 
@@ -94,8 +98,10 @@ proactive.
 
 ## Data Source of Truth
 
-- **Behavioral contract:** `docs/adr/` — accepted ADRs govern public API and
-  runtime behavior. Changing behavior requires adding or amending an ADR first.
+- **Behavioral contract:** the constitution at `.specify/memory/constitution.md`
+  (canonical). `docs/adr/` is a frozen legacy log retired via the Spec Kit
+  workflow; changing public API or runtime behavior is specified through a Spec
+  Kit feature (GitHub issue → spec → plan → tasks), not a new ADR.
 - **Agent instructions:** `AGENTS.md` (imported by `CLAUDE.md` and `GEMINI.md`).
 - **Inbound runtime data:** command-line flags, Hujson config on stdin/file,
   and W3C trace context via the `TRACEPARENT` / `TRACESTATE` environment
@@ -131,8 +137,9 @@ To check whether a proposed change respects these boundaries, ask:
 2. **Determinism:** Do two runs with identical input produce byte-identical
    `stdout` (modulo documented non-deterministic fields)? Envelopes must use
    structs, not maps; timestamps must be RFC 3339 UTC.
-3. **ADR alignment:** Is there an accepted ADR for this behavior? If the change
-   alters a public API or runtime contract, the ADR comes first.
+3. **Constitution & ADR alignment:** Does the change satisfy the constitution's
+   principles? Public API / runtime changes go through the Spec Kit feature
+   workflow (absorbing any governing frozen ADR into research.md), not a new ADR.
 4. **Scope:** Is this a cross-cutting primitive (belongs in `ax-go`) or a domain
    feature (belongs in the adopting CLI)? When in doubt, delegate.
 5. **Security:** TLS preserved, no PII/secret logging, user input sanitized via
