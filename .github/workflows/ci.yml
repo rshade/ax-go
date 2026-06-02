@@ -131,3 +131,6 @@ jobs:
 
       - name: Run go vet
         run: go vet ./...
+
+      - name: Check example coverage on the primary API
+        run: go run ./internal/cmd/doccover

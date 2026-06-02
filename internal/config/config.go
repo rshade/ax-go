@@ -14,6 +14,7 @@ type InvalidMaxBytesError struct {
 	MaxBytes int64
 }
 
+// Error returns the validation message for a negative config read limit.
 func (e InvalidMaxBytesError) Error() string {
 	return "config max bytes must be greater than or equal to zero"
 }
@@ -23,6 +24,7 @@ type TooLargeError struct {
 	MaxBytes int64
 }
 
+// Error returns the validation message for oversized config input.
 func (e TooLargeError) Error() string {
 	return fmt.Sprintf("config exceeds maximum size of %d bytes", e.MaxBytes)
 }
