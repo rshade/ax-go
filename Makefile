@@ -1,7 +1,7 @@
 GOLANGCI_LINT?=$(HOME)/go/bin/golangci-lint
 GOLANGCI_LINT_VERSION?=2.11.4
 MARKDOWNLINT?=markdownlint
-MARKDOWNLINT_FILES?=AGENTS.md README.md IMPLEMENTATION_PROMPT.md docs/**/*.md
+MARKDOWNLINT_FILES?=AGENTS.md README.md docs/**/*.md
 ACTIONLINT?=$(HOME)/go/bin/actionlint
 
 .PHONY: all

@@ -41,8 +41,8 @@ Derived docs reconciled in this change:
        research.md + no-new-ADRs; points at this constitution)
 
 Follow-up TODOs (retired incrementally, NOT in this change):
-  - README.md ADR index/links, ROADMAP.md issue↔ADR tags, IMPLEMENTATION_PROMPT.md,
-    and Go doc-comments (error.go, logger.go, mode.go) are updated per-feature as
+  - README.md ADR index/links, ROADMAP.md issue↔ADR tags, and Go doc-comments
+    (error.go, logger.go, mode.go) are updated per-feature as
     each governing ADR is absorbed into a feature's research.md and deleted as that
     feature's final task (Principle VI + Governance).
 -->
@@ -253,7 +253,7 @@ These are decisions, not oversights:
   governs that feature MUST be captured in the feature's `research.md` (Phase 0). That
   feature's `tasks.md` MUST include, as its FINAL task, deletion of those ADR file(s)
   and updating every reference to them (the README ADR index and links, `CONTEXT.md`,
-  `AGENTS.md`, `ROADMAP.md`, `IMPLEMENTATION_PROMPT.md`, and Go doc-comments). An ADR
+  `AGENTS.md`, `ROADMAP.md`, and Go doc-comments). An ADR
   MUST NOT be deleted until its decisions are recorded in `research.md`.
 - New architectural decisions are recorded in the consuming feature's `research.md`
   and, when cross-cutting, elevated to a constitution principle by amendment — not as

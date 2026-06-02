@@ -164,7 +164,7 @@ Examples of foundational tasks (adjust based on your project):
 - [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
 - [ ] TXXX Security hardening
 - [ ] TXXX Run quickstart.md validation
-- [ ] TXXX [FINAL] Retire superseded ADR(s) — ONLY after research.md captures their decisions/alternatives/consequences: delete `docs/adr/NNNN-*.md` and update every reference (README ADR index/links, CONTEXT.md, AGENTS.md, ROADMAP.md, IMPLEMENTATION_PROMPT.md, Go doc-comments). Omit this task entirely if the feature is governed by no ADR.
+- [ ] TXXX [FINAL] Retire superseded ADR(s) — ONLY after research.md captures their decisions/alternatives/consequences: delete `docs/adr/NNNN-*.md` and update every reference (README ADR index/links, CONTEXT.md, AGENTS.md, ROADMAP.md, Go doc-comments). Omit this task entirely if the feature is governed by no ADR.
 
 ---
 

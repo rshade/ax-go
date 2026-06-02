@@ -35,8 +35,6 @@ conflicts with the constitution, the constitution wins.
 - `examples/integration/` contains the runnable integration command for
   exercising the public API from a real Cobra CLI. Keep it current when
   public behavior or examples change.
-- `IMPLEMENTATION_PROMPT.md` captures the advisory-architect workflow used to
-  pressure-test design decisions.
 - `AGENTS.md` is the canonical agent instruction file. `GEMINI.md` and
   `CLAUDE.md` should import this file rather than duplicate guidance.
 

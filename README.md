@@ -181,9 +181,8 @@ Sequenced from the accepted ADRs and the current scaffold:
 ## Contributing
 
 Decisions are made the ADR way: a proposal is captured in `docs/adr/`,
-pressure-tested for trade-offs (the advisory-architect process described in
-[`IMPLEMENTATION_PROMPT.md`](IMPLEMENTATION_PROMPT.md)), and only then accepted
-to guide implementation.
+pressure-tested for trade-offs, and only then accepted to guide
+implementation.
 
 Before changing public behavior, read the relevant ADR and update or supersede
 it when the decision surface changes.
