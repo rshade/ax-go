@@ -306,6 +306,20 @@ linters:
           # Default: true
           skipRecvDeref: false
 
+    godoclint:
+      # Keep godoclint's default well-formedness ("basic") checks and ADD
+      # require-doc, which gates the PRESENCE of a doc comment on every exported
+      # symbol. revive's overlapping "exported ... should have comment" message
+      # is intentionally suppressed in exclusions below to avoid double-reporting.
+      default: basic
+      enable:
+        - require-doc
+      options:
+        require-doc:
+          # Enforce docs on exported symbols only.
+          ignore-exported: false
+          ignore-unexported: true
+
     govet:
       # Enable all analyzers.
       # Default: false
@@ -454,6 +468,7 @@ linters:
           - funlen
           - gocognit
           - goconst
+          - godoclint
           - gosec
           - govet
           - intrange
@@ -474,6 +489,7 @@ linters:
           - funlen
           - gocognit
           - goconst
+          - godoclint
           - gosec
           - govet
           - intrange

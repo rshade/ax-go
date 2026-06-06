@@ -26,8 +26,22 @@ go.work.sum
 
 # env file
 .env
+.env*
+
+# Node tooling
+node_modules/
+dist/
+build/
+*.log
 
 # Editor/IDE
-# .idea/
-# .vscode/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+*.tmp
+*.swp
+
+# Dependency directories
+vendor/
 PR_MESSAGE.md

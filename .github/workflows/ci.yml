@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: '1.25.8'
+  GO_VERSION: '1.26.4'
   # Bypass the Go proxy for rshade modules - fetch directly from GitHub.
   GOPRIVATE: github.com/rshade/*
 
@@ -65,7 +65,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.11.4
+          version: v2.12.2
           args: --timeout=5m
 
       - name: Run markdownlint
@@ -131,3 +131,6 @@ jobs:
 
       - name: Run go vet
         run: go vet ./...
+
+      - name: Check example coverage on the primary API
+        run: go run ./internal/cmd/doccover

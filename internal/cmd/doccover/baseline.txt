@@ -1,0 +1,15 @@
+# doccover ratchet baseline.
+#
+# Required primary-API symbols (see internal/cmd/doccover/main.go) that do not
+# yet have an ExampleXxx. doccover fails only when a required symbol is missing
+# an example AND is not listed here. Remove a line once you add its example.
+# Goal: burn this file down to empty.
+
+BuildMCPSchema
+BuildSchema
+Execute
+Logger
+NewLogger
+Schema
+StartTelemetry
+Telemetry

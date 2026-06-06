@@ -7,7 +7,7 @@
 and still ergonomic for human engineers.
 
 The module is `github.com/rshade/ax-go`, the package name should be `ax`, and
-the project currently targets Go `1.25.8`. The canonical source of truth for
+the project currently targets Go `1.26.4`. The canonical source of truth for
 behavior and public API decisions is the constitution at
 `.specify/memory/constitution.md`. The ADRs in `docs/adr/` are a FROZEN legacy
 decision log being retired through the Spec Kit feature workflow; where an ADR
@@ -58,8 +58,9 @@ conflicts with the constitution, the constitution wins.
 - Input accepts Hujson for human convenience on **reads only** — writes emit
   strict JSON (Hujson cannot Marshal comments). To mutate an existing Hujson
   file while preserving user formatting, use the AST `Patch` path
-  (ADR-0010). Output emits strict, minified JSON for bounded payloads and
-  NDJSON for streaming or unbounded result sets (ADR-0011).
+  preserved in `specs/001-bound-config-reads/research.md`. Output emits strict,
+  minified JSON for bounded payloads and NDJSON for streaming or unbounded
+  result sets (ADR-0011).
 - All commands must support agent-safety primitives:
   - `--idempotency-key`, auto-generating UUID v4 when absent and surfacing the
     key in the output envelope.
@@ -118,7 +119,8 @@ conflicts with the constitution, the constitution wins.
 6. Run `go test -race ./...` before handing work back. The race detector
    is REQUIRED, not optional — concurrent code is ubiquitous (OTel
    exporters, Loki push, ZeroLog hooks, idempotency).
-7. Run `go vet ./...` and `golangci-lint run`. Both must be clean.
+7. Run `go vet ./...`, `golangci-lint run`, and `make doc-coverage`
+   (ExampleXxx coverage on the primary API). All must be clean.
 8. Use `testing.B` with `-benchmem` for allocation or hot-path performance
    claims. Do not assert numeric performance targets without a benchmark.
 
@@ -148,10 +150,20 @@ Test forms and when to use each:
   than one input shape. Standard form: `[]struct{}` cases, a `for`
   loop, `t.Run(tc.name, ...)`. Skip table-driven only when a single
   happy path is genuinely all that exists.
-- **`ExampleXxx` functions** for every exported function, type, and
-  method an agent or human is likely to invoke. They compile, run, and
-  appear in godoc — the highest-leverage doc artifact Go offers, and
-  the primary way agents learn the API surface.
+- **`ExampleXxx` functions** are how agents learn the API — they
+  compile, run, and appear in godoc, the highest-leverage doc artifact
+  Go offers. Coverage is two-tier:
+  - *Required and gated:* a verified `ExampleXxx` on the **primary API
+    surface** (constructors, the core exported types, and top-level
+    entry points). `make doc-coverage` (`internal/cmd/doccover`)
+    enforces this in CI, ratcheted through `baseline.txt` so it can
+    never silently regress.
+  - *Encouraged, not gated:* examples for other exported symbols where
+    they add clarity. `WithX` functional options are demonstrated
+    **inside** a parent example, not gated individually.
+  Doc-comment *presence* is a separate, stricter rule and stays at
+  100%: every exported symbol MUST carry a doc comment, enforced by
+  `golangci-lint` (`godoclint`'s `require-doc`).
 - **Golden-file tests** for `__schema` output, the `ax.Error` envelope
   JSON shape, and any output that is stable-by-contract. Schema
   stability is part of the public API.
@@ -178,6 +190,29 @@ Test surfaces every change must exercise (where applicable):
   line when a span is active)
 - Output determinism (same input → byte-identical envelope modulo
   documented non-deterministic fields)
+
+## Documentation Discipline (Contracts, Not Narration)
+
+Coding agents read doc comments as much as humans do, and an agent
+working in the package learns the contract from them. Write doc comments
+as contracts, not narration.
+
+- **Document the contract, not the code.** State inputs, outputs, the
+  error a function returns and the **exit code** it maps to, invariants,
+  units, and fail-closed semantics. Mirror the stable `error_code` style
+  the specs use (e.g. FR-007 / SC-005 of the bounded-config feature).
+- **Never write "what" comments that restate the code.** A comment that
+  narrates the line above it (`// increment i`) is noise on a good day
+  and a lie after the next refactor. Comment the **why**: rationale,
+  constraints, the non-obvious.
+- **Prefer verified docs over prose; treat drift as a defect.** An
+  `ExampleXxx` compiles and (with `// Output:`) is executed by
+  `go test`, so it cannot silently drift; a golden file breaks on
+  change; a type pins a shape. When a fact can be pinned by an example,
+  a golden test, or a type, prefer that over a sentence.
+- **Presence is gated; quality is on you.** `godoclint`'s `require-doc`
+  gates that every exported symbol HAS a doc comment. It cannot tell a
+  contract from narration — that is the reviewer's job.
 
 ## Go Discipline
 

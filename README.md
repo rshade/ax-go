@@ -69,10 +69,22 @@ without guessing. The primary format is ax-native JSON, with
 
 - **Input:** accept [Hujson](https://github.com/tailscale/hujson) (comments and
   trailing commas) for human convenience. Config reads are capped at 1 MiB by
-  default; use `ax.WithMaxConfigBytes` when a CLI intentionally supports a
-  larger bounded config.
+  default at the read boundary; use `ax.WithMaxConfigBytes` when a CLI
+  intentionally supports a larger bounded config. The public helpers are
+  `ax.ParseConfig(ctx, reader, &cfg, ...)` and
+  `ax.ParseConfigFile(ctx, path, &cfg, ...)`, so slow cooperative sources can be
+  canceled through `context.Context`.
 - **Output:** emit strict, minified JSON for bounded payloads; emit NDJSON for
   streaming / unbounded result sets.
+
+Config read rejections are standard `ax.Error` envelopes. Oversized input uses
+the frozen `error_code` `config_too_large`; an out-of-range cap (negative or
+above `ax.MaxConfigBytesCeiling`, 1 GiB) uses `config_max_bytes_invalid`.
+Invalid Hujson or schema mismatches use `config_invalid`, and a nil
+`ParseConfigOption` uses `config_option_invalid`. All map to exit code `2` and
+are discoverable with `errors.As(err, &axErr)`. Reads accept Hujson extensions,
+but writes remain strict JSON; preserving comments when mutating existing Hujson
+is reserved for the future AST `Patch` write path.
 
 ### Agent-safety primitives
 
@@ -115,8 +127,10 @@ in [ADR-0002](docs/adr/0002-error-envelope-schema.md).
 
 ## Architecture Decisions (ADRs)
 
-ax-go is ADR-driven: each decision is documented and pressure-tested before code
-locks it in. These ADRs define the current public API direction.
+The ADRs are a frozen legacy decision log. New public API or runtime behavior
+changes go through the Spec Kit workflow and record decisions in the feature's
+`research.md`; retired ADR decisions are absorbed there before the ADR file is
+deleted.
 
 | ADR | Title | Status |
 | --- | --- | --- |
@@ -129,7 +143,6 @@ locks it in. These ADRs define the current public API direction.
 | [0007](docs/adr/0007-id-strategy.md) | ID Strategy | **Accepted (2026-05-28)** |
 | [0008](docs/adr/0008-cli-framework-cobra.md) | CLI Framework — Cobra | **Accepted (2026-05-28)** |
 | [0009](docs/adr/0009-logger-zerolog.md) | Structured Logger — ZeroLog | **Accepted (2026-05-28)** |
-| [0010](docs/adr/0010-input-config-hujson.md) | Input Config Format — Hujson | **Accepted (2026-05-28)** |
 | [0011](docs/adr/0011-output-payload-json.md) | Output Payload Format — Strict JSON / NDJSON | **Accepted (2026-05-28)** |
 | [0012](docs/adr/0012-directory-layout.md) | Directory Layout | **Accepted (2026-05-30)** |
 
@@ -180,12 +193,10 @@ Sequenced from the accepted ADRs and the current scaffold:
 
 ## Contributing
 
-Decisions are made the ADR way: a proposal is captured in `docs/adr/`,
-pressure-tested for trade-offs, and only then accepted to guide
-implementation.
-
-Before changing public behavior, read the relevant ADR and update or supersede
-it when the decision surface changes.
+Before changing public behavior, use the Spec Kit feature workflow. Read the
+constitution, absorb any governing frozen ADR decisions into the feature's
+`research.md`, and keep README plus `examples/integration/` current with the
+public contract. Do not create or edit ADRs for new work.
 
 ## License
 

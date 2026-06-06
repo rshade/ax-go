@@ -13,6 +13,8 @@ import (
 
 const version = "v0.1.0"
 const defaultStreamCount = 3
+const appName = "ax-integration"
+const failCommandName = "fail"
 
 type integrationConfig struct {
 	Name  string `json:"name"`
@@ -56,7 +58,7 @@ func newRootCommand(stdin io.Reader) *cobra.Command {
 	var configPath string
 
 	root := &cobra.Command{
-		Use:   "ax-integration",
+		Use:   appName,
 		Short: "Exercise ax-go primitives from a real Cobra command",
 		Example: `  ax-integration --format=json --name Ada
   ax-integration --config=config.hujson
@@ -68,7 +70,7 @@ func newRootCommand(stdin io.Reader) *cobra.Command {
 				cmd.Context(),
 				ax.WithLoggerWriter(cmd.ErrOrStderr()),
 				ax.WithLoggerLabels(ax.Labels{
-					Application: "ax-integration",
+					Application: appName,
 					Version:     version,
 				}),
 			)
@@ -148,7 +150,7 @@ func newStreamCommand() *cobra.Command {
 
 func newFailCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "fail",
+		Use:   failCommandName,
 		Short: "Return an intentional ax.Error envelope",
 		Example: `  ax-integration fail --format=json
   ax-integration fail --idempotency-key=demo-key`,
@@ -159,7 +161,7 @@ func newFailCommand() *cobra.Command {
 				"integration_failure",
 				"intentional integration failure",
 				ax.WithActionableFix("run a non-failing subcommand"),
-				ax.WithErrorContext(map[string]any{"example": "fail"}),
+				ax.WithErrorContext(map[string]any{"example": failCommandName}),
 				ax.WithErrorExitCode(ax.ExitValidation),
 			)
 		},
@@ -176,20 +178,14 @@ func readConfig(ctx context.Context, stdin io.Reader, path string) (integrationC
 
 	var cfg integrationConfig
 	if path == "-" {
-		if err := ax.ParseConfig(stdin, &cfg); err != nil {
+		if err := ax.ParseConfig(ctx, stdin, &cfg); err != nil {
 			return integrationConfig{}, false, fmt.Errorf("parse stdin config: %w", err)
 		}
 		return cfg, true, nil
 	}
 
-	file, err := os.Open(path)
-	if err != nil {
-		return integrationConfig{}, false, fmt.Errorf("open config: %w", err)
-	}
-	defer file.Close()
-
-	if parseErr := ax.ParseConfig(file, &cfg); parseErr != nil {
-		return integrationConfig{}, false, fmt.Errorf("parse config: %w", parseErr)
+	if err := ax.ParseConfigFile(ctx, path, &cfg); err != nil {
+		return integrationConfig{}, false, fmt.Errorf("parse config: %w", err)
 	}
 	return cfg, true, nil
 }

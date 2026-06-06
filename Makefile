@@ -1,5 +1,5 @@
 GOLANGCI_LINT?=$(HOME)/go/bin/golangci-lint
-GOLANGCI_LINT_VERSION?=2.11.4
+GOLANGCI_LINT_VERSION?=2.12.2
 MARKDOWNLINT?=markdownlint
 MARKDOWNLINT_FILES?=AGENTS.md README.md docs/**/*.md
 ACTIONLINT?=$(HOME)/go/bin/actionlint
@@ -27,6 +27,11 @@ test-cover:
 bench:
 	@echo "Running benchmarks..."
 	go test -run='^$$' -bench=. -benchmem ./...
+
+.PHONY: doc-coverage
+doc-coverage:
+	@echo "Checking ExampleXxx coverage on the primary API..."
+	go run ./internal/cmd/doccover
 
 .PHONY: lint
 lint:
@@ -106,6 +111,7 @@ help:
 	@echo "  test          - Run tests with the race detector"
 	@echo "  test-cover    - Run tests with coverage profile"
 	@echo "  bench         - Run benchmarks with -benchmem"
+	@echo "  doc-coverage  - Check ExampleXxx coverage on the primary API"
 	@echo "  lint          - Run golangci-lint, markdownlint, and actionlint"
 	@echo "  lint-actions  - Run actionlint on GitHub workflows"
 	@echo "  validate      - Check gofmt, go mod tidy, and go vet"

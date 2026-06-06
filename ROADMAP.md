@@ -47,7 +47,12 @@ Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
   files and diff tests so schema drift is caught.
 - [ ] #4 Fuzz tests for every parser surface (AGENTS mandate) [M] — Hujson
   config input, idempotency-key validation, error-envelope round-trip, and
-  `TRACEPARENT` extraction each need a `FuzzXxx`.
+  `TRACEPARENT` extraction each need a `FuzzXxx`. This is the canonical tracker
+  for the parser-fuzz deferral recorded in
+  [`specs/001-bound-config-reads/plan.md`](specs/001-bound-config-reads/plan.md)
+  and
+  [`specs/001-bound-config-reads/research.md`](specs/001-bound-config-reads/research.md);
+  do not open a parallel tracker for the bounded-config feature.
 - [ ] #5 Output-determinism harness [M] — assert byte-identical `stdout` across
   two runs of the same input, modulo documented non-deterministic fields.
 - [ ] #6 Build-time version injection [S] — wire `-ldflags "-X ..."` in the
@@ -65,9 +70,10 @@ Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
 - [ ] #8 Logger cardinality-discipline enforcement [M] — enforce the
   label/payload split (ADR-0006) at the API level so high-cardinality fields
   can't be promoted to Loki labels.
-- [ ] #9 Hujson AST `Patch` write path (ADR-0010) [L] — mutate an existing
-  Hujson file while preserving user formatting/comments, since strict-JSON
-  writes can't.
+- [ ] #9 Hujson AST `Patch` write path [L] — mutate an existing Hujson file
+  while preserving user formatting/comments, since strict-JSON writes can't.
+  The retired Hujson input decision's read/write consequences are absorbed in
+  [`specs/001-bound-config-reads/research.md`](specs/001-bound-config-reads/research.md).
 - [ ] #10 `ax-go mcp-server` runnable wrapper (ADR-0003) [L] — wrap an ax-go CLI
   as a live MCP server with no per-tool work, building on the existing
   `__schema --as=mcp` adapter.
@@ -145,7 +151,8 @@ gaps that deepen the machine-contract half of AX.*
   injection, mode/idempotency/dry-run context, error normalization.
 - [x] ID generation — UUID v4/v7 (ADR-0007) [S].
 - [x] JSON + NDJSON envelope writers (ADR-0011) [S].
-- [x] Hujson read parsing (ADR-0010 read path) [S].
+- [x] Hujson read parsing and bounded read cap
+  ([specs/001-bound-config-reads](specs/001-bound-config-reads)) [S].
 - [x] zerolog logger + trace-correlation hook (ADR-0009) [M].
 - [x] Telemetry W3C extraction + no-op scaffold (ADR-0005, partial) [M] —
   `TRACEPARENT`/`TRACESTATE` extraction and provider lifecycle; real export

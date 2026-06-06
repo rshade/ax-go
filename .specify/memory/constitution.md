@@ -1,6 +1,19 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Amendment 2026-06-01 — Version change: 1.0.0 → 1.1.0 (MINOR)
+Bump rationale: Materially expanded Principle VII (Test-First Discipline) to make
+documentation part of the verified contract: doc-comment PRESENCE gated at 100%
+(golangci-lint godoclint require-doc); a two-tier ExampleXxx model (gated primary
+API via `make doc-coverage` / internal/cmd/doccover with a ratchet baseline,
+encouraged elsewhere); and a docs-as-contract, drift-is-a-defect rule. Mirrors the
+new AGENTS.md "Documentation Discipline" section. No other principles changed.
+Modified principles: VII. Test-First Discipline (expanded body + rationale; title
+unchanged).
+Templates: plan/spec/tasks templates reviewed — no changes required (none implied
+blanket example coverage). Derived docs: AGENTS.md reconciled in the same change.
+
+--- Original ratification report (template → 1.0.0) below ---
 Version change: template (unversioned placeholders) → 1.0.0
 Bump rationale: First formal ratification. The file previously held only raw
 [BRACKET] template tokens; filling it with concrete principles and governance
@@ -143,15 +156,31 @@ library becomes an unmaintainable application.
 - Tests land before implementation: every new behavior or exported function starts
   with a failing test asserting the contract; every bug fix starts with a failing
   regression test.
-- Use table-driven tests by default; an `ExampleXxx` for every exported symbol
-  agents or humans invoke; golden files for stable-by-contract output; fuzz tests
-  for every parser surface; and `testing.B` with `-benchmem` for any
-  allocation/performance claim.
-- `go test -race ./...` is REQUIRED, not optional. `go vet ./...` and
-  `golangci-lint run` MUST be clean.
+- Test forms: table-driven tests by default; golden files for stable-by-contract
+  output; fuzz tests for every parser surface; and `testing.B` with `-benchmem`
+  for any allocation/performance claim.
+- Documentation is verified contract, not afterthought:
+  - Doc-comment PRESENCE is 100% — every exported symbol MUST carry a doc
+    comment, gated by `golangci-lint` (`godoclint`'s `require-doc`).
+  - `ExampleXxx` coverage is two-tier: a verified `ExampleXxx` is REQUIRED and
+    gated on the primary API surface (constructors, core exported types,
+    top-level entry points), enforced in CI by `make doc-coverage`
+    (`internal/cmd/doccover`) and ratcheted through a baseline so it cannot
+    silently regress; examples for other exported symbols are ENCOURAGED but not
+    gated, and `WithX` functional options are demonstrated inside a parent
+    example rather than gated individually.
+  - Doc comments are contracts, not narration: state inputs, outputs, the error
+    returned and the exit code it maps to, invariants, units, and fail-closed
+    semantics; never write "what" comments that restate the code; comment the
+    "why".
+- `go test -race ./...` is REQUIRED, not optional. `go vet ./...`,
+  `golangci-lint run`, and `make doc-coverage` MUST be clean.
 
-**Rationale**: The contract is verified, not asserted; `ExampleXxx` functions are
-also how agents learn the API surface.
+**Rationale**: The contract is verified, not asserted. Coding agents learn the API
+from doc comments and `ExampleXxx` functions, so documentation is contract surface:
+presence is gated everywhere, the primary API is demonstrated by examples that
+compile and run, and verified artifacts (examples, golden files, types) beat prose
+because prose drifts silently while examples and golden files break loudly.
 
 ### VIII. Observability & ID Discipline
 
@@ -268,4 +297,4 @@ These are decisions, not oversights:
   principles and the ADR-absorption rule; every PR review verifies compliance; any
   violation MUST be justified in the plan's Complexity Tracking table.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-01 | **Last Amended**: 2026-06-01
+**Version**: 1.1.0 | **Ratified**: 2026-06-01 | **Last Amended**: 2026-06-01

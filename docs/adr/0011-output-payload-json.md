@@ -8,9 +8,9 @@ ACCEPTED — 2026-05-28.
 
 Per the Golden Rule (GEMINI.md, ADR-0002), `stdout` carries data
 payloads. Agents and pipeline tools (jq, fx, gron) need a
-deterministic, parseable format. Mixing the Hujson input format
-(ADR-0010) into output would force every downstream parser to handle
-a non-standard format.
+deterministic, parseable format. Mixing the Hujson input format into
+output would force every downstream parser to handle a non-standard
+format.
 
 A second wrinkle: for `list`-style commands with unbounded result
 sets, emitting a single monolithic JSON array forces the agent to

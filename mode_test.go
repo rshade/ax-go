@@ -20,7 +20,7 @@ func TestResolveModePrecedence(t *testing.T) {
 		},
 		{
 			name:        "agent mode wins over tty",
-			agentMode:   "true",
+			agentMode:   "TRUE",
 			stdoutIsTTY: true,
 			want:        ModeJSON,
 		},

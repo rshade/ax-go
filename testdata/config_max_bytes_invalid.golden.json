@@ -1,0 +1,1 @@
+{"error_code":"config_max_bytes_invalid","message":"config max bytes must be between 0 and 1073741824","trace_id":"00000000000000000000000000000000","tool":"","version":"","schema_version":"1.0.0","actionable_fix":"set a config byte limit between 0 and MaxConfigBytesCeiling","context":{"max_bytes":-1}}

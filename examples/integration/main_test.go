@@ -48,8 +48,8 @@ func TestRunDefaultCommand(t *testing.T) {
 	if err := json.Unmarshal(stderr.Bytes(), &logLine); err != nil {
 		t.Fatalf("stderr log line was not JSON: %v", err)
 	}
-	if logLine["application"] != "ax-integration" {
-		t.Fatalf("application label = %v, want ax-integration", logLine["application"])
+	if logLine["application"] != appName {
+		t.Fatalf("application label = %v, want %s", logLine["application"], appName)
 	}
 }
 
@@ -165,7 +165,7 @@ func TestRunFailCommandWritesErrorEnvelopeToStderr(t *testing.T) {
 
 	code := run(
 		context.Background(),
-		[]string{"fail", "--format=json"},
+		[]string{failCommandName, "--format=json"},
 		strings.NewReader(""),
 		&stdout,
 		&stderr,
@@ -186,8 +186,8 @@ func TestRunFailCommandWritesErrorEnvelopeToStderr(t *testing.T) {
 	if got.ErrorCode != "integration_failure" {
 		t.Fatalf("error code = %q, want integration_failure", got.ErrorCode)
 	}
-	if got.Tool != "ax-integration" {
-		t.Fatalf("tool = %q, want ax-integration", got.Tool)
+	if got.Tool != appName {
+		t.Fatalf("tool = %q, want %s", got.Tool, appName)
 	}
 	if got.Version != version {
 		t.Fatalf("version = %q, want %q", got.Version, version)
@@ -215,8 +215,8 @@ func TestRunSchemaCommand(t *testing.T) {
 	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
 		t.Fatalf("stdout was not schema JSON: %v", err)
 	}
-	if got.Tool != "ax-integration" {
-		t.Fatalf("tool = %q, want ax-integration", got.Tool)
+	if got.Tool != appName {
+		t.Fatalf("tool = %q, want %s", got.Tool, appName)
 	}
 	if len(got.Command.Commands) == 0 {
 		t.Fatal("schema did not include subcommands")

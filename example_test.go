@@ -1,0 +1,164 @@
+package ax_test
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	ax "github.com/rshade/ax-go"
+)
+
+// ExampleParseConfig shows the read-side Hujson asymmetry: comments and trailing
+// commas are accepted on input, and the result decodes into a normal struct.
+func ExampleParseConfig() {
+	const hujson = `{
+		// comments and trailing commas are allowed on reads
+		"name": "ax",
+		"replicas": 3,
+	}`
+
+	var cfg struct {
+		Name     string `json:"name"`
+		Replicas int    `json:"replicas"`
+	}
+	if err := ax.ParseConfig(
+		context.Background(),
+		strings.NewReader(hujson),
+		&cfg,
+		ax.WithMaxConfigBytes(1<<10),
+	); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Printf("%s x%d\n", cfg.Name, cfg.Replicas)
+	// Output: ax x3
+}
+
+// ExampleParseConfigFile reads and decodes a Hujson configuration file from
+// disk, applying the same 1 MiB read cap as ParseConfig.
+func ExampleParseConfigFile() {
+	dir, err := os.MkdirTemp("", "ax-config")
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	defer os.RemoveAll(dir)
+
+	path := filepath.Join(dir, "config.hujson")
+	if err := os.WriteFile(path, []byte(`{"name": "ax"}`), 0o600); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	var cfg struct {
+		Name string `json:"name"`
+	}
+	if err := ax.ParseConfigFile(context.Background(), path, &cfg); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println(cfg.Name)
+	// Output: ax
+}
+
+// ExampleNewError builds a structured error envelope with an actionable fix and
+// a deterministic exit code, then reads the exit code back out.
+func ExampleNewError() {
+	err := ax.NewError(
+		context.Background(),
+		"config_too_large",
+		"config exceeds maximum size of 1048576 bytes",
+		ax.WithActionableFix("reduce the config or raise the limit with WithMaxConfigBytes"),
+		ax.WithErrorExitCode(ax.ExitValidation),
+	)
+
+	fmt.Println(err)
+	fmt.Println(ax.ErrorExitCode(err))
+	// Output:
+	// config exceeds maximum size of 1048576 bytes
+	// 2
+}
+
+// ExampleError shows how a consumer classifies a failure: recover the *ax.Error
+// envelope with errors.As, then branch on the stable error_code and exit code
+// without parsing human-facing text.
+func ExampleError() {
+	err := ax.NewError(
+		context.Background(),
+		"config_max_bytes_invalid",
+		"config max bytes must be between 0 and 1073741824",
+		ax.WithErrorExitCode(ax.ExitValidation),
+	)
+
+	var axErr *ax.Error
+	if errors.As(err, &axErr) {
+		fmt.Println(axErr.ErrorCode)
+		fmt.Println(axErr.ExitCode())
+	}
+	// Output:
+	// config_max_bytes_invalid
+	// 2
+}
+
+// ExampleNewEnvelope wraps a payload in the standard success envelope, carrying
+// trace metadata from the context. With no active span the IDs are the zero
+// W3C values, so the output is deterministic.
+func ExampleNewEnvelope() {
+	type result struct {
+		ID string `json:"id"`
+	}
+
+	env := ax.NewEnvelope(context.Background(), result{ID: "abc"})
+	if err := ax.WriteJSON(os.Stdout, env); err != nil {
+		fmt.Println("error:", err)
+	}
+	// Output: {"data":{"id":"abc"},"meta":{"trace_id":"00000000000000000000000000000000","span_id":"0000000000000000"}}
+}
+
+// ExampleEnvelope shows the envelope shape directly: a typed Data field and a
+// Metadata block. span_id is omitted when empty.
+func ExampleEnvelope() {
+	env := ax.Envelope[string]{
+		Data: "hello",
+		Meta: ax.Metadata{TraceID: ax.ZeroTraceID},
+	}
+	if err := ax.WriteJSON(os.Stdout, env); err != nil {
+		fmt.Println("error:", err)
+	}
+	// Output: {"data":"hello","meta":{"trace_id":"00000000000000000000000000000000"}}
+}
+
+// ExampleMode shows agent-mode resolution: with no --format flag, no AGENT_MODE,
+// and a non-TTY stdout, ax resolves to machine-readable JSON.
+func ExampleMode() {
+	mode, err := ax.ResolveMode("", "", false)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println(mode)
+	// Output: json
+}
+
+// ExampleNewIdempotencyKey returns a UUID v4 string in canonical 36-character
+// form, surfaced in the output envelope so retries are safe.
+func ExampleNewIdempotencyKey() {
+	key := ax.NewIdempotencyKey()
+	fmt.Println(len(key))
+	// Output: 36
+}
+
+// ExampleNewEntityID returns a UUID v7 resource identifier in canonical
+// 36-character form.
+func ExampleNewEntityID() {
+	id, err := ax.NewEntityID()
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println(len(id))
+	// Output: 36
+}

@@ -30,7 +30,7 @@ func ParseMode(value string) (Mode, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "json", "agent", "machine":
 		return ModeJSON, nil
-	case "human", "text":
+	case string(ModeHuman), "text":
 		return ModeHuman, nil
 	default:
 		return "", fmt.Errorf("unknown output mode %q", value)
@@ -58,7 +58,7 @@ func parseAgentMode(value string) (Mode, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "1", "true", "yes", "on", "json", "agent", "machine":
 		return ModeJSON, nil
-	case "0", "false", "no", "off", "human", "text":
+	case "0", "false", "no", "off", string(ModeHuman), "text":
 		return ModeHuman, nil
 	default:
 		return "", fmt.Errorf("unknown AGENT_MODE value %q", value)
