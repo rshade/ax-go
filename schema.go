@@ -12,6 +12,10 @@ import (
 // SchemaVersion is the current SemVer version for ax-native schemas.
 const SchemaVersion = ErrorSchemaVersion
 
+// schemaCommandName is the reserved machine-discoverability command name every
+// ax-go CLI exposes (Principle III).
+const schemaCommandName = "__schema"
+
 // Schema is the ax-native reflective JSON tree emitted by __schema.
 type Schema struct {
 	SchemaVersion string          `json:"schema_version"`
@@ -99,7 +103,7 @@ func BuildSchema(root *cobra.Command, opts ...SchemaOption) Schema {
 func NewSchemaCommand(root *cobra.Command, opts ...SchemaOption) *cobra.Command {
 	var as string
 	cmd := &cobra.Command{
-		Use:   "__schema",
+		Use:   schemaCommandName,
 		Short: "Emit the AX machine-discoverability schema",
 		Example: `  app __schema
   app __schema --as=mcp`,

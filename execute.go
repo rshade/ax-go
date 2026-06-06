@@ -146,7 +146,7 @@ func prepareCommand(root *cobra.Command, cfg executeConfig) {
 
 func ensureSchemaCommand(root *cobra.Command, version string) {
 	for _, command := range root.Commands() {
-		if command.Name() == "__schema" {
+		if command.Name() == schemaCommandName {
 			return
 		}
 	}

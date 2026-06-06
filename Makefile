@@ -1,5 +1,5 @@
 GOLANGCI_LINT?=$(HOME)/go/bin/golangci-lint
-GOLANGCI_LINT_VERSION?=2.11.4
+GOLANGCI_LINT_VERSION?=2.12.2
 MARKDOWNLINT?=markdownlint
 MARKDOWNLINT_FILES?=AGENTS.md README.md docs/**/*.md
 ACTIONLINT?=$(HOME)/go/bin/actionlint

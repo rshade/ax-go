@@ -7,7 +7,7 @@
 and still ergonomic for human engineers.
 
 The module is `github.com/rshade/ax-go`, the package name should be `ax`, and
-the project currently targets Go `1.25.8`. The canonical source of truth for
+the project currently targets Go `1.26.4`. The canonical source of truth for
 behavior and public API decisions is the constitution at
 `.specify/memory/constitution.md`. The ADRs in `docs/adr/` are a FROZEN legacy
 decision log being retired through the Spec Kit feature workflow; where an ADR
@@ -58,8 +58,9 @@ conflicts with the constitution, the constitution wins.
 - Input accepts Hujson for human convenience on **reads only** — writes emit
   strict JSON (Hujson cannot Marshal comments). To mutate an existing Hujson
   file while preserving user formatting, use the AST `Patch` path
-  (ADR-0010). Output emits strict, minified JSON for bounded payloads and
-  NDJSON for streaming or unbounded result sets (ADR-0011).
+  preserved in `specs/001-bound-config-reads/research.md`. Output emits strict,
+  minified JSON for bounded payloads and NDJSON for streaming or unbounded
+  result sets (ADR-0011).
 - All commands must support agent-safety primitives:
   - `--idempotency-key`, auto-generating UUID v4 when absent and surfacing the
     key in the output envelope.

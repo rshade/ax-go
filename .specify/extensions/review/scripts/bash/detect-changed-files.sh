@@ -160,9 +160,15 @@ if [[ -n "$CURRENT_BRANCH" && -n "$DEFAULT_BRANCH" && "$CURRENT_BRANCH" != "$DEF
             [[ -n "$line" ]] && UNSTAGED+=("$line")
         done < <(git diff --name-only -z --diff-filter=ACMR 2>/dev/null)
 
+        # Untracked (new, not yet staged) files — gitignored files excluded
+        UNTRACKED=()
+        while IFS= read -r -d '' line; do
+            [[ -n "$line" ]] && UNTRACKED+=("$line")
+        done < <(git ls-files --others --exclude-standard -z 2>/dev/null)
+
         # Combine and deduplicate (bash 3 compatible — no associative arrays)
         CHANGED_FILES=()
-        for f in "${COMMITTED[@]}" "${STAGED[@]}" "${UNSTAGED[@]}"; do
+        for f in "${COMMITTED[@]}" "${STAGED[@]}" "${UNSTAGED[@]}" "${UNTRACKED[@]}"; do
             [[ -z "$f" ]] && continue
             _dup=false
             for existing in "${CHANGED_FILES[@]}"; do
@@ -176,7 +182,7 @@ if [[ -n "$CURRENT_BRANCH" && -n "$DEFAULT_BRANCH" && "$CURRENT_BRANCH" != "$DEF
             fi
         done
 
-        MODE="Feature branch diff (${DEFAULT_BRANCH}...HEAD) + uncommitted changes"
+        MODE="Feature branch diff (${DEFAULT_BRANCH}...HEAD) + uncommitted + untracked changes"
     else
         # merge-base failed — fall through to Mode B
         DEFAULT_BRANCH=""
@@ -195,9 +201,15 @@ if [[ -z "$MODE" ]]; then
         [[ -n "$line" ]] && UNSTAGED+=("$line")
     done < <(git diff --name-only -z --diff-filter=ACMR 2>/dev/null)
 
+    # Untracked (new, not yet staged) files — gitignored files excluded
+    UNTRACKED=()
+    while IFS= read -r -d '' line; do
+        [[ -n "$line" ]] && UNTRACKED+=("$line")
+    done < <(git ls-files --others --exclude-standard -z 2>/dev/null)
+
     # Combine and deduplicate (bash 3 compatible — no associative arrays)
     CHANGED_FILES=()
-    for f in "${STAGED[@]}" "${UNSTAGED[@]}"; do
+    for f in "${STAGED[@]}" "${UNSTAGED[@]}" "${UNTRACKED[@]}"; do
         [[ -z "$f" ]] && continue
         _dup=false
         for existing in "${CHANGED_FILES[@]}"; do
@@ -211,7 +223,7 @@ if [[ -z "$MODE" ]]; then
         fi
     done
 
-    MODE="Working directory changes (staged + unstaged)"
+    MODE="Working directory changes (staged + unstaged + untracked)"
     [[ -z "$DEFAULT_BRANCH" ]] && DEFAULT_BRANCH="(unknown)"
 fi
 

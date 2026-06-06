@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"testing"
 )
 
@@ -48,5 +50,67 @@ func TestWriteErrorEnvelope(t *testing.T) {
 
 	if ErrorExitCode(err) != ExitValidation {
 		t.Fatalf("ErrorExitCode = %d, want %d", ErrorExitCode(err), ExitValidation)
+	}
+}
+
+func TestErrorExitCodeContextErrors(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		want int
+	}{
+		{
+			name: "wrapped deadline exceeded",
+			err:  fmt.Errorf("read config: %w", context.DeadlineExceeded),
+			want: ExitNetwork,
+		},
+		{
+			name: "wrapped canceled",
+			err:  fmt.Errorf("read config: %w", context.Canceled),
+			want: ExitInternal,
+		},
+		{
+			name: "plain non context error",
+			err:  errors.New("plain failure"),
+			want: ExitInternal,
+		},
+		{
+			name: "envelope exit code wins over ctx sentinel in cause chain",
+			err: NewError(
+				context.Background(),
+				"config_invalid",
+				"decode failed",
+				WithErrorExitCode(ExitValidation),
+				WithErrorCause(fmt.Errorf("read config: %w", context.DeadlineExceeded)),
+			),
+			want: ExitValidation,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := ErrorExitCode(tc.err); got != tc.want {
+				t.Fatalf("ErrorExitCode = %d, want %d", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestErrorCauseChain(t *testing.T) {
+	sentinel := errors.New("underlying decode failure")
+
+	withCause := NewError(
+		context.Background(),
+		"config_invalid",
+		"decode failed",
+		WithErrorCause(sentinel),
+	)
+	if !errors.Is(withCause, sentinel) {
+		t.Fatal("errors.Is(withCause, sentinel) = false, want the cause reachable through Unwrap")
+	}
+
+	plain := NewError(context.Background(), "validation_error", "bad input")
+	if got := errors.Unwrap(plain); got != nil {
+		t.Fatalf("errors.Unwrap(plain) = %v, want nil", got)
 	}
 }
