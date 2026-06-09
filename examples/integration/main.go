@@ -11,7 +11,8 @@ import (
 	"github.com/rshade/ax-go"
 )
 
-const version = "v0.1.0"
+var version string
+
 const defaultStreamCount = 3
 const appName = "ax-integration"
 const failCommandName = "fail"
@@ -39,7 +40,8 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, env func(string) string) int {
-	root := newRootCommand(stdin)
+	resolved := ax.ResolveVersion(version)
+	root := newRootCommand(stdin, resolved)
 	root.SetArgs(args)
 
 	return ax.Execute(
@@ -49,11 +51,11 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 		ax.WithStdout(stdout),
 		ax.WithStderr(stderr),
 		ax.WithEnv(env),
-		ax.WithVersion(version),
+		ax.WithVersion(resolved),
 	)
 }
 
-func newRootCommand(stdin io.Reader) *cobra.Command {
+func newRootCommand(stdin io.Reader, resolved string) *cobra.Command {
 	var name string
 	var configPath string
 
@@ -71,7 +73,7 @@ func newRootCommand(stdin io.Reader) *cobra.Command {
 				ax.WithLoggerWriter(cmd.ErrOrStderr()),
 				ax.WithLoggerLabels(ax.Labels{
 					Application: appName,
-					Version:     version,
+					Version:     resolved,
 				}),
 			)
 

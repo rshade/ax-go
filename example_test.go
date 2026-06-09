@@ -162,3 +162,11 @@ func ExampleNewEntityID() {
 	fmt.Println(len(id))
 	// Output: 36
 }
+
+// ExampleResolveVersion shows the deterministic injected-version path used by
+// release builds. When the injected value is empty, ResolveVersion falls back to
+// the running binary's build metadata and finally to "0.0.0-unknown".
+func ExampleResolveVersion() {
+	fmt.Println(ax.ResolveVersion("v1.2.3"))
+	// Output: v1.2.3
+}

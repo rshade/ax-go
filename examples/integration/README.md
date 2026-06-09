@@ -28,9 +28,31 @@ go run ./examples/integration __schema
 go run ./examples/integration __schema --as=mcp
 ```
 
+Build the example with version injection and inspect the same schema field:
+
+```sh
+make build-example
+./bin/ax-integration __schema
+```
+
+`make build-example` derives `VERSION` from
+`git describe --tags --always --dirty` and injects it with:
+
+```sh
+go build -ldflags "-X main.version=$(git describe --tags --always --dirty)" \
+  -o bin/ax-integration ./examples/integration
+```
+
+The resulting `__schema.version` is non-empty and VCS-derived, such as a tag
+or commit identifier with a dirty marker. Override `VERSION` for release or
+reproducible builds:
+
+```sh
+make build-example VERSION=v1.2.3
+```
+
 Return a structured error envelope on `stderr`:
 
 ```sh
 go run ./examples/integration fail --format=json
 ```
-

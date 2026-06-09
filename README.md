@@ -173,6 +173,58 @@ go run ./examples/integration __schema
 go run ./examples/integration fail --format=json
 ```
 
+## Build-time version injection
+
+Production CLIs built on ax-go should resolve their version once at process
+startup and pass the same value to every version surface. Keep the linker target
+as a writable `var`, then use `ax.ResolveVersion`:
+
+```go
+var version string // set by -ldflags "-X main.version=..."
+
+func run(ctx context.Context, root *cobra.Command) int {
+    resolved := ax.ResolveVersion(version)
+
+    logger := ax.NewLogger(ctx, ax.WithLoggerLabels(ax.Labels{
+        Application: "mytool",
+        Version:     resolved,
+    }))
+    _ = logger
+
+    return ax.Execute(ctx, root, ax.WithVersion(resolved))
+}
+```
+
+`ResolveVersion` returns a non-placeholder injected value when present,
+otherwise it falls back to the running binary's Go build metadata
+(`Main.Version`, then `vcs.revision` with a dirty marker) and finally to
+`0.0.0-unknown`. It never returns an empty string or the bare placeholders
+`dev` or `unknown`.
+
+Build the integration example with the documented injection target:
+
+```sh
+make build-example
+./bin/ax-integration __schema
+```
+
+The target injects `git describe --tags --always --dirty` into
+`main.version`:
+
+```sh
+go build -ldflags "-X main.version=$(git describe --tags --always --dirty)" \
+  -o bin/ax-integration ./examples/integration
+```
+
+Override `VERSION` for release and reproducible builds:
+
+```sh
+make build-example VERSION=v1.2.3
+```
+
+The same resolved value feeds `__schema.version`, the `ax.Error` envelope
+`version`, and the logger `version` label.
+
 ## Roadmap
 
 Sequenced from the accepted ADRs and the current scaffold:

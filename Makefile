@@ -3,6 +3,7 @@ GOLANGCI_LINT_VERSION?=2.12.2
 MARKDOWNLINT?=markdownlint
 MARKDOWNLINT_FILES?=AGENTS.md README.md docs/**/*.md
 ACTIONLINT?=$(HOME)/go/bin/actionlint
+VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.0-unknown)
 
 .PHONY: all
 all: build
@@ -11,6 +12,11 @@ all: build
 build:
 	@echo "Building ax library..."
 	go build ./...
+
+.PHONY: build-example
+build-example:
+	@echo "Building integration example with version $(VERSION)..."
+	go build -ldflags "-X main.version=$(VERSION)" -o bin/ax-integration ./examples/integration
 
 .PHONY: test
 test:
@@ -108,6 +114,7 @@ clean:
 help:
 	@echo "Available targets:"
 	@echo "  build         - Compile the library (go build ./...)"
+	@echo "  build-example - Compile the integration example with version injection"
 	@echo "  test          - Run tests with the race detector"
 	@echo "  test-cover    - Run tests with coverage profile"
 	@echo "  bench         - Run benchmarks with -benchmem"

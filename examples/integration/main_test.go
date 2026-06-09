@@ -189,8 +189,72 @@ func TestRunFailCommandWritesErrorEnvelopeToStderr(t *testing.T) {
 	if got.Tool != appName {
 		t.Fatalf("tool = %q, want %s", got.Tool, appName)
 	}
-	if got.Version != version {
-		t.Fatalf("version = %q, want %q", got.Version, version)
+	want := ax.ResolveVersion(version)
+	if got.Version != want {
+		t.Fatalf("version = %q, want %q", got.Version, want)
+	}
+}
+
+func TestRunUsesResolvedVersionAcrossSchemaAndLogger(t *testing.T) {
+	want := ax.ResolveVersion(version)
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	code := run(
+		context.Background(),
+		[]string{"--name", "Ada"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		func(string) string { return "" },
+	)
+
+	if code != ax.ExitSuccess {
+		t.Fatalf("exit code = %d, want %d; stderr=%s", code, ax.ExitSuccess, stderr.String())
+	}
+
+	gotLogVersion := ""
+	for _, line := range strings.Split(strings.TrimSpace(stderr.String()), "\n") {
+		if line == "" {
+			continue
+		}
+		var logLine map[string]any
+		if err := json.Unmarshal([]byte(line), &logLine); err != nil {
+			t.Fatalf("stderr log line was not JSON: %v", err)
+		}
+		if versionValue, ok := logLine["version"].(string); ok && versionValue != "" {
+			gotLogVersion = versionValue
+			break
+		}
+	}
+	if gotLogVersion == "" {
+		t.Fatalf("stderr log version missing; stderr=%s", stderr.String())
+	}
+	if gotLogVersion != want {
+		t.Fatalf("logger version = %q, want %q", gotLogVersion, want)
+	}
+
+	stdout.Reset()
+	stderr.Reset()
+	code = run(
+		context.Background(),
+		[]string{"__schema"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		func(string) string { return "" },
+	)
+
+	if code != ax.ExitSuccess {
+		t.Fatalf("schema exit code = %d, want %d; stderr=%s", code, ax.ExitSuccess, stderr.String())
+	}
+
+	var gotSchema ax.Schema
+	if err := json.Unmarshal(stdout.Bytes(), &gotSchema); err != nil {
+		t.Fatalf("stdout was not schema JSON: %v", err)
+	}
+	if gotSchema.Version != want {
+		t.Fatalf("schema version = %q, want %q", gotSchema.Version, want)
 	}
 }
 
@@ -217,6 +281,12 @@ func TestRunSchemaCommand(t *testing.T) {
 	}
 	if got.Tool != appName {
 		t.Fatalf("tool = %q, want %s", got.Tool, appName)
+	}
+	if got.Version == "" {
+		t.Fatal("schema version is empty")
+	}
+	if got.Version == "v0.1.0" {
+		t.Fatal("schema version still uses the old hardcoded v0.1.0 placeholder")
 	}
 	if len(got.Command.Commands) == 0 {
 		t.Fatal("schema did not include subcommands")
