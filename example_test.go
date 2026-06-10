@@ -170,3 +170,68 @@ func ExampleResolveVersion() {
 	fmt.Println(ax.ResolveVersion("v1.2.3"))
 	// Output: v1.2.3
 }
+
+// ExamplePatchConfig shows the comment-preserving write path: RFC 6902
+// patch operations mutate the Hujson AST in place so user comments survive.
+func ExamplePatchConfig() {
+	const existing = `{
+	// service endpoint
+	"host": "localhost",
+	"port": 8080,
+}`
+	patch := []byte(`[{"op":"replace","path":"/port","value":9090}]`)
+
+	patched, err := ax.PatchConfig(
+		context.Background(),
+		strings.NewReader(existing),
+		patch,
+	)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println(strings.Contains(string(patched), "// service endpoint"))
+	fmt.Println(strings.Contains(string(patched), "9090"))
+	// Output:
+	// true
+	// true
+}
+
+// ExamplePatchConfigFile reads a Hujson config file, applies RFC 6902 patch
+// operations, and writes the result back atomically, preserving user comments.
+func ExamplePatchConfigFile() {
+	dir, err := os.MkdirTemp("", "ax-patch")
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	defer os.RemoveAll(dir)
+
+	path := filepath.Join(dir, "config.hujson")
+	initial := []byte(`{
+	// production endpoint
+	"host": "prod.example.com",
+	"port": 443,
+}`)
+	if err := os.WriteFile(path, initial, 0o600); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	patch := []byte(`[{"op":"replace","path":"/port","value":8443}]`)
+	if err := ax.PatchConfigFile(context.Background(), path, patch); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	result, err := os.ReadFile(path)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println(strings.Contains(string(result), "// production endpoint"))
+	fmt.Println(strings.Contains(string(result), "8443"))
+	// Output:
+	// true
+	// true
+}

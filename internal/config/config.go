@@ -117,3 +117,50 @@ func Unmarshal(data []byte, dst any) error {
 	}
 	return nil
 }
+
+// HujsonParseError wraps a Hujson parse failure so the caller can distinguish
+// a bad-input error from a patch-application error.
+type HujsonParseError struct {
+	Err error
+}
+
+// Error returns the Hujson parse failure message.
+func (e *HujsonParseError) Error() string { return "parse hujson: " + e.Err.Error() }
+
+// Unwrap preserves the error chain so errors.Is and errors.As reach the root cause.
+func (e *HujsonParseError) Unwrap() error { return e.Err }
+
+// PatchApplyError wraps an RFC 6902 patch failure so the caller can distinguish
+// it from a bad-input (parse) error.
+type PatchApplyError struct {
+	Err error
+}
+
+// Error returns the patch application failure message.
+func (e *PatchApplyError) Error() string { return "apply patch: " + e.Err.Error() }
+
+// Unwrap preserves the error chain so errors.Is and errors.As reach the root cause.
+func (e *PatchApplyError) Unwrap() error { return e.Err }
+
+// Patch parses data as Hujson, applies RFC 6902 patch operations to the AST,
+// formats the result canonically, and returns the patched Hujson bytes.
+//
+// Comments in data are preserved through the AST. Whitespace is NOT preserved:
+// Format normalizes indentation, value alignment, and blank lines to canonical
+// Hujson style. Format is required because patch operations splice raw JSON
+// into the AST — without it, added values render minified mid-line. The patch
+// document must be strict JSON per RFC 6902 (an array of operation objects). A
+// Hujson parse failure returns *HujsonParseError; a patch-application failure
+// returns *PatchApplyError; no other error types are returned — the public
+// error normalization in package ax relies on that invariant.
+func Patch(data []byte, patch []byte) ([]byte, error) {
+	ast, parseErr := hujson.Parse(data)
+	if parseErr != nil {
+		return nil, &HujsonParseError{Err: parseErr}
+	}
+	if patchErr := ast.Patch(patch); patchErr != nil {
+		return nil, &PatchApplyError{Err: patchErr}
+	}
+	ast.Format()
+	return ast.Pack(), nil
+}

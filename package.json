@@ -4,7 +4,7 @@
   "description": "Tooling devDependencies (commitlint, markdownlint) for the ax-go library",
   "private": true,
   "scripts": {
-    "lint:md": "markdownlint-cli AGENTS.md README.md \"docs/**/*.md\"",
+    "lint:md": "markdownlint AGENTS.md README.md \"docs/**/*.md\"",
     "commitlint": "commitlint"
   },
   "devDependencies": {

@@ -8,6 +8,9 @@ VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.
 .PHONY: all
 all: build
 
+.PHONY: ci
+ci: test validate lint doc-coverage
+
 .PHONY: build
 build:
 	@echo "Building ax library..."
@@ -113,6 +116,7 @@ clean:
 .PHONY: help
 help:
 	@echo "Available targets:"
+	@echo "  ci            - Run test, validate, lint, and doc-coverage"
 	@echo "  build         - Compile the library (go build ./...)"
 	@echo "  build-example - Compile the integration example with version injection"
 	@echo "  test          - Run tests with the race detector"

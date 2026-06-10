@@ -46,3 +46,4 @@ Thumbs.db
 # Dependency directories
 vendor/
 PR_MESSAGE.md
+.claude/agent-memory/

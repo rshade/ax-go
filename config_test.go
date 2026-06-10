@@ -5,11 +5,13 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -736,6 +738,295 @@ func assertNotAxError(t *testing.T, err error) {
 func parseConfigError(input string, opts ...ParseConfigOption) error {
 	var got struct{}
 	return ParseConfig(context.Background(), strings.NewReader(input), &got, opts...)
+}
+
+func TestPatchConfigPreservesCommentsAfterPatch(t *testing.T) {
+	existing := `{
+	// database settings
+	"host": "localhost",
+	"port": 5432,
+}`
+	patch := []byte(`[{"op":"replace","path":"/port","value":5433}]`)
+
+	got, err := PatchConfig(context.Background(), strings.NewReader(existing), patch)
+	if err != nil {
+		t.Fatalf("PatchConfig returned error: %v", err)
+	}
+
+	if !strings.Contains(string(got), "// database settings") {
+		t.Fatalf("PatchConfig stripped comments; got:\n%s", got)
+	}
+	if !strings.Contains(string(got), `"host": "localhost"`) {
+		t.Fatalf("PatchConfig dropped unchanged field; got:\n%s", got)
+	}
+	if !strings.Contains(string(got), "5433") {
+		t.Fatalf("PatchConfig did not apply replace; got:\n%s", got)
+	}
+}
+
+func TestPatchConfigReturnsConfigInvalidForBadHujson(t *testing.T) {
+	patch := []byte(`[{"op":"add","path":"/x","value":1}]`)
+	_, err := PatchConfig(context.Background(), strings.NewReader("{"), patch)
+	assertConfigError(t, err, "config_invalid")
+}
+
+func TestPatchConfigReturnsConfigPatchInvalidForBadPatch(t *testing.T) {
+	cases := []struct {
+		name  string
+		patch string
+	}{
+		{
+			name:  "patch is not an array",
+			patch: `{"op":"add","path":"/x","value":1}`,
+		},
+		{
+			name:  "target path not found",
+			patch: `[{"op":"remove","path":"/nonexistent"}]`,
+		},
+		{
+			name:  "missing required op field",
+			patch: `[{"path":"/x","value":1}]`,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := PatchConfig(
+				context.Background(),
+				strings.NewReader(`{"a":1}`),
+				[]byte(tc.patch),
+			)
+			assertPatchError(t, err, "config_patch_invalid")
+		})
+	}
+}
+
+func TestPatchConfigHonorsReadCapOption(t *testing.T) {
+	existing := strings.Repeat(" ", 10) + `{"a":1}`
+	patch := []byte(`[]`)
+
+	_, err := PatchConfig(
+		context.Background(),
+		strings.NewReader(existing),
+		patch,
+		WithMaxConfigBytes(5),
+	)
+	assertConfigError(t, err, "config_too_large")
+}
+
+func TestPatchConfigEmptyPatchIsNoOp(t *testing.T) {
+	existing := `{
+	// preserved comment
+	"name": "ax",
+}`
+	got, err := PatchConfig(context.Background(), strings.NewReader(existing), []byte(`[]`))
+	if err != nil {
+		t.Fatalf("PatchConfig returned error on no-op patch: %v", err)
+	}
+
+	if !strings.Contains(string(got), "// preserved comment") {
+		t.Fatalf("PatchConfig stripped comments on no-op; got:\n%s", got)
+	}
+}
+
+func TestPatchConfigFilePreservesCommentsOnDisk(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.hujson")
+
+	original := []byte(`{
+	// production host
+	"host": "prod.example.com",
+	"port": 443,
+}`)
+	if err := os.WriteFile(path, original, 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	patch := []byte(`[{"op":"replace","path":"/port","value":8443}]`)
+	if err := PatchConfigFile(context.Background(), path, patch); err != nil {
+		t.Fatalf("PatchConfigFile returned error: %v", err)
+	}
+
+	result, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read patched file: %v", err)
+	}
+
+	if !strings.Contains(string(result), "// production host") {
+		t.Fatalf("PatchConfigFile stripped comments; got:\n%s", result)
+	}
+	if !strings.Contains(string(result), "8443") {
+		t.Fatalf("PatchConfigFile did not apply patch; got:\n%s", result)
+	}
+}
+
+func TestPatchConfigFilePreservesPermissions(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.hujson")
+
+	const wantMode = 0o640
+	if err := os.WriteFile(path, []byte(`{"a":1}`), wantMode); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	patch := []byte(`[{"op":"replace","path":"/a","value":2}]`)
+	if err := PatchConfigFile(context.Background(), path, patch); err != nil {
+		t.Fatalf("PatchConfigFile returned error: %v", err)
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("stat patched file: %v", err)
+	}
+	if got := info.Mode().Perm(); got != wantMode {
+		t.Fatalf("file mode = %04o, want %04o", got, wantMode)
+	}
+}
+
+func TestPatchConfigFileReturnsErrorWhenFileDoesNotExist(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "nonexistent.hujson")
+	err := PatchConfigFile(context.Background(), path, []byte(`[]`))
+	if err == nil {
+		t.Fatal("PatchConfigFile returned nil error for nonexistent file")
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("PatchConfigFile error = %v, want os.ErrNotExist in chain", err)
+	}
+}
+
+func TestPatchConfigFileLeavesOriginalIntactWhenTempCreateFails(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("running as root: directory permissions are not enforced")
+	}
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.hujson")
+	original := []byte(`{"a":1}`)
+	if err := os.WriteFile(path, original, 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	// A read-only directory forces os.CreateTemp to fail inside
+	// atomicWriteFile, exercising the no-corruption guarantee.
+	if err := os.Chmod(dir, 0o500); err != nil {
+		t.Fatalf("chmod dir read-only: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o700) })
+
+	patch := []byte(`[{"op":"replace","path":"/a","value":2}]`)
+	if err := PatchConfigFile(context.Background(), path, patch); err == nil {
+		t.Fatal("PatchConfigFile returned nil error with read-only directory")
+	}
+
+	got, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read original file: %v", err)
+	}
+	if !bytes.Equal(got, original) {
+		t.Fatalf("original file modified after failed write; got:\n%s", got)
+	}
+}
+
+func TestPatchConfigFileConcurrentPatchesKeepFileValid(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.hujson")
+	if err := os.WriteFile(path, []byte(`{"port":1}`), 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	const writers = 8
+	var wg sync.WaitGroup
+	errs := make([]error, writers)
+	for i := range writers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			patch := fmt.Appendf(nil, `[{"op":"replace","path":"/port","value":%d}]`, 1000+i)
+			errs[i] = PatchConfigFile(context.Background(), path, patch)
+		}()
+	}
+	wg.Wait()
+
+	for i, err := range errs {
+		if err != nil {
+			t.Fatalf("writer %d: PatchConfigFile returned error: %v", i, err)
+		}
+	}
+
+	var got struct {
+		Port int `json:"port"`
+	}
+	if err := ParseConfigFile(context.Background(), path, &got); err != nil {
+		t.Fatalf("patched file is not valid Hujson: %v", err)
+	}
+	if got.Port < 1000 || got.Port >= 1000+writers {
+		t.Fatalf("port = %d, want last-writer value in [1000, %d)", got.Port, 1000+writers)
+	}
+}
+
+func TestPatchConfigErrorGolden(t *testing.T) {
+	cases := []struct {
+		name     string
+		existing string
+		patch    string
+		wantCode string
+		golden   string
+	}{
+		{
+			name:     "patch apply failure",
+			existing: `{"a":1}`,
+			patch:    `[{"op":"remove","path":"/nonexistent"}]`,
+			wantCode: "config_patch_invalid",
+			golden:   "testdata/config_patch_invalid.golden.json",
+		},
+		{
+			name:     "invalid hujson",
+			existing: `{`,
+			patch:    `[]`,
+			wantCode: "config_invalid",
+			golden:   "testdata/config_patch_hujson_invalid.golden.json",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, gotErr := PatchConfig(
+				context.Background(),
+				strings.NewReader(tc.existing),
+				[]byte(tc.patch),
+			)
+			assertPatchError(t, gotErr, tc.wantCode)
+
+			var axErr *Error
+			if !errors.As(gotErr, &axErr) {
+				t.Fatalf("error type = %T, want *Error", gotErr)
+			}
+
+			var stderr bytes.Buffer
+			if writeErr := WriteError(&stderr, axErr); writeErr != nil {
+				t.Fatalf("WriteError returned error: %v", writeErr)
+			}
+			assertGolden(t, tc.golden, stderr.Bytes())
+		})
+	}
+}
+
+func assertPatchError(t *testing.T, err error, wantCode string) {
+	t.Helper()
+
+	if err == nil {
+		t.Fatal("PatchConfig returned nil error")
+	}
+	var axErr *Error
+	if !errors.As(err, &axErr) {
+		t.Fatalf("error type = %T, want *Error", err)
+	}
+	if axErr.ErrorCode != wantCode {
+		t.Fatalf("ErrorCode = %q, want %q", axErr.ErrorCode, wantCode)
+	}
+	if got := ErrorExitCode(err); got != ExitValidation {
+		t.Fatalf("ErrorExitCode = %d, want %d", got, ExitValidation)
+	}
 }
 
 type erroringReader struct {
