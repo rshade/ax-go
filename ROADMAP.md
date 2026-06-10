@@ -7,7 +7,7 @@
 
 ## Status note
 
-All open items are filed as GitHub issues (`#1`–`#31`) and carry `roadmap/*` +
+All open items are filed as GitHub issues (`#2`–`#32`) and carry `roadmap/*` +
 `effort/*` labels synced to the sections below. Level-of-effort indicators:
 `[S]` Small (1-2h), `[M]` Medium (½-1d), `[L]` Large (multi-day). No milestones
 or release tags exist yet (pre-v0.1.0).
@@ -24,17 +24,18 @@ by owning the cross-cutting primitives once: stream separation, deterministic
 exit codes, the `ax.Error` envelope, `__schema` discoverability, agent-safety
 primitives, and short-lived-process-correct observability.
 
-## Immediate Focus (v0.1.0 — make the skeleton safe)
+## Immediate Focus (v0.2.0 — deliver the runtime promises)
 
-Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
+Single-WIP per the Promotion Gate (`target_focus_depth: 1`). v0.1.0's lone
+safety item (#1, bounded config reads) shipped 2026-06-06 (`ea74c7d`).
 
-- [ ] #1 Bound config reads at the read boundary [S] — `config.go:15` uses
-  unbounded `io.ReadAll`, violating the "never read unbounded user input"
-  guardrail. Add a default 1 MiB `io.LimitReader` cap (configurable via option);
-  an oversized config is an `ExitValidation` error, not an OOM. Land the failing
-  size-limit test first.
+- [ ] #6 Build-time version injection [S] — wire `-ldflags "-X ..."` in the
+  `Makefile` and `examples/integration/` so `__schema.version` is a real value,
+  never empty/`dev`.
+  *Promoted by /roadmap sync on 2026-06-08 — fills the single Immediate Focus
+  slot opened when #1 closed.*
 
-## Near-Term Vision (v0.2.0 — deliver the runtime promises)
+## Near-Term Vision (v0.2.0 — remaining runtime promises)
 
 - [ ] #2 Real OTel export + span lifecycle (ADR-0005) [L] — `telemetry.go:60`
   installs a `TracerProvider` with **no exporter**, so spans are discarded and
@@ -55,9 +56,6 @@ Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
   do not open a parallel tracker for the bounded-config feature.
 - [ ] #5 Output-determinism harness [M] — assert byte-identical `stdout` across
   two runs of the same input, modulo documented non-deterministic fields.
-- [ ] #6 Build-time version injection [S] — wire `-ldflags "-X ..."` in the
-  `Makefile` and `examples/integration/` so `__schema.version` is a real value,
-  never empty/`dev`.
 
 ## Future Vision (Long-Term)
 
@@ -101,6 +99,14 @@ gaps that deepen the machine-contract half of AX.*
   correct calls from the contract alone. Complements #16.
 - [ ] #29 Static agent-discovery artifact (`llms.txt`) — emit vs delegate [M] —
   ADR decision on fetch-before-invoke discovery derived from `__schema`.
+- [ ] #32 Build-time `llms.txt` generation [L] — an exported
+  `ax.GenerateLLMsTxt(...)` plus a `cmd/` docs tool that merge the reflected
+  command/flag skeleton (the same reflection that powers `__schema`) with an
+  author-supplied curated preamble and link graph. A *documentation artifact*,
+  not a new runtime machine format —
+  `__schema` JSON + `--as=mcp` stay unchanged. Consensus of a `/decide` debate;
+  deferred until the first real downstream consumer needs a published `llms.txt`.
+  Pairs with #29 (the emit-vs-delegate decision it implements).
 - [ ] #30 Envelope runtime trust signals [M] — `side_effects_performed`,
   `idempotency_replayed`, `requires_confirmation` (human handoff). Extends #13.
 - [ ] #31 Agent-acceptance test harness [M] — drive the CLI as an agent would
@@ -151,8 +157,10 @@ gaps that deepen the machine-contract half of AX.*
   injection, mode/idempotency/dry-run context, error normalization.
 - [x] ID generation — UUID v4/v7 (ADR-0007) [S].
 - [x] JSON + NDJSON envelope writers (ADR-0011) [S].
-- [x] Hujson read parsing and bounded read cap
-  ([specs/001-bound-config-reads](specs/001-bound-config-reads)) [S].
+- [x] #1 Hujson read parsing and bounded read cap
+  ([specs/001-bound-config-reads](specs/001-bound-config-reads)) [S] — default
+  1 MiB `io.LimitReader`; an oversized config is an `ExitValidation` error, not
+  an OOM. Shipped 2026-06-06 (`ea74c7d`).
 - [x] zerolog logger + trace-correlation hook (ADR-0009) [M].
 - [x] Telemetry W3C extraction + no-op scaffold (ADR-0005, partial) [M] —
   `TRACEPARENT`/`TRACESTATE` extraction and provider lifecycle; real export

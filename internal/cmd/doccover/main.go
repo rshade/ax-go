@@ -56,6 +56,7 @@ func requiredSymbols() []string {
 		"NewLogger",
 		"ParseConfig",
 		"ParseConfigFile",
+		"ResolveVersion",
 		"StartTelemetry",
 		// core types
 		"Envelope",
