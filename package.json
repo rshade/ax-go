@@ -8,8 +8,8 @@
     "commitlint": "commitlint"
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.1.0",
-    "@commitlint/config-conventional": "^20.2.0",
+    "@commitlint/cli": "^21.0.0",
+    "@commitlint/config-conventional": "^21.0.0",
     "markdownlint-cli": "^0.48.0"
   },
   "engines": {
