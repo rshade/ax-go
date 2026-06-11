@@ -1,0 +1,1 @@
+{"error_code":"config_patch_invalid","message":"config patch is not a valid RFC 6902 document or a patch operation failed","trace_id":"00000000000000000000000000000000","tool":"","version":"","schema_version":"1.0.0","actionable_fix":"verify the patch document is a valid RFC 6902 JSON array and all target paths exist"}

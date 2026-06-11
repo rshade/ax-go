@@ -10,6 +10,116 @@ import (
 	"time"
 )
 
+func TestPatchPreservesCommentsAndFormatting(t *testing.T) {
+	existing := []byte(`{
+	// server settings
+	"host": "localhost",
+	"port": 8080,
+}`)
+	patch := []byte(`[{"op":"replace","path":"/port","value":9090}]`)
+
+	got, err := Patch(existing, patch)
+	if err != nil {
+		t.Fatalf("Patch returned error: %v", err)
+	}
+
+	if !strings.Contains(string(got), "// server settings") {
+		t.Fatalf("Patch stripped comments; got:\n%s", got)
+	}
+	if !strings.Contains(string(got), `"host": "localhost"`) {
+		t.Fatalf("Patch dropped unchanged field; got:\n%s", got)
+	}
+	if !strings.Contains(string(got), "9090") {
+		t.Fatalf("Patch did not apply replace; got:\n%s", got)
+	}
+}
+
+func TestPatchInvalidHujsonReturnsHujsonParseError(t *testing.T) {
+	_, err := Patch([]byte("{"), []byte(`[]`))
+	if err == nil {
+		t.Fatal("Patch returned nil error for invalid Hujson")
+	}
+
+	var parseErr *HujsonParseError
+	if !errors.As(err, &parseErr) {
+		t.Fatalf("error type = %T, want *HujsonParseError", err)
+	}
+	if parseErr.Unwrap() == nil {
+		t.Fatal("HujsonParseError.Unwrap() = nil, want underlying parse error")
+	}
+}
+
+func TestPatchInvalidPatchDocumentReturnsPatchApplyError(t *testing.T) {
+	cases := []struct {
+		name  string
+		patch string
+	}{
+		{"not an array", `{"op":"add","path":"/x","value":1}`},
+		{"target not found", `[{"op":"remove","path":"/nonexistent"}]`},
+		{"missing op field", `[{"path":"/x","value":1}]`},
+		{"unknown op", `[{"op":"frobnicate","path":"/x"}]`},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			_, err := Patch([]byte(`{"a":1}`), []byte(tc.patch))
+			if err == nil {
+				t.Fatal("Patch returned nil error")
+			}
+
+			var patchErr *PatchApplyError
+			if !errors.As(err, &patchErr) {
+				t.Fatalf("error type = %T, want *PatchApplyError", err)
+			}
+			if patchErr.Unwrap() == nil {
+				t.Fatal("PatchApplyError.Unwrap() = nil, want underlying error")
+			}
+		})
+	}
+}
+
+func TestPatchEmptyPatchIsNoOp(t *testing.T) {
+	existing := []byte(`{
+	// a comment
+	"name": "ax",
+}`)
+	got, err := Patch(existing, []byte(`[]`))
+	if err != nil {
+		t.Fatalf("Patch returned error: %v", err)
+	}
+
+	if !strings.Contains(string(got), "// a comment") {
+		t.Fatalf("Patch stripped comments on no-op; got:\n%s", got)
+	}
+	if !strings.Contains(string(got), `"name"`) {
+		t.Fatalf("Patch dropped field on no-op; got:\n%s", got)
+	}
+}
+
+func TestPatchRoundTrip(t *testing.T) {
+	existing := []byte(`{"name":"ax","replicas":3}`)
+
+	replacePatch := []byte(`[{"op":"replace","path":"/replicas","value":5}]`)
+	patched, err := Patch(existing, replacePatch)
+	if err != nil {
+		t.Fatalf("Patch returned error: %v", err)
+	}
+
+	if !strings.Contains(string(patched), "5") {
+		t.Fatalf("Patch did not apply replace; got:\n%s", patched)
+	}
+
+	revertPatch := []byte(`[{"op":"replace","path":"/replicas","value":3}]`)
+	roundTripped, err := Patch(patched, revertPatch)
+	if err != nil {
+		t.Fatalf("revert Patch returned error: %v", err)
+	}
+
+	if !strings.Contains(string(roundTripped), "3") {
+		t.Fatalf("round-trip did not restore original value; got:\n%s", roundTripped)
+	}
+}
+
 func TestReadBoundedHonorsContextCancelation(t *testing.T) {
 	t.Run("already canceled aborts before first read", func(t *testing.T) {
 		ctx, cancel := context.WithCancel(context.Background())

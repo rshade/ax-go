@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -255,6 +257,187 @@ func TestRunUsesResolvedVersionAcrossSchemaAndLogger(t *testing.T) {
 	}
 	if gotSchema.Version != want {
 		t.Fatalf("schema version = %q, want %q", gotSchema.Version, want)
+	}
+}
+
+func TestRunPatchConfigCommand(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.hujson")
+	initial := []byte(`{
+	// integration config
+	"name": "Ada",
+	"count": 2,
+}`)
+	if err := os.WriteFile(path, initial, 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run(
+		context.Background(),
+		[]string{
+			"patch-config",
+			"--format=json",
+			"--idempotency-key=test-key",
+			"--config=" + path,
+			`--patch=[{"op":"replace","path":"/count","value":5}]`,
+		},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		func(string) string { return "" },
+	)
+
+	if code != ax.ExitSuccess {
+		t.Fatalf("exit code = %d, want %d; stderr=%s", code, ax.ExitSuccess, stderr.String())
+	}
+
+	var got ax.Envelope[patchConfigPayload]
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("stdout was not a JSON envelope: %v", err)
+	}
+	if !got.Data.Patched {
+		t.Fatal("payload patched = false, want true")
+	}
+	if got.Data.Path != path {
+		t.Fatalf("payload path = %q, want %q", got.Data.Path, path)
+	}
+
+	result, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read patched file: %v", err)
+	}
+	if !strings.Contains(string(result), "// integration config") {
+		t.Fatalf("patch stripped comments; got:\n%s", result)
+	}
+	if !strings.Contains(string(result), "5") {
+		t.Fatalf("patch was not applied; got:\n%s", result)
+	}
+}
+
+func TestRunPatchConfigCommandDryRunHasNoSideEffects(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.hujson")
+	initial := []byte(`{
+	// integration config
+	"name": "Ada",
+	"count": 2,
+}`)
+	if err := os.WriteFile(path, initial, 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run(
+		context.Background(),
+		[]string{
+			"patch-config",
+			"--format=json",
+			"--dry-run",
+			"--idempotency-key=test-key",
+			"--config=" + path,
+			`--patch=[{"op":"replace","path":"/count","value":5}]`,
+		},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		func(string) string { return "" },
+	)
+
+	if code != ax.ExitSuccess {
+		t.Fatalf("exit code = %d, want %d; stderr=%s", code, ax.ExitSuccess, stderr.String())
+	}
+
+	result, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read config file: %v", err)
+	}
+	if !bytes.Equal(result, initial) {
+		t.Fatalf("dry-run modified the file; got:\n%s", result)
+	}
+
+	var got ax.Envelope[patchConfigPayload]
+	if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+		t.Fatalf("stdout was not a JSON envelope: %v", err)
+	}
+	if !got.Meta.DryRun {
+		t.Fatal("meta dry_run = false, want true")
+	}
+	if !got.Data.Patched {
+		t.Fatal("payload patched = false, want true (dry-run payload must match a real run)")
+	}
+	if got.Data.Path != path {
+		t.Fatalf("payload path = %q, want %q", got.Data.Path, path)
+	}
+}
+
+func TestRunPatchConfigCommandDryRunSurfacesPatchErrors(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.hujson")
+	initial := []byte(`{"count": 2}`)
+	if err := os.WriteFile(path, initial, 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run(
+		context.Background(),
+		[]string{
+			"patch-config",
+			"--format=json",
+			"--dry-run",
+			"--config=" + path,
+			`--patch=[{"op":"remove","path":"/nonexistent"}]`,
+		},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		func(string) string { return "" },
+	)
+
+	if code != ax.ExitValidation {
+		t.Fatalf("exit code = %d, want %d", code, ax.ExitValidation)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout not empty on dry-run patch failure: %s", stdout.String())
+	}
+	if !strings.Contains(stderr.String(), "config_patch_invalid") {
+		t.Fatalf("stderr missing config_patch_invalid envelope; got: %s", stderr.String())
+	}
+
+	result, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read config file: %v", err)
+	}
+	if !bytes.Equal(result, initial) {
+		t.Fatalf("dry-run modified the file; got:\n%s", result)
+	}
+}
+
+func TestRunPatchConfigCommandRequiresFlags(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	code := run(
+		context.Background(),
+		[]string{"patch-config", "--format=json"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		func(string) string { return "" },
+	)
+
+	if code != ax.ExitValidation {
+		t.Fatalf("exit code = %d, want %d", code, ax.ExitValidation)
+	}
+	if stdout.Len() != 0 {
+		t.Fatalf("stdout not empty on validation failure: %s", stdout.String())
 	}
 }
 

@@ -21,6 +21,25 @@ Emit NDJSON envelopes:
 go run ./examples/integration stream --format=json --count=3
 ```
 
+Patch a Hujson config file in place, preserving comments:
+
+```sh
+printf '{\n// keep me\n"name":"Ada",\n"count":2,\n}' > /tmp/config.hujson
+go run ./examples/integration patch-config --format=json \
+  --config=/tmp/config.hujson \
+  --patch='[{"op":"replace","path":"/count","value":5}]'
+```
+
+With `--dry-run`, `patch-config` rehearses the patch — it reads the config and
+applies the patch in memory so the same errors surface as a real run — but
+writes nothing. The success envelope is identical apart from `meta.dry_run`:
+
+```sh
+go run ./examples/integration patch-config --format=json --dry-run \
+  --config=/tmp/config.hujson \
+  --patch='[{"op":"replace","path":"/count","value":5}]'
+```
+
 Inspect the reflected command schema:
 
 ```sh

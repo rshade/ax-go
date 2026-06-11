@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 
 	internalconfig "github.com/rshade/ax-go/internal/config"
 )
@@ -152,4 +153,145 @@ func normalizeConfigDecodeError(ctx context.Context, decodeErr error) error {
 		WithErrorCause(decodeErr),
 		WithErrorExitCode(ExitValidation),
 	)
+}
+
+// PatchConfig reads Hujson from r, applies RFC 6902 JSON patch operations, and
+// returns the patched Hujson content with comments preserved. Whitespace is
+// normalized to canonical Hujson formatting; user indentation, value alignment,
+// and blank lines are not preserved byte-for-byte.
+//
+// This is the comment-preserving write path: unlike strict-JSON writes, the
+// returned bytes remain valid Hujson so the caller can write them back to a
+// human-maintained config file without stripping user comments. The patch
+// document must be a strict JSON array of RFC 6902 operation objects. An invalid
+// existing config returns config_invalid; an invalid or failing patch returns
+// config_patch_invalid; read cap and context errors follow ParseConfig's contract.
+func PatchConfig(ctx context.Context, r io.Reader, patch []byte, opts ...ParseConfigOption) ([]byte, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	cfg, err := applyParseConfigOptions(ctx, opts)
+	if err != nil {
+		return nil, err
+	}
+
+	data, err := internalconfig.ReadBounded(ctx, r, cfg.maxBytes)
+	if err != nil {
+		return nil, normalizeConfigReadError(ctx, err)
+	}
+
+	patched, err := internalconfig.Patch(data, patch)
+	if err != nil {
+		return nil, normalizePatchError(ctx, err)
+	}
+	return patched, nil
+}
+
+// PatchConfigFile reads path as Hujson, applies RFC 6902 JSON patch operations,
+// and writes the patched result back to path atomically, preserving comments.
+// Whitespace is normalized to canonical Hujson formatting (see PatchConfig). The
+// original file permissions are preserved.
+//
+// Open or stat failures are returned as-is. Patch behavior matches PatchConfig.
+// The write is atomic: a temporary file in the same directory is written and
+// then renamed, so a partial write never corrupts the existing file. The rename
+// guarantees atomicity, not crash durability: no fsync is issued, so a power
+// loss immediately after return may lose the write. If path is a symlink, the
+// rename replaces the symlink itself with a regular file; the symlink target is
+// not modified. Concurrent external writes to path follow last-writer-wins.
+func PatchConfigFile(ctx context.Context, path string, patch []byte, opts ...ParseConfigOption) error {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Open(path)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	patched, err := PatchConfig(ctx, file, patch, opts...)
+	if err != nil {
+		return err
+	}
+
+	return atomicWriteFile(path, patched, info.Mode())
+}
+
+// atomicWriteFile writes data to path atomically: it creates a temporary file in
+// the same directory, writes data to it, sets the given mode, and renames the
+// temporary file over path. A failure before the rename does not corrupt path.
+func atomicWriteFile(path string, data []byte, mode os.FileMode) error {
+	dir := filepath.Dir(path)
+
+	tmp, err := os.CreateTemp(dir, ".ax-patch-*")
+	if err != nil {
+		return fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmp.Name()
+
+	if err = writeAndClose(tmp, tmpPath, data, mode); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if renameErr := os.Rename(tmpPath, path); renameErr != nil {
+		_ = os.Remove(tmpPath)
+		return fmt.Errorf("rename temp file: %w", renameErr)
+	}
+	return nil
+}
+
+// writeAndClose writes data to f, sets mode, and closes f. On any error it
+// closes f (ignoring the close error) and returns the original error.
+func writeAndClose(f *os.File, name string, data []byte, mode os.FileMode) error {
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("write temp file: %w", err)
+	}
+	if err := f.Chmod(mode); err != nil {
+		_ = f.Close()
+		return fmt.Errorf("chmod temp file: %w", err)
+	}
+	if err := f.Close(); err != nil {
+		return fmt.Errorf("close temp file %s: %w", name, err)
+	}
+	return nil
+}
+
+// normalizePatchError maps internalconfig.Patch failures onto the frozen config
+// error codes: *HujsonParseError becomes config_invalid and *PatchApplyError
+// becomes config_patch_invalid, both mapping to ExitValidation. Patch guarantees
+// it returns only those two wrapper types, so the trailing passthrough is a
+// defensive guard for future error shapes, mirroring normalizeConfigDecodeError.
+func normalizePatchError(ctx context.Context, err error) error {
+	var parseErr *internalconfig.HujsonParseError
+	if errors.As(err, &parseErr) {
+		return NewError(
+			ctx,
+			"config_invalid",
+			"config is not valid Hujson",
+			WithActionableFix("fix the config syntax and retry"),
+			WithErrorCause(parseErr.Err),
+			WithErrorExitCode(ExitValidation),
+		)
+	}
+
+	var patchErr *internalconfig.PatchApplyError
+	if errors.As(err, &patchErr) {
+		return NewError(
+			ctx,
+			"config_patch_invalid",
+			"config patch is not a valid RFC 6902 document or a patch operation failed",
+			WithActionableFix("verify the patch document is a valid RFC 6902 JSON array and all target paths exist"),
+			WithErrorCause(patchErr.Err),
+			WithErrorExitCode(ExitValidation),
+		)
+	}
+	return err
 }

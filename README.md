@@ -6,11 +6,12 @@
 [![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go)](go.mod)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-> **Status: 🚧 Implementation scaffold.** The module, license, accepted ADRs,
-> and initial Go package skeleton are in place. The public API is still early,
-> but core primitives such as `ax.Error`, `ax.Execute`, `ax.NewLogger`,
-> `ax.ParseConfig`, and `ax.NewEntityID` now compile and are covered by focused
-> contract tests.
+> **Status: ✅ Released.** The current release is **v0.1.0** — the first
+> pinnable version: `go get github.com/rshade/ax-go@v0.1.0`. Core primitives
+> such as `ax.Error`, `ax.Execute`, `ax.NewLogger`, `ax.ParseConfig`, and
+> `ax.NewEntityID` are covered by contract tests, and all public output shapes
+> are frozen by golden fixtures. See [CHANGELOG.md](CHANGELOG.md) for release
+> history.
 
 ## Mission
 
@@ -83,8 +84,16 @@ above `ax.MaxConfigBytesCeiling`, 1 GiB) uses `config_max_bytes_invalid`.
 Invalid Hujson or schema mismatches use `config_invalid`, and a nil
 `ParseConfigOption` uses `config_option_invalid`. All map to exit code `2` and
 are discoverable with `errors.As(err, &axErr)`. Reads accept Hujson extensions,
-but writes remain strict JSON; preserving comments when mutating existing Hujson
-is reserved for the future AST `Patch` write path.
+but payload writes remain strict JSON.
+
+To mutate an existing Hujson config without stripping user comments,
+`ax.PatchConfig(ctx, reader, patch, ...)` and
+`ax.PatchConfigFile(ctx, path, patch, ...)` apply RFC 6902 JSON Patch
+operations to the Hujson AST. Comments survive; whitespace is normalized to
+canonical Hujson formatting. `PatchConfigFile` writes back atomically (temp
+file + rename) and preserves file permissions. An invalid patch document or a
+failed patch operation uses the frozen `error_code` `config_patch_invalid`
+(exit code `2`); an invalid existing config uses `config_invalid`.
 
 ### Agent-safety primitives
 
