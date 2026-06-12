@@ -1,12 +1,14 @@
 package ax_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 
 	ax "github.com/rshade/ax-go"
 )
@@ -169,6 +171,36 @@ func ExampleNewEntityID() {
 func ExampleResolveVersion() {
 	fmt.Println(ax.ResolveVersion("v1.2.3"))
 	// Output: v1.2.3
+}
+
+// ExampleStartTelemetry installs W3C propagation and configures the telemetry
+// lifecycle with explicit stderr, service identity, and shutdown budget options.
+func ExampleStartTelemetry() {
+	var stderr bytes.Buffer
+	ctx, telemetry, err := ax.StartTelemetry(
+		context.Background(),
+		ax.WithTelemetryEnv(func(string) string { return "" }),
+		ax.WithTelemetryStderr(&stderr),
+		ax.WithTelemetryServiceName("example"),
+		ax.WithTelemetryServiceVersion("v1.2.3"),
+		ax.WithTelemetryShutdownBudget(50*time.Millisecond),
+	)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	if err := telemetry.Shutdown(context.Background()); err != nil {
+		fmt.Println("shutdown:", err)
+		return
+	}
+
+	fmt.Println(telemetry != nil)
+	fmt.Println(ax.TraceIDFromContext(ctx))
+	fmt.Println(stderr.Len())
+	// Output:
+	// true
+	// 00000000000000000000000000000000
+	// 0
 }
 
 // ExamplePatchConfig shows the comment-preserving write path: RFC 6902

@@ -3,7 +3,81 @@ package ax
 import (
 	"context"
 	"testing"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/trace"
 )
+
+func TestStartTelemetryCreatesRecordingSpanWithoutCollector(t *testing.T) {
+	ctx, telemetry, err := StartTelemetry(
+		context.Background(),
+		WithTelemetryEnv(func(string) string { return "" }),
+	)
+	if err != nil {
+		t.Fatalf("StartTelemetry returned error: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := telemetry.Shutdown(context.Background()); err != nil {
+			t.Fatalf("Telemetry.Shutdown returned error: %v", err)
+		}
+	})
+
+	ctx, span := otel.Tracer("github.com/rshade/ax-go/test").Start(ctx, "app")
+	defer span.End()
+
+	if !span.IsRecording() {
+		t.Fatal("span is not recording")
+	}
+	traceID := TraceIDFromContext(ctx)
+	spanID := SpanIDFromContext(ctx)
+	if traceID == ZeroTraceID {
+		t.Fatalf("TraceIDFromContext = %q, want non-zero", traceID)
+	}
+	if spanID == ZeroSpanID {
+		t.Fatalf("SpanIDFromContext = %q, want non-zero", spanID)
+	}
+	if got := TraceIDFromContext(ctx); got != traceID {
+		t.Fatalf("TraceIDFromContext changed from %q to %q", traceID, got)
+	}
+	if got := SpanIDFromContext(ctx); got != spanID {
+		t.Fatalf("SpanIDFromContext changed from %q to %q", spanID, got)
+	}
+}
+
+func TestStartTelemetryAlwaysSamplesUnsampledInboundTraceparent(t *testing.T) {
+	const traceID = "4bf92f3577b34da6a3ce929d0e0e4736"
+
+	ctx, telemetry, err := StartTelemetry(
+		context.Background(),
+		WithTelemetryEnv(func(key string) string {
+			if key == "TRACEPARENT" {
+				return "00-" + traceID + "-00f067aa0ba902b7-00"
+			}
+			return ""
+		}),
+	)
+	if err != nil {
+		t.Fatalf("StartTelemetry returned error: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := telemetry.Shutdown(context.Background()); err != nil {
+			t.Fatalf("Telemetry.Shutdown returned error: %v", err)
+		}
+	})
+
+	ctx, span := otel.Tracer("github.com/rshade/ax-go/test").Start(ctx, "app")
+	defer span.End()
+
+	if got := TraceIDFromContext(ctx); got != traceID {
+		t.Fatalf("TraceIDFromContext = %q, want %q", got, traceID)
+	}
+	if !span.IsRecording() {
+		t.Fatal("span is not recording for unsampled inbound TRACEPARENT")
+	}
+	if !trace.SpanContextFromContext(ctx).IsSampled() {
+		t.Fatal("span context is not sampled for unsampled inbound TRACEPARENT")
+	}
+}
 
 func TestStartTelemetryExtractsTraceparent(t *testing.T) {
 	traceID := "4bf92f3577b34da6a3ce929d0e0e4736"

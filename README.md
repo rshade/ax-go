@@ -116,8 +116,9 @@ in [ADR-0002](docs/adr/0002-error-envelope-schema.md).
   serializer choices rather than asserting numeric bars.
 - **Trace propagation:** contexts carry and propagate W3C Trace Context IDs by
   default, via the OpenTelemetry SDK
-  ([ADR-0004](docs/adr/0004-trace-id-format.md),
-  [ADR-0005](docs/adr/0005-otel-integration.md)).
+  ([ADR-0004](docs/adr/0004-trace-id-format.md);
+  real export lifecycle delivered by
+  [spec 004](specs/004-real-otel-export/)).
 - **Observability backends:** Grafana Loki for log aggregation
   ([ADR-0006](docs/adr/0006-loki-integration.md)); Tempo / Jaeger /
   Honeycomb-compatible for traces via OTel.
@@ -131,6 +132,18 @@ in [ADR-0002](docs/adr/0002-error-envelope-schema.md).
 - **Structured logging:** `ax.NewLogger(ctx)` returns an `ax.Logger` backed by
   zerolog with trace correlation wired in
   ([ADR-0009](docs/adr/0009-logger-zerolog.md)).
+- **Telemetry lifecycle:** `ax.Execute()` opens a recording root span around the
+  command, so logs written with `cmd.Context()` carry non-zero `trace_id` and
+  `span_id` even when no collector is configured. Set
+  `OTEL_EXPORTER_OTLP_ENDPOINT` to enable OTLP HTTP trace export; a plaintext
+  `http://` local collector is allowed, while `https://` uses verified TLS and
+  TLS verification is never disabled. Set `AX_OTEL_DEBUG=1` to print
+  human-readable span data to `stderr` for local debugging. Both destinations
+  can be enabled together, all telemetry stays off `stdout`, and exporter
+  failures degrade to a `stderr` diagnostic without changing the command's
+  `stdout` payload or exit code. Export attempts and shutdown are bounded by the
+  telemetry shutdown budget (default `2s`, configurable with
+  `ax.WithTelemetryShutdownTimeout`).
 - **Idiomatic Go:** package name is `ax`. Keep abstractions narrow and tied to
   accepted ADRs.
 
@@ -147,7 +160,6 @@ deleted.
 | [0002](docs/adr/0002-error-envelope-schema.md) | JSON Error Envelope Schema | **Accepted (2026-05-28)** |
 | [0003](docs/adr/0003-schema-output-format.md) | `__schema` Output Format | **Accepted (2026-05-28)** |
 | [0004](docs/adr/0004-trace-id-format.md) | Trace ID Format | **Accepted (2026-05-28)** |
-| [0005](docs/adr/0005-otel-integration.md) | OpenTelemetry SDK Integration | **Accepted (2026-05-28)** |
 | [0006](docs/adr/0006-loki-integration.md) | Grafana Loki Backend Integration | **Accepted (2026-05-28)** |
 | [0007](docs/adr/0007-id-strategy.md) | ID Strategy | **Accepted (2026-05-28)** |
 | [0008](docs/adr/0008-cli-framework-cobra.md) | CLI Framework — Cobra | **Accepted (2026-05-28)** |
@@ -238,17 +250,13 @@ The same resolved value feeds `__schema.version`, the `ax.Error` envelope
 
 Sequenced from the accepted ADRs and the current scaffold:
 
-1. **Complete telemetry exporters** — keep the no-op default, add
-   `OTEL_EXPORTER_OTLP_ENDPOINT` OTLP/HTTP auto-configuration, and add the
-   `AX_OTEL_DEBUG=1` stderr exporter path from
-   [ADR-0005](docs/adr/0005-otel-integration.md).
-2. **Harden `__schema`** — enforce example coverage, expand output-mode
+1. **Harden `__schema`** — enforce example coverage, expand output-mode
    declarations, and mature the MCP adapter from
    [ADR-0003](docs/adr/0003-schema-output-format.md).
-3. **Implement Loki direct push** — keep stderr shipping as the default and add
+2. **Implement Loki direct push** — keep stderr shipping as the default and add
    opt-in `AX_LOKI_URL` direct push from
    [ADR-0006](docs/adr/0006-loki-integration.md).
-4. **Expand examples and benchmarks** — keep
+3. **Expand examples and benchmarks** — keep
    [`examples/integration/`](examples/integration/) current with public API
    changes and benchmark hot paths with `testing.B` / `-benchmem`.
 

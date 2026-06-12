@@ -58,7 +58,8 @@ idempotency keys, run IDs) — see ADR-0007 for the broader ID strategy.
 
 - ax-go takes a direct dependency on `go.opentelemetry.io/otel/sdk`.
 - The `TRACEPARENT` env var is the canonical inbound trace-context channel
-  (see ADR-0005 for the full OTel integration).
+  (see [`specs/004-real-otel-export`](../../specs/004-real-otel-export/)
+  for the real OTel export lifecycle).
 - All log lines, error envelopes (ADR-0002), and stdout JSON metadata
   blocks carry `trace_id` (and `span_id` where appropriate) sourced from
   the active OTel span context.

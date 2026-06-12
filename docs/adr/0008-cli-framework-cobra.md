@@ -67,8 +67,9 @@ analysis.
 Adopt **Option A** — `github.com/spf13/cobra`.
 
 The ax base wraps `cobra.Command.Execute()` via `ax.Execute()`
-(see ADR-0005 for the OTel flush-on-exit wrapper and ADR-0001 for the
-mode-resolution `PersistentPreRun` hook).
+(see [`specs/004-real-otel-export`](../../specs/004-real-otel-export/)
+for the OTel flush-on-exit wrapper and ADR-0001 for the mode-resolution
+`PersistentPreRun` hook).
 
 ## Consequences
 

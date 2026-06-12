@@ -6,14 +6,16 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/rshade/ax-go/internal/cli"
 )
-
-const defaultTelemetryShutdownTimeout = 2 * time.Second
 
 // ExecuteOption configures Execute.
 type ExecuteOption func(*executeConfig)
@@ -94,25 +96,29 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	if cfg.env == nil {
 		cfg.env = os.Getenv
 	}
-
-	ctx, telemetry, telemetryErr := StartTelemetry(ctx, WithTelemetryEnv(cfg.env))
-	if telemetryErr != nil {
-		_ = WriteError(cfg.stderr, NewError(
-			ctx,
-			"telemetry_error",
-			telemetryErr.Error(),
-			WithErrorTool(root.Name()),
-			WithErrorVersion(cfg.version),
-		))
-		return ExitInternal
+	if cfg.stderr == nil {
+		cfg.stderr = os.Stderr
 	}
+	cfg.stderr = &synchronizedWriter{writer: cfg.stderr}
+
+	ctx, telemetry, _ := StartTelemetry(
+		ctx,
+		WithTelemetryEnv(cfg.env),
+		WithTelemetryStderr(cfg.stderr),
+		WithTelemetryServiceName(root.Name()),
+		WithTelemetryServiceVersion(cfg.version),
+		WithTelemetryShutdownBudget(cfg.shutdownTimeout),
+	)
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.shutdownTimeout)
 		defer cancel()
 		if shutdownErr := telemetry.Shutdown(shutdownCtx); shutdownErr != nil {
-			fmt.Fprintf(cfg.stderr, "ax: otel shutdown failed: %v\n", shutdownErr)
+			fmt.Fprintf(cfg.stderr, "ax: otel shutdown failed: %s\n", telemetryDiagnostic(shutdownErr.Error()))
 		}
 	}()
+
+	ctx, span := otel.Tracer("github.com/rshade/ax-go").Start(ctx, root.Name())
+	defer span.End()
 
 	prepareCommand(root, cfg)
 	root.SetIn(cfg.stdin)
@@ -120,12 +126,24 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	root.SetErr(cfg.stderr)
 
 	if executeErr := root.ExecuteContext(ctx); executeErr != nil {
+		span.SetStatus(codes.Error, "")
 		axErr := normalizeExecuteError(root.Context(), root.Name(), cfg.version, executeErr)
 		_ = WriteError(cfg.stderr, axErr)
 		return axErr.ExitCode()
 	}
 
 	return ExitSuccess
+}
+
+type synchronizedWriter struct {
+	mu     sync.Mutex
+	writer io.Writer
+}
+
+func (w *synchronizedWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.writer.Write(p)
 }
 
 func prepareCommand(root *cobra.Command, cfg executeConfig) {
@@ -180,6 +198,7 @@ func wrapPersistentPreRun(root *cobra.Command, cfg executeConfig) {
 		ctx = WithDryRun(ctx, dryRun)
 		ctx = WithIdempotencyKey(ctx, idempotencyKey)
 		cmd.SetContext(ctx)
+		trace.SpanFromContext(ctx).SetName(cmd.CommandPath())
 
 		if previousE != nil {
 			if preRunErr := previousE(cmd, args); preRunErr != nil {
