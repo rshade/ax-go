@@ -32,8 +32,9 @@ observability when the same resource is referenced from multiple traces.
 ### Observability (`trace_id`, `span_id`)
 
 **Use OTel-generated W3C IDs** (see ADR-0004). Never substitute. Surface
-via the ZeroLog hook (ADR-0005), error envelopes (ADR-0002), and stdout
-JSON metadata blocks.
+via the ZeroLog hook documented in
+[`specs/004-real-otel-export`](../../specs/004-real-otel-export/), error
+envelopes (ADR-0002), and stdout JSON metadata blocks.
 
 ### Idempotency keys (`--idempotency-key`)
 

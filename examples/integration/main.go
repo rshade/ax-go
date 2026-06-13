@@ -69,6 +69,8 @@ func newRootCommand(stdin io.Reader, resolved string) *cobra.Command {
 		Use:   appName,
 		Short: "Exercise ax-go primitives from a real Cobra command",
 		Example: `  ax-integration --format=json --name Ada
+  OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 ax-integration --format=json
+  AX_OTEL_DEBUG=1 ax-integration --format=json
   ax-integration --config=config.hujson
   ax-integration stream --count=3
   ax-integration patch-config --config=config.hujson --patch='[{"op":"replace","path":"/count","value":5}]'

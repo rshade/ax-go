@@ -37,12 +37,6 @@ safety item (#1, bounded config reads) shipped 2026-06-06 (`ea74c7d`).
 
 ## Near-Term Vision (v0.2.0 — remaining runtime promises)
 
-- [ ] #2 Real OTel export + span lifecycle (ADR-0005) [L] — `telemetry.go:60`
-  installs a `TracerProvider` with **no exporter**, so spans are discarded and
-  no span wraps command execution (logger `trace_id`/`span_id` stay zero unless
-  `TRACEPARENT` is injected). Add a configurable OTLP exporter, create a root
-  span around `Execute`, and use a flush path that guarantees zero loss on a
-  short-lived process exit.
 - [ ] #3 Golden-file tests for stable-by-contract output [M] — `__schema` (ax +
   mcp) and the `ax.Error` envelope JSON are public API. Add `testdata/` golden
   files and diff tests so schema drift is caught.
@@ -162,9 +156,11 @@ gaps that deepen the machine-contract half of AX.*
   1 MiB `io.LimitReader`; an oversized config is an `ExitValidation` error, not
   an OOM. Shipped 2026-06-06 (`ea74c7d`).
 - [x] zerolog logger + trace-correlation hook (ADR-0009) [M].
-- [x] Telemetry W3C extraction + no-op scaffold (ADR-0005, partial) [M] —
-  `TRACEPARENT`/`TRACESTATE` extraction and provider lifecycle; real export
-  still pending (see Near-Term).
+- [x] #2 Real OTel export + span lifecycle
+  ([specs/004-real-otel-export](specs/004-real-otel-export)) [L] —
+  recording root span around `Execute`, log correlation with no collector,
+  OTLP HTTP export with synchronous bounded attempts, `AX_OTEL_DEBUG` stderr
+  export, fail-open diagnostics, and outbound propagation coverage.
 - [x] Integration example CLI (`examples/integration/`) [M].
 - [x] ADR-0012 directory layout [S] — documents the public root facade,
   `internal/` implementation packages, `cmd/` runnable binaries, and

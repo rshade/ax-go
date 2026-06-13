@@ -8,7 +8,9 @@ ACCEPTED — 2026-05-28.
 
 Per the Golden Rule, structured JSON logs go to `stderr`. ax-go needs
 a fast, allocation-conscious logger that integrates with OTel trace
-correlation (ADR-0005) and Loki cardinality discipline (ADR-0006).
+correlation (delivered by
+[`specs/004-real-otel-export`](../../specs/004-real-otel-export/)) and Loki
+cardinality discipline (ADR-0006).
 
 ## Decision Drivers
 
@@ -61,8 +63,9 @@ The ax base exposes `ax.NewLogger(ctx)` as the canonical constructor,
 returning an `ax.Logger` (initially backed by `*zerolog.Logger`)
 pre-wired with:
 
-- The OTel correlation hook (ADR-0005) injecting `trace_id` and
-  `span_id` on every line.
+- The OTel correlation hook documented in
+  [`specs/004-real-otel-export`](../../specs/004-real-otel-export/)
+  injecting `trace_id` and `span_id` on every line.
 - Type-segregated label vs. payload field APIs supporting ADR-0006's
   Loki cardinality rule.
 

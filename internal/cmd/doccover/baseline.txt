@@ -11,5 +11,4 @@ Execute
 Logger
 NewLogger
 Schema
-StartTelemetry
 Telemetry

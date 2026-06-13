@@ -16,6 +16,8 @@ const (
 	ModeHuman Mode = "human"
 )
 
+const truthyTrue = "true"
+
 // ModeDetectionRule documents the ADR-0001 resolution precedence applied by
 // ResolveMode. It is surfaced verbatim in __schema output.
 const ModeDetectionRule = "--format flag > AGENT_MODE env > TTY detection"
@@ -56,7 +58,7 @@ func ResolveMode(explicitFormat, agentMode string, stdoutIsTTY bool) (Mode, erro
 
 func parseAgentMode(value string) (Mode, error) {
 	switch strings.ToLower(strings.TrimSpace(value)) {
-	case "1", "true", "yes", "on", "json", "agent", "machine":
+	case "1", truthyTrue, "yes", "on", "json", "agent", "machine":
 		return ModeJSON, nil
 	case "0", "false", "no", "off", string(ModeHuman), "text":
 		return ModeHuman, nil
