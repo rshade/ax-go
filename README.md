@@ -3,15 +3,16 @@
 > Agentic Experience (AX) foundation for Go CLI tools — the "Common DNA" for
 > the rshade portfolio.
 
-[![Go](https://img.shields.io/badge/Go-1.25-00ADD8?logo=go)](go.mod)
+[![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](go.mod)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-> **Status: ✅ Released.** The current release is **v0.1.0** — the first
-> pinnable version: `go get github.com/rshade/ax-go@v0.1.0`. Core primitives
-> such as `ax.Error`, `ax.Execute`, `ax.NewLogger`, `ax.ParseConfig`, and
-> `ax.NewEntityID` are covered by contract tests, and all public output shapes
-> are frozen by golden fixtures. See [CHANGELOG.md](CHANGELOG.md) for release
-> history.
+> **Status: Released.** The current pinnable release is **v0.0.1**:
+> `go get github.com/rshade/ax-go@v0.0.1`. The v0.1.0 output contracts are
+> already frozen in code — core primitives such as `ax.Error`, `ax.Execute`,
+> `ax.NewLogger`, `ax.ParseConfig`, and `ax.NewEntityID` are covered by
+> contract tests, and all public output shapes are pinned by golden fixtures.
+> v0.1.0 itself is tagged by release-please from the Conventional Commit
+> history; see [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## Mission
 
@@ -184,12 +185,14 @@ public subpackages are intentionally avoided.
 The runnable integration command in
 [`examples/integration/`](examples/integration/) exercises the public `ax-go`
 API from a real Cobra CLI. It covers bounded JSON envelopes, NDJSON streaming,
-Hujson config parsing, `__schema`, structured `ax.Error` output, idempotency
-keys, and stderr logging.
+Hujson config parsing, in-place Hujson patching, `__schema`, structured
+`ax.Error` output, idempotency keys, and stderr logging.
 
 ```sh
 go run ./examples/integration --format=json --idempotency-key=demo-key --name=Ada
 go run ./examples/integration stream --format=json --count=3
+go run ./examples/integration patch-config --format=json --config=config.json \
+  --patch='[{"op":"replace","path":"/name","value":"Grace"}]'
 go run ./examples/integration __schema
 go run ./examples/integration fail --format=json
 ```
