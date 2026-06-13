@@ -7,15 +7,16 @@
 
 ## Status note
 
-All open items are filed as GitHub issues (`#2`–`#32`) and carry `roadmap/*` +
+All open items are filed as GitHub issues (`#4`–`#48`) and carry `roadmap/*` +
 `effort/*` labels synced to the sections below. Level-of-effort indicators:
-`[S]` Small (1-2h), `[M]` Medium (½-1d), `[L]` Large (multi-day). No milestones
-or release tags exist yet (pre-v0.1.0).
+`[S]` Small (1-2h), `[M]` Medium (½-1d), `[L]` Large (multi-day). `v0.0.1` is
+released via release-please; the `v0.1.0` output contracts are frozen and await
+the next release tag.
 
-The codebase today is a **functional skeleton**: the envelope/schema/mode
-*shapes* are real and tested, but the load-bearing runtime promises (real OTel
-export, bounded reads, the full test discipline) are deferred. The work below
-makes the foundation honest.
+The load-bearing runtime promises are now landing: bounded config reads (#1) and
+real OTel export + span lifecycle (#2) have shipped. What remains to make the
+foundation fully honest is the test discipline (#4 fuzz, #5 determinism), the
+telemetry follow-up polish (#45–#48), and the v1.0 governance surface below.
 
 ## Vision
 
@@ -26,20 +27,25 @@ primitives, and short-lived-process-correct observability.
 
 ## Immediate Focus (v0.2.0 — deliver the runtime promises)
 
-Single-WIP per the Promotion Gate (`target_focus_depth: 1`). v0.1.0's lone
-safety item (#1, bounded config reads) shipped 2026-06-06 (`ea74c7d`).
+Single-WIP per the Promotion Gate (`target_focus_depth: 1`). The prior slot
+holder (#6, build-time version injection) shipped 2026-06-10 and #2 (real OTel
+export) closed 2026-06-13, opening this slot.
 
-- [ ] #6 Build-time version injection [S] — wire `-ldflags "-X ..."` in the
-  `Makefile` and `examples/integration/` so `__schema.version` is a real value,
-  never empty/`dev`.
-  *Promoted by /roadmap sync on 2026-06-08 — fills the single Immediate Focus
-  slot opened when #1 closed.*
+- [ ] #45 Refactor telemetry internals [S] — dedupe the sanitizer + mutex
+  writer and simplify the fail-open helpers in `internal/telemetry`, hardening
+  the code merged for #2 while it is fresh.
+  *Promoted by /roadmap sync on 2026-06-12 — epic-child of the just-closed #2
+  (score +25); fills the single Immediate Focus slot.*
 
 ## Near-Term Vision (v0.2.0 — remaining runtime promises)
 
-- [ ] #3 Golden-file tests for stable-by-contract output [M] — `__schema` (ax +
-  mcp) and the `ax.Error` envelope JSON are public API. Add `testdata/` golden
-  files and diff tests so schema drift is caught.
+- [ ] #46 Telemetry unit tests [M] — first unit tests for `internal/telemetry`,
+  covering fail-open, `tracestate`, and debug-export paths on the #2 code.
+- [ ] #47 Inject `service.version` in the integration example [S] — set the OTel
+  resource `service.version` so the reference CLI stops emitting
+  `version=0.0.0-unknown`.
+- [ ] #48 Telemetry doc fixes [S] — correct the understated `Start` doc, drop the
+  stale `WithSyncer` reference, and add the writer rationale.
 - [ ] #4 Fuzz tests for every parser surface (AGENTS mandate) [M] — Hujson
   config input, idempotency-key validation, error-envelope round-trip, and
   `TRACEPARENT` extraction each need a `FuzzXxx`. This is the canonical tracker
@@ -161,6 +167,12 @@ gaps that deepen the machine-contract half of AX.*
   recording root span around `Execute`, log correlation with no collector,
   OTLP HTTP export with synchronous bounded attempts, `AX_OTEL_DEBUG` stderr
   export, fail-open diagnostics, and outbound propagation coverage.
+- [x] #6 Build-time version injection via `-ldflags` [S] — `__schema.version`,
+  the `ax.Error` envelope `version`, and the logger `version` label resolve
+  through `ax.ResolveVersion`; never ships `dev`/`unknown`. Closed 2026-06-10.
+- [x] #3 Golden-file tests for `__schema` + `ax.Error` envelope [M] — public
+  output shapes pinned by `testdata/` fixtures so schema drift breaks CI. Closed
+  2026-06-11.
 - [x] Integration example CLI (`examples/integration/`) [M].
 - [x] ADR-0012 directory layout [S] — documents the public root facade,
   `internal/` implementation packages, `cmd/` runnable binaries, and
