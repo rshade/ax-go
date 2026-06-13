@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.0.2](https://github.com/rshade/ax-go/compare/v0.0.1...v0.0.2) (2026-06-13)
+
+
+### Added
+
+* **config:** add Hujson patch API and freeze v0.1.0 output contracts ([#37](https://github.com/rshade/ax-go/issues/37)) ([43187ad](https://github.com/rshade/ax-go/commit/43187adef95de52a58e6cf805fae481d763305f3)), closes [#3](https://github.com/rshade/ax-go/issues/3) [#6](https://github.com/rshade/ax-go/issues/6) [#14](https://github.com/rshade/ax-go/issues/14)
+* **telemetry:** add real OTLP export and command span lifecycle ([#49](https://github.com/rshade/ax-go/issues/49)) ([c28f86a](https://github.com/rshade/ax-go/commit/c28f86a9893a8d3b52e88eb28ced99a3af9e6b3b)), closes [#2](https://github.com/rshade/ax-go/issues/2)
+
 ## 0.0.1 (2026-06-11)
 
 
