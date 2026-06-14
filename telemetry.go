@@ -133,7 +133,12 @@ func StartTelemetry(ctx context.Context, opts ...TelemetryOption) (context.Conte
 		ShutdownBudget: cfg.shutdownBudget,
 	})
 	if err != nil {
-		fmt.Fprintf(cfg.stderr, "ax: otel disabled: %s\n", telemetryDiagnostic(err.Error()))
+		// This branch is intentionally unreachable today: internaltelemetry.Start
+		// handles all failure modes fail-open internally and always returns nil.
+		// The branch exists solely for signature stability — if a future change to
+		// internal.Start ever makes it fallible, the public API contract (fail-open
+		// with a no-op provider) is already enforced here without a breaking change.
+		fmt.Fprintf(cfg.stderr, "ax: otel disabled: %s\n", internaltelemetry.SanitizeDiagnostic(err.Error()))
 		tp = sdktrace.NewTracerProvider(sdktrace.WithSampler(sdktrace.AlwaysSample()))
 		otel.SetTracerProvider(tp)
 	}
@@ -145,20 +150,9 @@ func telemetryDebugEnabled(value string) bool {
 	switch strings.ToLower(strings.TrimSpace(value)) {
 	case "", "0", "false", "no", "off":
 		return false
-	case truthyTrue, "1", "yes", "on":
-		return true
 	default:
 		return true
 	}
-}
-
-func telemetryDiagnostic(value string) string {
-	return strings.Map(func(r rune) rune {
-		if r < 0x20 || r == 0x7f {
-			return ' '
-		}
-		return r
-	}, value)
 }
 
 // Shutdown flushes and shuts down the configured tracer provider.

@@ -72,7 +72,7 @@ mapped to concrete OTel SDK types and the ax-go option surface.
 - **What**: the mechanism handing finished spans to the exporter, force-flushed
   at exit (spec Key Entity).
 - **Type**: `sdktrace.SimpleSpanProcessor` (one per active exporter), registered
-  via `WithSpanProcessor`/`WithSyncer`.
+  via `WithSpanProcessor`.
 - **Rules**: exports **synchronously at `span.End()`** (research D3), so a
   completed root span is exported before `Telemetry.Shutdown` runs; the shutdown
   flush is bounded by the shutdown budget and the exporter is bounded by a derived

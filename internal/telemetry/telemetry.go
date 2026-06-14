@@ -40,7 +40,22 @@ type Config struct {
 	ShutdownBudget time.Duration
 }
 
-// Start installs W3C trace propagation and returns a tracer provider.
+// Start installs W3C trace propagation, resolves exporters from cfg, and
+// returns a context carrying any inbound trace/state from cfg.TraceParent and
+// cfg.TraceState, a fully configured TracerProvider, and a nil error.
+//
+// Exporter resolution (fail-open):
+//   - cfg.OTLPEndpoint set → OTLP HTTP exporter attached via SimpleSpanProcessor;
+//     construction failure emits a one-time stderr diagnostic and the exporter
+//     is skipped — the provider remains usable.
+//   - cfg.Debug set → pretty-print stderr debug exporter attached; same
+//     fail-open behavior on construction failure.
+//   - Both, neither, or either may be active simultaneously.
+//
+// The error return is always nil. Exporter and propagation failures degrade
+// to a no-op/recording-only provider rather than surfacing an error; the error
+// return exists solely for signature stability in case a future change makes
+// Start fallible.
 func Start(ctx context.Context, cfg Config) (context.Context, *sdktrace.TracerProvider, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -77,7 +92,7 @@ func Start(ctx context.Context, cfg Config) (context.Context, *sdktrace.TracerPr
 	}
 	if cfg.Debug {
 		exporter, err := stdouttrace.New(
-			stdouttrace.WithWriter(&lockedWriter{writer: cfg.Stderr}),
+			stdouttrace.WithWriter(NewLockedWriter(cfg.Stderr)),
 			stdouttrace.WithPrettyPrint(),
 			stdouttrace.WithoutTimestamps(),
 		)
@@ -170,14 +185,14 @@ type diagnosticExporter struct {
 	once     sync.Once
 }
 
+// ExportSpans is fail-open: an export failure is reported as a one-time stderr
+// diagnostic and the return is always nil so a single unreachable collector
+// cannot cascade into a command failure.
 func (e *diagnosticExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlySpan) error {
-	err := e.exporter.ExportSpans(ctx, spans)
-	if err != nil {
+	if err := e.exporter.ExportSpans(ctx, spans); err != nil {
 		e.once.Do(func() {
 			writeDiagnostic(e.stderr, "otel export failed", err)
 		})
-		//nolint:nilerr // Export is fail-open; the diagnostic is the contract.
-		return nil
 	}
 	return nil
 }
@@ -195,9 +210,20 @@ func (e *diagnosticExporter) Shutdown(ctx context.Context) error {
 	return nil
 }
 
+// lockedWriter serializes concurrent writes to an underlying io.Writer using a
+// mutex. NewLockedWriter constructs one; the type itself is unexported.
 type lockedWriter struct {
 	mu     sync.Mutex
 	writer io.Writer
+}
+
+// NewLockedWriter returns an io.Writer that serializes all writes to w with a
+// mutex. It is used at two intentional layers of defense-in-depth: Execute (ax
+// package) wraps cfg.stderr before any goroutine touches it, and Start wraps
+// the same writer again for the specific inner path taken by the stdouttrace
+// debug exporter. Each layer cannot assume the other synchronizes its writes.
+func NewLockedWriter(w io.Writer) io.Writer {
+	return &lockedWriter{writer: w}
 }
 
 func (w *lockedWriter) Write(p []byte) (int, error) {
@@ -214,10 +240,13 @@ func writeDiagnostic(w io.Writer, message string, err error) {
 		fmt.Fprintf(w, "ax: %s\n", message)
 		return
 	}
-	fmt.Fprintf(w, "ax: %s: %s\n", message, sanitizeDiagnostic(err.Error()))
+	fmt.Fprintf(w, "ax: %s: %s\n", message, SanitizeDiagnostic(err.Error()))
 }
 
-func sanitizeDiagnostic(value string) string {
+// SanitizeDiagnostic replaces ASCII control characters (< 0x20 and DEL 0x7f)
+// with spaces, preventing log-forging via newline injection or ANSI escapes in
+// error messages that are written to stderr diagnostics.
+func SanitizeDiagnostic(value string) string {
 	return strings.Map(func(r rune) rune {
 		if r < 0x20 || r == 0x7f {
 			return ' '

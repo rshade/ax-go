@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	internaltelemetry "github.com/rshade/ax-go/internal/telemetry"
 )
 
 // TestExecuteTelemetryRejectsUntrustedTLS guards FR-004: outbound OTLP export
@@ -39,11 +41,11 @@ func TestExecuteTelemetryRejectsUntrustedTLS(t *testing.T) {
 }
 
 func TestTelemetryDiagnosticSanitizesControlCharacters(t *testing.T) {
-	got := telemetryDiagnostic("bad\nforged: line\ttab\x1b[31mred\x7f")
+	got := internaltelemetry.SanitizeDiagnostic("bad\nforged: line\ttab\x1b[31mred\x7f")
 	if strings.ContainsAny(got, "\n\t\x1b\x7f") {
-		t.Fatalf("telemetryDiagnostic left control characters (log-forging risk): %q", got)
+		t.Fatalf("SanitizeDiagnostic left control characters (log-forging risk): %q", got)
 	}
 	if !strings.Contains(got, "forged: line") {
-		t.Fatalf("telemetryDiagnostic dropped legitimate content: %q", got)
+		t.Fatalf("SanitizeDiagnostic dropped legitimate content: %q", got)
 	}
 }
