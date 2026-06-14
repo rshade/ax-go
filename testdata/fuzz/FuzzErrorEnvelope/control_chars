@@ -1,0 +1,4 @@
+go test fuzz v1
+string("config_invalid")
+string("line1\nline2\ttab")
+string("decode failed")
