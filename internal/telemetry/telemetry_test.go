@@ -7,10 +7,43 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/trace"
 )
+
+func TestSanitizeDiagnostic(t *testing.T) {
+	tests := []struct {
+		name  string
+		input string
+		want  string
+	}{
+		{
+			name:  "sanitizes control characters",
+			input: "bad\nforged: line\ttab\x1b[31mred\x7f",
+			want:  "bad forged: line tab [31mred ",
+		},
+		{
+			name:  "passes normal strings through unchanged",
+			input: "normal error message",
+			want:  "normal error message",
+		},
+		{
+			name:  "replaces DEL (0x7f) with space",
+			input: "before\x7fafter",
+			want:  "before after",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := SanitizeDiagnostic(tc.input); got != tc.want {
+				t.Fatalf("SanitizeDiagnostic(%q) = %q, want %q", tc.input, got, tc.want)
+			}
+		})
+	}
+}
 
 func TestTelemetryResource(t *testing.T) {
 	const (
@@ -153,6 +186,35 @@ func (s *stubExporter) ExportSpans(context.Context, []sdktrace.ReadOnlySpan) err
 
 func (s *stubExporter) Shutdown(context.Context) error {
 	return s.shutdownErr
+}
+
+func TestStartExtractsTraceState(t *testing.T) {
+	const (
+		traceID    = "4bf92f3577b34da6a3ce929d0e0e4736"
+		spanID     = "00f067aa0ba902b7"
+		traceState = "rojo=00f067aa0ba902b7"
+	)
+
+	ctx, tp, err := Start(context.Background(), Config{
+		TraceParent: "00-" + traceID + "-" + spanID + "-01",
+		TraceState:  traceState,
+	})
+	if err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+	t.Cleanup(func() {
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		_ = tp.Shutdown(shutdownCtx)
+	})
+
+	sc := trace.SpanContextFromContext(ctx)
+	if !sc.IsValid() {
+		t.Fatal("span context is not valid after Start with TRACEPARENT+TRACESTATE")
+	}
+	if got := sc.TraceState().String(); got != traceState {
+		t.Fatalf("TraceState = %q, want %q", got, traceState)
+	}
 }
 
 func TestDiagnosticExporterShutdownFailOpen(t *testing.T) {

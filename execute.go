@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"io"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -15,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/rshade/ax-go/internal/cli"
+	internaltelemetry "github.com/rshade/ax-go/internal/telemetry"
 )
 
 // ExecuteOption configures Execute.
@@ -99,7 +99,10 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	if cfg.stderr == nil {
 		cfg.stderr = os.Stderr
 	}
-	cfg.stderr = &synchronizedWriter{writer: cfg.stderr}
+	// Serialize all writes to stderr. OTel exporters, zerolog hooks, and the
+	// shutdown diagnostic may write concurrently; a mutex writer prevents
+	// interleaved or torn output lines.
+	cfg.stderr = internaltelemetry.NewLockedWriter(cfg.stderr)
 
 	ctx, telemetry, _ := StartTelemetry(
 		ctx,
@@ -113,7 +116,8 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.shutdownTimeout)
 		defer cancel()
 		if shutdownErr := telemetry.Shutdown(shutdownCtx); shutdownErr != nil {
-			fmt.Fprintf(cfg.stderr, "ax: otel shutdown failed: %s\n", telemetryDiagnostic(shutdownErr.Error()))
+			fmt.Fprintf(cfg.stderr, "ax: otel shutdown failed: %s\n",
+				internaltelemetry.SanitizeDiagnostic(shutdownErr.Error()))
 		}
 	}()
 
@@ -133,17 +137,6 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	}
 
 	return ExitSuccess
-}
-
-type synchronizedWriter struct {
-	mu     sync.Mutex
-	writer io.Writer
-}
-
-func (w *synchronizedWriter) Write(p []byte) (int, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-	return w.writer.Write(p)
 }
 
 func prepareCommand(root *cobra.Command, cfg executeConfig) {
