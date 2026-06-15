@@ -17,6 +17,7 @@ const defaultStreamCount = 3
 const appName = "ax-integration"
 const failCommandName = "fail"
 const patchConfigCommandName = "patch-config"
+const streamCommandName = "stream"
 
 type integrationConfig struct {
 	Name  string `json:"name"`
@@ -46,8 +47,19 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, env func(string) string) int {
+	return runWithEntityID(ctx, args, stdin, stdout, stderr, env, ax.NewEntityID)
+}
+
+func runWithEntityID(
+	ctx context.Context,
+	args []string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	env func(string) string,
+	newEntityID func() (string, error),
+) int {
 	resolved := ax.ResolveVersion(version)
-	root := newRootCommand(stdin, resolved)
+	root := newRootCommand(stdin, resolved, newEntityID)
 	root.SetArgs(args)
 
 	return ax.Execute(
@@ -61,7 +73,7 @@ func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.
 	)
 }
 
-func newRootCommand(stdin io.Reader, resolved string) *cobra.Command {
+func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string, error)) *cobra.Command {
 	var name string
 	var configPath string
 
@@ -87,7 +99,7 @@ func newRootCommand(stdin io.Reader, resolved string) *cobra.Command {
 			)
 
 			mode, _ := ax.ModeFromContext(cmd.Context())
-			entityID, err := ax.NewEntityID()
+			entityID, err := newEntityID()
 			if err != nil {
 				return fmt.Errorf("create entity id: %w", err)
 			}
@@ -126,7 +138,7 @@ func newStreamCommand() *cobra.Command {
 	var count int
 
 	cmd := &cobra.Command{
-		Use:   "stream",
+		Use:   streamCommandName,
 		Short: "Emit NDJSON envelopes",
 		Example: `  ax-integration stream --format=json --count=3
   ax-integration stream --count=3 --idempotency-key=demo-key`,

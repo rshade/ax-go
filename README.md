@@ -165,7 +165,6 @@ deleted.
 | [0007](docs/adr/0007-id-strategy.md) | ID Strategy | **Accepted (2026-05-28)** |
 | [0008](docs/adr/0008-cli-framework-cobra.md) | CLI Framework — Cobra | **Accepted (2026-05-28)** |
 | [0009](docs/adr/0009-logger-zerolog.md) | Structured Logger — ZeroLog | **Accepted (2026-05-28)** |
-| [0011](docs/adr/0011-output-payload-json.md) | Output Payload Format — Strict JSON / NDJSON | **Accepted (2026-05-28)** |
 | [0012](docs/adr/0012-directory-layout.md) | Directory Layout | **Accepted (2026-05-30)** |
 
 Full text and rationale live in [`docs/adr/`](docs/adr/).

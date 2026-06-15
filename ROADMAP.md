@@ -156,7 +156,7 @@ gaps that deepen the machine-contract half of AX.*
 - [x] `Execute()` Cobra lifecycle wrapper [L] — flag injection, schema
   injection, mode/idempotency/dry-run context, error normalization.
 - [x] ID generation — UUID v4/v7 (ADR-0007) [S].
-- [x] JSON + NDJSON envelope writers (ADR-0011) [S].
+- [x] JSON + NDJSON envelope writers [S].
 - [x] #1 Hujson read parsing and bounded read cap
   ([specs/001-bound-config-reads](specs/001-bound-config-reads)) [S] — default
   1 MiB `io.LimitReader`; an oversized config is an `ExitValidation` error, not
