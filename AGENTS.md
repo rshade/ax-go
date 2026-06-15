@@ -60,7 +60,7 @@ conflicts with the constitution, the constitution wins.
   file while preserving user formatting, use the AST `Patch` path
   preserved in `specs/001-bound-config-reads/research.md`. Output emits strict,
   minified JSON for bounded payloads and NDJSON for streaming or unbounded
-  result sets (ADR-0011).
+  result sets (absorbed into specs/006-output-determinism-harness/research.md).
 - All commands must support agent-safety primitives:
   - `--idempotency-key`, auto-generating UUID v4 when absent and surfacing the
     key in the output envelope.
@@ -284,4 +284,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
+at specs/006-output-determinism-harness/plan.md
 <!-- SPECKIT END -->
