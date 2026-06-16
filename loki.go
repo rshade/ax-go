@@ -23,8 +23,9 @@ const (
 	// not contain a recognisable "level" field, or when the field value is empty.
 	levelUnknown = "unknown"
 
-	// lokiFlushTimeout caps the wait in closeWithContext so process shutdown
-	// cannot block indefinitely; entries still in flight after this are dropped.
+	// lokiFlushTimeout caps the wait in drain and the final push issued by
+	// flushRemaining so process shutdown cannot block indefinitely; entries
+	// still in flight after this are dropped.
 	lokiFlushTimeout = 2 * time.Second
 
 	// lokiPostTimeout bounds each individual HTTP request to the Loki push API.
@@ -170,12 +171,12 @@ func (lw *lokiWriter) run(ctx context.Context) {
 		case entry := <-lw.ch:
 			batch = append(batch, entry)
 			if len(batch) >= lokiBatchSize {
-				lw.postBatch(context.Background(), batch)
+				lw.postBatch(ctx, batch)
 				batch = batch[:0]
 			}
 		case <-ticker.C:
 			if len(batch) > 0 {
-				lw.postBatch(context.Background(), batch)
+				lw.postBatch(ctx, batch)
 				batch = batch[:0]
 			}
 		case ack := <-lw.flushRequests:
@@ -232,11 +233,14 @@ func extractLevel(line string) string {
 // streamKeyFromLine returns the complete Loki stream grouping key for one
 // zerolog JSON log line. Only the low-cardinality allowlist is read from the
 // JSON body; trace_id, span_id, and all other fields stay payload-only.
+//
+// The level is whatever extractLevel returns, including the sentinel
+// "unknown" for malformed or missing level fields. Preserving "unknown" (rather
+// than blanking it) keeps the level label present on every stream so that
+// {level="unknown"} queries surface these lines instead of silently dropping
+// the label.
 func streamKeyFromLine(line string) lokiStreamKey {
 	key := lokiStreamKey{level: extractLevel(line)}
-	if key.level == levelUnknown {
-		key.level = ""
-	}
 
 	var fields map[string]json.RawMessage
 	if err := json.Unmarshal([]byte(line), &fields); err != nil {
@@ -381,8 +385,14 @@ func WithLokiFromEnv() LoggerOption {
 		}
 
 		parsed, err := url.Parse(rawURL)
-		if err != nil || parsed.Host == "" {
-			fmt.Fprintf(cfg.writer, "ax: AX_LOKI_URL is malformed: %v\n", err)
+		if err != nil {
+			fmt.Fprintf(cfg.writer, "ax: AX_LOKI_URL %q is malformed: %v\n", rawURL, err)
+			return
+		}
+		if parsed.Host == "" {
+			fmt.Fprintf(cfg.writer,
+				"ax: AX_LOKI_URL %q is missing a scheme://host "+
+					"(expected e.g. http://localhost:3100)\n", rawURL)
 			return
 		}
 
