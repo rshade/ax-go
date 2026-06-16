@@ -49,6 +49,7 @@ func requiredSymbols() []string {
 		"BuildMCPSchema",
 		"BuildSchema",
 		"Execute",
+		"Flush",
 		"NewEntityID",
 		"NewEnvelope",
 		"NewError",
@@ -60,6 +61,7 @@ func requiredSymbols() []string {
 		"PatchConfigFile",
 		"ResolveVersion",
 		"StartTelemetry",
+		"WithLokiFromEnv",
 		// core types
 		"Envelope",
 		"Error",

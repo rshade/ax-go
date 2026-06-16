@@ -120,9 +120,10 @@ in [ADR-0002](docs/adr/0002-error-envelope-schema.md).
   ([ADR-0004](docs/adr/0004-trace-id-format.md);
   real export lifecycle delivered by
   [spec 004](specs/004-real-otel-export/)).
-- **Observability backends:** Grafana Loki for log aggregation
-  ([ADR-0006](docs/adr/0006-loki-integration.md)); Tempo / Jaeger /
-  Honeycomb-compatible for traces via OTel.
+- **Observability backends:** Grafana Loki for log aggregation via
+  opt-in direct push (`AX_LOKI_URL`; see
+  [`specs/007-loki-direct-push/research.md`](specs/007-loki-direct-push/research.md));
+  Tempo / Jaeger / Honeycomb-compatible for traces via OTel.
 - **ID strategy:** OTel trace/span IDs for observability; UUID v4 for
   idempotency keys; UUID v7 for resource and entity IDs
   ([ADR-0007](docs/adr/0007-id-strategy.md)). Never mix observability IDs with
@@ -161,7 +162,6 @@ deleted.
 | [0002](docs/adr/0002-error-envelope-schema.md) | JSON Error Envelope Schema | **Accepted (2026-05-28)** |
 | [0003](docs/adr/0003-schema-output-format.md) | `__schema` Output Format | **Accepted (2026-05-28)** |
 | [0004](docs/adr/0004-trace-id-format.md) | Trace ID Format | **Accepted (2026-05-28)** |
-| [0006](docs/adr/0006-loki-integration.md) | Grafana Loki Backend Integration | **Accepted (2026-05-28)** |
 | [0007](docs/adr/0007-id-strategy.md) | ID Strategy | **Accepted (2026-05-28)** |
 | [0008](docs/adr/0008-cli-framework-cobra.md) | CLI Framework — Cobra | **Accepted (2026-05-28)** |
 | [0009](docs/adr/0009-logger-zerolog.md) | Structured Logger — ZeroLog | **Accepted (2026-05-28)** |

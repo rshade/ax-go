@@ -87,7 +87,10 @@ func BuildSchema(root *cobra.Command, opts ...SchemaOption) Schema {
 				"message",
 				"trace_id",
 				"tool",
-				"version",
+				// This is the error-envelope schema field key, a distinct public
+				// contract from the Loki stream-label key labelFieldVersion; the
+				// two must evolve independently, so do not collapse to that constant.
+				"version", //nolint:goconst // public schema field, not the Loki label key
 				"schema_version",
 			},
 			Optional: []string{

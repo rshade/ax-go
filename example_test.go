@@ -267,3 +267,36 @@ func ExamplePatchConfigFile() {
 	// true
 	// true
 }
+
+// ExampleWithLokiFromEnv shows the no-op path: when AX_LOKI_URL is unset,
+// WithLokiFromEnv adds no Loki sink and the logger behaves identically to a
+// logger without it. No network connection is attempted. CLI authors add this
+// option once; it activates only when operators set AX_LOKI_URL at runtime.
+func ExampleWithLokiFromEnv() {
+	os.Unsetenv("AX_LOKI_URL") // ensure deterministic no-op output
+	var buf bytes.Buffer
+	logger := ax.NewLogger(
+		context.Background(),
+		ax.WithLoggerWriter(&buf),
+		ax.WithLokiFromEnv(),
+	)
+	logger.Info(context.Background()).Msg("no loki sink active")
+	// Output:
+}
+
+// ExampleFlush shows the shutdown pattern: Flush drains any buffered Loki log
+// entries before the process exits. When no Loki sink is active (AX_LOKI_URL
+// unset), Flush is a no-op that returns nil immediately.
+func ExampleFlush() {
+	os.Unsetenv("AX_LOKI_URL") // ensure no-op for this example
+	var buf bytes.Buffer
+	logger := ax.NewLogger(
+		context.Background(),
+		ax.WithLoggerWriter(&buf),
+		ax.WithLokiFromEnv(),
+	)
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	_ = ax.Flush(ctx, logger)
+	// Output:
+}

@@ -61,13 +61,15 @@ export) closed 2026-06-13, opening this slot.
 
 ### Library & runtime
 
-- [ ] #7 Loki direct-push addon (`loki.go`, ADR-0006) [M] — opt-in via
+- [x] #7 Loki direct-push addon (`loki.go`) [M] — opt-in via
   `AX_LOKI_URL` as a **separate addon file**, never coupled into `logger.go`;
-  the core logger must stay shippable with no Loki dependency. Non-blocking
-  push, failures never break the CLI's primary work.
-- [ ] #8 Logger cardinality-discipline enforcement [M] — enforce the
-  label/payload split (ADR-0006) at the API level so high-cardinality fields
-  can't be promoted to Loki labels.
+  the core logger stays shippable with no Loki dependency. Non-blocking push,
+  failures never break the CLI's primary work. Shipped via
+  [`specs/007-loki-direct-push`](specs/007-loki-direct-push/).
+- [x] #8 Logger cardinality-discipline enforcement [M] — enforce the
+  label/payload split (Constitution Principle VIII) at the API level so
+  high-cardinality fields can't be promoted to Loki labels. Delivered as part
+  of `specs/007-loki-direct-push` (`loki.go` `buildStreamMap` + FR-009).
 - [ ] #9 Hujson AST `Patch` write path [L] — mutate an existing Hujson file
   while preserving user formatting/comments, since strict-JSON writes can't.
   The retired Hujson input decision's read/write consequences are absorbed in

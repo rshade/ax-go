@@ -87,7 +87,8 @@ conflicts with the constitution, the constitution wins.
 - Grafana Loki is the log aggregation target; Tempo, Jaeger, and
   Honeycomb-compatible systems are valid trace backends through OTel.
   Default log shipping is decoupled (`stderr` → Promtail/Alloy DaemonSet);
-  direct push is opt-in via `AX_LOKI_URL` (ADR-0006). Enforce label
+  direct push is opt-in via `AX_LOKI_URL` (Constitution Principle VIII;
+  see `specs/007-loki-direct-push/research.md`). Enforce label
   cardinality discipline at the logger API level: `environment`,
   `application`, `level`, `host`, and `version` are labels
   (low-cardinality, indexed); `trace_id`, `span_id`, `user_id`, durations,
@@ -260,7 +261,8 @@ follows them.
 - Never relax machine-readable output guarantees for human convenience.
 - Never use trace IDs as resource IDs or resource IDs as trace IDs.
 - **Never log PII, secrets, tokens, or credentials** — not in Loki labels,
-  not in JSON payload. The cardinality split (ADR-0006) governs index
+  not in JSON payload. The cardinality split (Constitution Principle VIII)
+  governs index
   performance; the no-PII rule is privacy/security and applies to all log
   output regardless.
 - **Never compose log messages from un-sanitized user-controlled strings.**
