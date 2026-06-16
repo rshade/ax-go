@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -18,6 +19,7 @@ const appName = "ax-integration"
 const failCommandName = "fail"
 const patchConfigCommandName = "patch-config"
 const streamCommandName = "stream"
+const lokiFlushBudget = 3 * time.Second
 
 type integrationConfig struct {
 	Name  string `json:"name"`
@@ -96,7 +98,13 @@ func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string
 					Application: appName,
 					Version:     resolved,
 				}),
+				ax.WithLokiFromEnv(),
 			)
+			defer func() {
+				flushCtx, cancel := context.WithTimeout(context.Background(), lokiFlushBudget)
+				defer cancel()
+				_ = ax.Flush(flushCtx, logger)
+			}()
 
 			mode, _ := ax.ModeFromContext(cmd.Context())
 			entityID, err := newEntityID()

@@ -2,6 +2,7 @@ package ax
 
 import (
 	"context"
+	"errors"
 	"io"
 	"os"
 
@@ -16,6 +17,16 @@ type Labels struct {
 	Version     string
 }
 
+// labelField* are the zerolog field names written by applyLabels and used as
+// Loki stream label keys in loki.go. They are defined here alongside Labels
+// so that any change to the label name is made in one place.
+const (
+	labelFieldEnvironment = "environment"
+	labelFieldApplication = "application"
+	labelFieldHost        = "host"
+	labelFieldVersion     = "version"
+)
+
 // Logger is the ADR-0009 logging surface, initially backed by zerolog.
 type Logger interface {
 	Debug(ctx context.Context) *zerolog.Event
@@ -26,17 +37,37 @@ type Logger interface {
 	Zerolog() *zerolog.Logger
 }
 
+// flusher is satisfied by Logger implementations that support draining buffered
+// sinks (e.g. the Loki direct-push sink). It is unexported to keep the public
+// Logger interface stable; ax.Flush uses a type assertion to reach it.
+type flusher interface {
+	flush(ctx context.Context) error
+}
+
+// logSink is a write-through log destination that can drain buffered entries on
+// shutdown. It is the single contract for an additional sink: every sink is an
+// io.Writer (fanned out via io.MultiWriter in NewLogger) and exposes a
+// context-aware drain (capped per-sink so shutdown cannot hang). The Loki
+// direct-push writer is the only implementation today.
+type logSink interface {
+	io.Writer
+	drain(ctx context.Context) error
+}
+
 type zerologLogger struct {
 	logger zerolog.Logger
+	sinks  []logSink // mirrors cfg.additionalSinks for flush access
 }
 
 // LoggerOption configures NewLogger.
 type LoggerOption func(*loggerConfig)
 
 type loggerConfig struct {
-	writer io.Writer
-	level  zerolog.Level
-	labels Labels
+	ctx             context.Context //nolint:containedctx // carried to bound sink goroutines to the logger lifetime
+	writer          io.Writer
+	level           zerolog.Level
+	labels          Labels
+	additionalSinks []logSink // optional extra write-through sinks
 }
 
 // WithLoggerWriter sets the logger output writer. Defaults to stderr.
@@ -61,8 +92,11 @@ func WithLoggerLabels(labels Labels) LoggerOption {
 }
 
 // NewLogger returns an ax Logger backed by zerolog and wired for trace correlation.
+// When LoggerOptions include additional sinks (e.g. WithLokiFromEnv), every log
+// line is fanned out to all sinks via io.MultiWriter alongside the primary writer.
 func NewLogger(ctx context.Context, opts ...LoggerOption) Logger {
 	cfg := loggerConfig{
+		ctx:    ctx,
 		writer: os.Stderr,
 		level:  zerolog.InfoLevel,
 	}
@@ -70,12 +104,21 @@ func NewLogger(ctx context.Context, opts ...LoggerOption) Logger {
 		opt(&cfg)
 	}
 
-	base := zerolog.New(cfg.writer).Level(cfg.level).With()
+	w := cfg.writer
+	if len(cfg.additionalSinks) > 0 {
+		writers := make([]io.Writer, 0, 1+len(cfg.additionalSinks))
+		writers = append(writers, cfg.writer)
+		for _, s := range cfg.additionalSinks {
+			writers = append(writers, s)
+		}
+		w = io.MultiWriter(writers...)
+	}
+
+	base := zerolog.New(w).Level(cfg.level).With()
 	base = applyLabels(base, cfg.labels)
 	logger := base.Logger().Hook(tracingHook{})
-	_ = ctx
 
-	return zerologLogger{logger: logger}
+	return zerologLogger{logger: logger, sinks: cfg.additionalSinks}
 }
 
 func (l zerologLogger) Debug(ctx context.Context) *zerolog.Event {
@@ -97,7 +140,10 @@ func (l zerologLogger) Error(ctx context.Context) *zerolog.Event {
 func (l zerologLogger) WithLabels(labels Labels) Logger {
 	ctx := l.logger.With()
 	ctx = applyLabels(ctx, labels)
-	return zerologLogger{logger: ctx.Logger()}
+	// Carry sinks forward so ax.Flush still drains buffered entries (e.g. the
+	// Loki sink) on the derived logger. Loki stream labels are extracted from
+	// each emitted log line, so labels added here remain queryable in Loki.
+	return zerologLogger{logger: ctx.Logger(), sinks: l.sinks}
 }
 
 func (l zerologLogger) Zerolog() *zerolog.Logger {
@@ -105,18 +151,36 @@ func (l zerologLogger) Zerolog() *zerolog.Logger {
 	return &logger
 }
 
+// flush drains each additional sink in order, passing the caller's context so
+// sinks can respect cancellation and deadlines (e.g. the Loki writer, which caps
+// its own wait). Drain errors are collected and joined.
+//
+// flush satisfies the unexported flusher interface so ax.Flush can drain
+// buffered sinks without modifying the public Logger contract. Exit code
+// mapping: sink drain errors are surfaced to ax.Flush callers but do not map
+// to a CLI exit code.
+func (l zerologLogger) flush(ctx context.Context) error {
+	var errs []error
+	for _, s := range l.sinks {
+		if err := s.drain(ctx); err != nil {
+			errs = append(errs, err)
+		}
+	}
+	return errors.Join(errs...)
+}
+
 func applyLabels(ctx zerolog.Context, labels Labels) zerolog.Context {
 	if labels.Environment != "" {
-		ctx = ctx.Str("environment", labels.Environment)
+		ctx = ctx.Str(labelFieldEnvironment, labels.Environment)
 	}
 	if labels.Application != "" {
-		ctx = ctx.Str("application", labels.Application)
+		ctx = ctx.Str(labelFieldApplication, labels.Application)
 	}
 	if labels.Host != "" {
-		ctx = ctx.Str("host", labels.Host)
+		ctx = ctx.Str(labelFieldHost, labels.Host)
 	}
 	if labels.Version != "" {
-		ctx = ctx.Str("version", labels.Version)
+		ctx = ctx.Str(labelFieldVersion, labels.Version)
 	}
 	return ctx
 }
