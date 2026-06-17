@@ -1,6 +1,29 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Amendment 2026-06-16 — Version change: 1.1.0 → 1.2.0 (MINOR)
+Bump rationale: Added TWO new principles and removed/redefined nothing, so MINOR
+(a new principle/section) is correct — not MAJOR, not PATCH.
+Added principles:
+  XI. Stability & SemVer — pragmatic pre-v1.0 contract (0.MINOR.0 MAY break;
+      0.x.PATCH bug-fixes-only; never auto-promote to 1.0.0); breaking-change
+      definition over BOTH the Go API surface and machine-payload shapes
+      (additive-tolerant); per-package-kind tier (internal/ exempt, root ax
+      governed, experimental noted). Mirrors specs/008-stability-deprecation-policy/contracts/stability-policy.md
+      Contract A and release-please-config.json bump flags.
+  XII. Deprecation Lifecycle — //Deprecated: Go-convention comment format,
+      mandatory migration note, ≥1 published 0.MINOR.0 notice window, staticcheck
+      SA1019 tooling (already enabled). Mirrors Contract B.
+Templates: plan/spec/tasks templates reviewed — no change required (they encode no
+stability or deprecation contract).
+Derived docs reconciled in this change: AGENTS.md (Accepted Architecture references
+both new principles), README.md (Status section documents the pre-v1.0 tier and links
+the policy). release-please-config.json aligned (bump-patch-for-minor-pre-major: false).
+No new ADRs created (SC-004) — the issue's proposed ADR-0013/ADR-0014 are recorded as
+constitution principles instead, per the frozen-ADR mandate.
+Modified principles: none (two added; nothing changed or removed).
+
+--- Amendment 2026-06-01 below ---
 Amendment 2026-06-01 — Version change: 1.0.0 → 1.1.0 (MINOR)
 Bump rationale: Materially expanded Principle VII (Test-First Discipline) to make
 documentation part of the verified contract: doc-comment PRESENCE gated at 100%
@@ -229,6 +252,63 @@ gets it right once for the whole portfolio.
 **Rationale**: A predictable, low-maintenance foundation that ages well and stays
 cheap to migrate.
 
+### XI. Stability & SemVer
+
+- **Pre-v1.0 contract (pragmatic `0.x`)**: while ax-go is in `0.x`, a `0.MINOR.0`
+  bump (the minor digit increments) MAY contain breaking changes; a `0.x.PATCH`
+  release MUST stay backward-compatible (bug fixes only — no breaking change and no
+  new exported surface). Patch releases are ALWAYS safe to take; that is the one hard
+  pre-v1.0 guarantee. Breaking changes MUST NOT auto-promote to `1.0.0` — promotion to
+  v1 is a deliberate, separate decision.
+- **Breaking-change definition (two surfaces)**: a change is breaking if it breaks a
+  consumer who depends only on the public surface.
+  - **Go API surface** (exported identifiers of package `ax`): `add` is non-breaking;
+    `remove`, `rename`, `re-type`, or `semantic change` is **breaking**.
+  - **Machine-payload shapes** (`ax.Error` envelope, `__schema` output) are
+    **additive-tolerant**: `add` a field is non-breaking (consumers MUST tolerate
+    unknown fields); `remove`, `rename`, `re-type`, or `semantic change` of an existing
+    field is **breaking**.
+- **Stability tier by package kind**: `internal/` packages are EXEMPT (the toolchain
+  blocks external import, so there is no external consumer to break); the root package
+  `ax` is GOVERNED by this policy; future experimental packages (e.g. a hypothetical
+  `ax/x/...`) are treated as pre-v1.0 regardless of the root version and documented
+  separately if introduced.
+- **Implied bump pre-v1.0**: any `breaking` change maps to a **minor** bump — never
+  major, never patch. A `non-breaking` `feat:` is a minor bump; a `non-breaking` `fix:`
+  is a patch. `release-please-config.json` enforces this (`bump-minor-pre-major: true`,
+  `bump-patch-for-minor-pre-major: false`).
+
+**Rationale**: ax-go's contract is broader than its Go types — `__schema` and the
+`ax.Error` envelope are declared public API (Principle III) and guarded by golden
+files, so a policy covering only Go types would let an envelope change silently break
+every agent diffing output. The single guarantee "patch is always safe" is what makes
+the policy actionable; keeping breaks on the minor digit pre-v1.0 avoids both freezing
+the API prematurely and churning the major digit.
+
+### XII. Deprecation Lifecycle
+
+- **Comment format (Go convention)**: a deprecated exported symbol MUST carry a
+  `//Deprecated:` paragraph as its own paragraph in the doc comment, so `staticcheck
+  SA1019` and `go doc` recognize it.
+- **Migration note (mandatory)**: the `//Deprecated:` note MUST state the replacement,
+  or — when none exists — the reason for removal.
+- **Notice window**: a symbol MUST carry its `//Deprecated:` comment in AT LEAST ONE
+  published `0.MINOR.0` release before it may be removed. Removal before the window MUST
+  be rejected in review with a pointer to this principle. Removal is itself a breaking
+  change → a **minor** bump pre-v1.0 (Principle XI).
+- **Tooling**: `staticcheck SA1019` (via `golangci-lint run`) flags every call site of a
+  deprecated symbol. It is already enabled (`.golangci.yml`
+  `linters.settings.staticcheck.checks` is `["all", "-ST1000", "-ST1016", "-QF1008"]` —
+  SA1019 is NOT excluded) and requires no configuration change.
+- **Lifecycle**: `live` → `deprecated` (`//Deprecated:` added, published in a
+  `0.MINOR.0`) → `removable` (after ≥1 published minor carrying the comment) → `removed`
+  (breaking change, rides a minor bump).
+
+**Rationale**: One published minor release gives every consumer at least one upgrade
+cycle in which `staticcheck SA1019` flags their call sites before a symbol disappears,
+while keeping the pre-v1.0 surface from accumulating zombie identifiers. It is the
+lightest window that still guarantees a machine-visible warning before breakage.
+
 ## Additional Constraints & Boundaries
 
 ax-go deliberately addresses the **machine-contract** half of AX
@@ -297,4 +377,4 @@ These are decisions, not oversights:
   principles and the ADR-absorption rule; every PR review verifies compliance; any
   violation MUST be justified in the plan's Complexity Tracking table.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-01 | **Last Amended**: 2026-06-01
+**Version**: 1.2.0 | **Ratified**: 2026-06-01 | **Last Amended**: 2026-06-16

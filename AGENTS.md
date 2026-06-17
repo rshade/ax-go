@@ -104,6 +104,16 @@ conflicts with the constitution, the constitution wins.
   superseding ADR. Do not introduce parallel-pluggable logger backends, an
   `ax.WithLogger(...)`-style runtime selection API, or a second concrete
   logger implementation while ADR-0009 stands.
+- Stability and deprecation are governed by Constitution Principle XI
+  (**Stability & SemVer**) and Principle XII (**Deprecation Lifecycle**).
+  Pre-v1.0 (`0.x`): a `0.x.PATCH` release is bug-fixes-only and always safe to
+  take; a `0.MINOR.0` bump MAY break (Go API surface OR machine-payload shapes
+  like `ax.Error` / `__schema`, which are additive-tolerant); breaking changes
+  ride the minor digit and never auto-promote to `1.0.0`. Deprecate an exported
+  symbol with a `//Deprecated:` doc-comment paragraph carrying a migration note,
+  let it ship in ≥1 published `0.MINOR.0` release (`staticcheck SA1019` flags
+  call sites — already enabled), then remove it. See the constitution principles
+  for the full policy.
 
 ## Development Workflow
 
