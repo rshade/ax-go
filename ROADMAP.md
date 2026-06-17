@@ -7,16 +7,21 @@
 
 ## Status note
 
-All open items are filed as GitHub issues (`#4`–`#48`) and carry `roadmap/*` +
+All open items are filed as GitHub issues (`#9`–`#53`) and carry `roadmap/*` +
 `effort/*` labels synced to the sections below. Level-of-effort indicators:
-`[S]` Small (1-2h), `[M]` Medium (½-1d), `[L]` Large (multi-day). `v0.0.1` is
-released via release-please; the `v0.1.0` output contracts are frozen and await
-the next release tag.
+`[S]` Small (1-2h), `[M]` Medium (½-1d), `[L]` Large (multi-day). release-please
+is live: `v0.0.1` and `v0.0.2` have been cut automatically with generated
+`CHANGELOG.md` entries; the `v0.1.0` output contracts remain frozen.
 
-The load-bearing runtime promises are now landing: bounded config reads (#1) and
-real OTel export + span lifecycle (#2) have shipped. What remains to make the
-foundation fully honest is the test discipline (#4 fuzz, #5 determinism), the
-telemetry follow-up polish (#45–#48), and the v1.0 governance surface below.
+The load-bearing runtime promises and the test discipline have now **all
+shipped**: bounded config reads (#1), real OTel export + span lifecycle (#2),
+golden-file tests (#3), parser fuzzing (#4), the determinism harness (#5),
+build-time version injection (#6), the Loki direct-push addon + cardinality
+discipline (#7, #8), and the telemetry follow-up polish (#45–#48). With the
+foundation's runtime contracts delivered and tested, the roadmap now pivots to
+the **v1.0 readiness & governance** surface and the AX machine-contract
+enhancements below. Both single-WIP focus slots are currently open pending the
+next promotion (see Immediate Focus).
 
 ## Vision
 
@@ -25,51 +30,39 @@ by owning the cross-cutting primitives once: stream separation, deterministic
 exit codes, the `ax.Error` envelope, `__schema` discoverability, agent-safety
 primitives, and short-lived-process-correct observability.
 
-## Immediate Focus (v0.2.0 — deliver the runtime promises)
+## Immediate Focus (v0.3.0 — v1.0 readiness & governance)
 
 Single-WIP per the Promotion Gate (`target_focus_depth: 1`). The prior slot
-holder (#6, build-time version injection) shipped 2026-06-10 and #2 (real OTel
-export) closed 2026-06-13, opening this slot.
+holder (#45, telemetry internals refactor) shipped 2026-06-14, and the entire
+v0.2.0 runtime-promise + test-discipline block (#4, #5, #46–#48) closed with it.
+**#17 (stability + deprecation policy) is the active single-WIP.** It defines
+what "breaking" means for the public API and unblocks #18, #23, and #26 before
+v1.0 contracts harden. Implemented via the Spec Kit feature workflow and a
+constitution amendment (Principles XI + XII); see
+[`specs/008-stability-deprecation-policy`](specs/008-stability-deprecation-policy/).
 
-- [ ] #45 Refactor telemetry internals [S] — dedupe the sanitizer + mutex
-  writer and simplify the fail-open helpers in `internal/telemetry`, hardening
-  the code merged for #2 while it is fresh.
-  *Promoted by /roadmap sync on 2026-06-12 — epic-child of the just-closed #2
-  (score +25); fills the single Immediate Focus slot.*
+## Near-Term Vision (v0.3.0 — governance queue)
 
-## Near-Term Vision (v0.2.0 — remaining runtime promises)
-
-- [ ] #46 Telemetry unit tests [M] — first unit tests for `internal/telemetry`,
-  covering fail-open, `tracestate`, and debug-export paths on the #2 code.
-- [ ] #47 Inject `service.version` in the integration example [S] — set the OTel
-  resource `service.version` so the reference CLI stops emitting
-  `version=0.0.0-unknown`.
-- [ ] #48 Telemetry doc fixes [S] — correct the understated `Start` doc, drop the
-  stale `WithSyncer` reference, and add the writer rationale.
-- [ ] #4 Fuzz tests for every parser surface (AGENTS mandate) [M] — Hujson
-  config input, idempotency-key validation, error-envelope round-trip, and
-  `TRACEPARENT` extraction each need a `FuzzXxx`. This is the canonical tracker
-  for the parser-fuzz deferral recorded in
-  [`specs/001-bound-config-reads/plan.md`](specs/001-bound-config-reads/plan.md)
-  and
-  [`specs/001-bound-config-reads/research.md`](specs/001-bound-config-reads/research.md);
-  do not open a parallel tracker for the bounded-config feature.
-- [ ] #5 Output-determinism harness [M] — assert byte-identical `stdout` across
-  two runs of the same input, modulo documented non-deterministic fields.
+- [ ] #12 Dedicated unit tests for `context.go`, `http.go`, `trace.go` [S] —
+  quick win; these are currently exercised only indirectly. Parallel-friendly
+  with the Immediate Focus keystone.
+- [ ] #27 `ax.Error` recovery/remediation fields (amend ADR-0002) [M] — add
+  optional `retryable` / `recovery` / `next_action` so an agent can self-correct,
+  not just report. The AX source audit's #1 in-scope win.
+- [ ] #19 `SECURITY.md` disclosure policy [S] — reporting channel, SLA,
+  supported-versions, out-of-scope (giant-Hujson DoS is a validation error).
+- [ ] #21 Test-coverage policy + CI enforcement [M] — baseline, floor, and a CI
+  gate that fails below it.
 
 ## Future Vision (Long-Term)
 
 ### Library & runtime
 
-- [x] #7 Loki direct-push addon (`loki.go`) [M] — opt-in via
-  `AX_LOKI_URL` as a **separate addon file**, never coupled into `logger.go`;
-  the core logger stays shippable with no Loki dependency. Non-blocking push,
-  failures never break the CLI's primary work. Shipped via
-  [`specs/007-loki-direct-push`](specs/007-loki-direct-push/).
-- [x] #8 Logger cardinality-discipline enforcement [M] — enforce the
-  label/payload split (Constitution Principle VIII) at the API level so
-  high-cardinality fields can't be promoted to Loki labels. Delivered as part
-  of `specs/007-loki-direct-push` (`loki.go` `buildStreamMap` + FR-009).
+- [ ] #53 Unified multi-format JSON codec [L] — one codec that reads
+  JSON/Hujson/JSON5/NDJSON/JSONL with auto-detection and a convert API, while
+  keeping output constitutionally strict. Widens the input contract beyond
+  Hujson, so it is governed through a Spec Kit feature **and** a Constitution
+  Principle V amendment. Reuse existing parsers, not hand-rolled dialects.
 - [ ] #9 Hujson AST `Patch` write path [L] — mutate an existing Hujson file
   while preserving user formatting/comments, since strict-JSON writes can't.
   The retired Hujson input decision's read/write consequences are absorbed in
@@ -79,14 +72,13 @@ export) closed 2026-06-13, opening this slot.
   `__schema --as=mcp` adapter.
 - [ ] #11 Hot-path benchmarks with `-benchmem` [M] — back the zerolog
   "zero/near-zero allocation" claim (ADR-0009) with a real `testing.B`.
-- [ ] #12 Dedicated unit tests for `context.go`, `http.go`, `trace.go` [S] —
-  these are currently exercised only indirectly.
 - [ ] #13 Agent-safety helpers for `--dry-run` side-effect suppression [M] —
   make it hard to accidentally cause side effects when `dry_run: true`.
-- [ ] #14 Wire up release-please flow [S] — config exists
-  (`release-please-config.json`) but no release is cut. release-please must
-  *generate* `CHANGELOG.md` from commit history; it is never hand-authored
-  (see AGENTS.md → Changelog & Releases).
+- [ ] #14 Wire up release-please flow [S] — **flow is now verified working**:
+  `v0.0.1` and `v0.0.2` were cut automatically with generated `CHANGELOG.md`
+  entries from Conventional Commit history. Remaining acceptance criteria are
+  documentation-only (commit conventions in CONTRIBUTING/README) and the v0.1.0
+  release tag. Candidate for closure — flagged for maintainer review.
 
 ### AX surface enhancements
 
@@ -122,9 +114,9 @@ gaps that deepen the machine-contract half of AX.*
 - [ ] #16 `__schema` non-deterministic-field enumeration [M] — declare a
   `non_deterministic_fields` array per command so agents diff safely. Pairs
   with #5.
-- [ ] #17 ADR-0013 (SemVer/stability) + ADR-0014 (deprecation) [M] — define what
-  "breaking" means, pre-v1.0 contract, and the deprecation lifecycle. Gates
-  #18, #23, #26.
+- [ ] #17 Stability & SemVer + Deprecation Lifecycle [M] — defines what "breaking"
+  means, pre-v1.0 contract, and the deprecation lifecycle. Gates #18, #23, #26.
+  *(Active — see Immediate Focus; implemented via Principles XI + XII.)*
 - [ ] #18 Move remaining non-public helpers under `internal/` before v1.0 [L] —
   keep drawing the public-API boundary while it's still cheap.
 - [ ] #19 `SECURITY.md` disclosure policy [S] — reporting channel, SLA,
@@ -146,6 +138,33 @@ gaps that deepen the machine-contract half of AX.*
 
 ### 2026-Q2
 
+- [x] #7 Loki direct-push addon (`loki.go`) [M] — opt-in via `AX_LOKI_URL` as a
+  **separate addon file**, never coupled into `logger.go`; the core logger stays
+  shippable with no Loki dependency. Non-blocking push, failures never break the
+  CLI's primary work. Shipped via
+  [`specs/007-loki-direct-push`](specs/007-loki-direct-push/). Closed 2026-06-16.
+- [x] #8 Logger cardinality-discipline enforcement [M] — enforces the
+  label/payload split (Constitution Principle VIII / FR-009) in `loki.go`
+  `buildStreamMap`, so high-cardinality fields can't be promoted to Loki labels.
+  Delivered with #7; closed by sync 2026-06-16.
+- [x] #5 Output-determinism harness [M] — asserts byte-identical `stdout` across
+  two runs of the same input, modulo documented non-deterministic fields. Closed
+  2026-06-15.
+- [x] #4 Fuzz tests for every parser surface [M] — `FuzzXxx` over Hujson config
+  input, idempotency-key validation, error-envelope round-trip, and `TRACEPARENT`
+  extraction (AGENTS mandate). Closed 2026-06-14.
+- [x] #45 Refactor telemetry internals [S] — deduped the sanitizer + mutex writer
+  and simplified the fail-open helpers in `internal/telemetry`, hardening the #2
+  code. Closed 2026-06-14.
+- [x] #46 Telemetry unit tests [M] — first unit tests for `internal/telemetry`,
+  covering fail-open, `tracestate`, and debug-export paths on the #2 code. Closed
+  2026-06-14.
+- [x] #47 Inject `service.version` in the integration example [S] — sets the OTel
+  resource `service.version` so the reference CLI no longer emits
+  `version=0.0.0-unknown`. Closed 2026-06-14.
+- [x] #48 Telemetry doc fixes [S] — corrected the understated `Start` doc, dropped
+  the stale `WithSyncer` reference, and added the writer rationale. Closed
+  2026-06-14.
 - [x] ADRs 0001–0011 accepted [L] — agent-mode trigger, error envelope, schema
   format, trace-ID format, OTel integration, Loki integration, ID strategy,
   Cobra framework, zerolog, Hujson input, JSON output.

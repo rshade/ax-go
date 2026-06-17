@@ -6,13 +6,22 @@
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](go.mod)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
-> **Status: Released.** The current pinnable release is **v0.0.1**:
-> `go get github.com/rshade/ax-go@v0.0.1`. The v0.1.0 output contracts are
-> already frozen in code — core primitives such as `ax.Error`, `ax.Execute`,
-> `ax.NewLogger`, `ax.ParseConfig`, and `ax.NewEntityID` are covered by
-> contract tests, and all public output shapes are pinned by golden fixtures.
-> v0.1.0 itself is tagged by release-please from the Conventional Commit
-> history; see [CHANGELOG.md](CHANGELOG.md) for release history.
+> **Status: Released (pre-v1.0, `0.x`).** The current pinnable release is
+> **v0.0.2**: `go get github.com/rshade/ax-go@v0.0.2`. The v0.1.0 output
+> contracts are already frozen in code — core primitives such as `ax.Error`,
+> `ax.Execute`, `ax.NewLogger`, `ax.ParseConfig`, and `ax.NewEntityID` are
+> covered by contract tests, and all public output shapes are pinned by golden
+> fixtures. v0.1.0 itself is tagged by release-please from the Conventional
+> Commit history; see [CHANGELOG.md](CHANGELOG.md) for release history.
+>
+> **Stability guarantee while in `0.x`:** a **patch** upgrade (`0.x.PATCH`) is
+> always safe — patch releases are bug-fixes-only and stay backward-compatible.
+> A **minor** bump (`0.MINOR.0`) MAY contain breaking changes (to the Go API or
+> to machine-payload shapes like `ax.Error` / `__schema`), and breaking changes
+> never auto-promote to `1.0.0`. The full policy — including what counts as a
+> breaking change and the deprecation lifecycle — lives in the constitution's
+> **Stability & SemVer** and **Deprecation Lifecycle** principles
+> ([`.specify/memory/constitution.md`](.specify/memory/constitution.md)).
 
 ## Mission
 
