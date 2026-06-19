@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.0](https://github.com/rshade/ax-go/compare/v0.0.2...v0.1.0) (2026-06-19)
+
+
+### Added
+
+* **loki:** add opt-in Loki direct-push addon with cardinality ([#60](https://github.com/rshade/ax-go/issues/60)) ([0652f76](https://github.com/rshade/ax-go/commit/0652f76ea983cdc94e366b9832474e884e8ff609))
+
+
+### Changed
+
+* **telemetry:** dedupe sanitizer + mutex writer, simplify fail-open helpers ([#51](https://github.com/rshade/ax-go/issues/51)) ([238d425](https://github.com/rshade/ax-go/commit/238d425e4b88c745880d80d6fbc74351411f58f1)), closes [#45](https://github.com/rshade/ax-go/issues/45) [#46](https://github.com/rshade/ax-go/issues/46) [#47](https://github.com/rshade/ax-go/issues/47) [#48](https://github.com/rshade/ax-go/issues/48)
+
+
+### Documentation
+
+* **governance:** add stability & deprecation policy as constitution Principles XI–XII ([#61](https://github.com/rshade/ax-go/issues/61)) ([aa50d76](https://github.com/rshade/ax-go/commit/aa50d76187c9029d774b3cd8b4e72d8a8870d519)), closes [#17](https://github.com/rshade/ax-go/issues/17)
+
 ## [0.0.2](https://github.com/rshade/ax-go/compare/v0.0.1...v0.0.2) (2026-06-13)
 
 
