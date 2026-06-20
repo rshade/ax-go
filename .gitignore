@@ -36,6 +36,9 @@ dist/
 build/
 *.log
 
+# Astro (docs site) content cache
+docs/.astro/
+
 # Editor/IDE
 .idea/
 .vscode/

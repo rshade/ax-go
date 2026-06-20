@@ -71,7 +71,8 @@ constitution wins.
 ## Delegated AX Pillars
 
 The Agentic Experience (AX) discipline that `ax-go` operationalizes is broader
-than what a CLI foundation should own (see `docs/sources.md`). `ax-go`
+than what a CLI foundation should own (see
+`docs/src/content/docs/sources.md`). `ax-go`
 deliberately addresses the **machine-contract** half of AX — discoverability,
 determinism, transparency, agent-safety, guardrails — and **cedes the
 stateful/experiential half to the adopting CLI and the agent runtime.** These

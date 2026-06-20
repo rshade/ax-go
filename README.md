@@ -5,13 +5,16 @@
 
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](go.mod)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+[![Docs](https://img.shields.io/badge/docs-live-blue)](https://rshade.github.io/ax-go/)
+
+📖 **Documentation:** <https://rshade.github.io/ax-go/>
 
 > **Status: Released (pre-v1.0, `0.x`).** The current pinnable release is
-> **v0.0.2**: `go get github.com/rshade/ax-go@v0.0.2`. The v0.1.0 output
-> contracts are already frozen in code — core primitives such as `ax.Error`,
+> **v0.1.0**: `go get github.com/rshade/ax-go@v0.1.0`. The v0.1.0 output
+> contracts are frozen in code — core primitives such as `ax.Error`,
 > `ax.Execute`, `ax.NewLogger`, `ax.ParseConfig`, and `ax.NewEntityID` are
 > covered by contract tests, and all public output shapes are pinned by golden
-> fixtures. v0.1.0 itself is tagged by release-please from the Conventional
+> fixtures. v0.1.0 was tagged by release-please from the Conventional
 > Commit history; see [CHANGELOG.md](CHANGELOG.md) for release history.
 >
 > **Stability guarantee while in `0.x`:** a **patch** upgrade (`0.x.PATCH`) is

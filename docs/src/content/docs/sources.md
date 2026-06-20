@@ -1,4 +1,7 @@
-# AX (Agentic / Agent Experience) — Source Material
+---
+title: Sources
+description: Reference sources on the Agentic Experience (AX) discipline that ax-go operationalizes for Go CLIs.
+---
 
 Reference sources on the **Agentic Experience (AX)** discipline that `ax-go`
 operationalizes for Go CLIs. ax-go *implements* this discipline; it did not
@@ -12,7 +15,10 @@ He defined it as *"the holistic experience AI agents will have as the user of a
 product or platform,"* positioning it alongside UX and DX. He explicitly
 considered and rejected **"Agentic Experience,"** preferring **"Agent
 Experience"** for parity with *User* / *Developer* Experience. The "Agentic
-Experience" variant is widely used interchangeably by other authors.
+Experience" variant is widely used interchangeably by other authors. ax-go
+deliberately adopts **"Agentic Experience"** as its house term — the
+widely-used interchangeable variant — while noting that the originator's
+preferred form is **"Agent Experience."**
 
 ## Canonical / originator sources
 

@@ -10,8 +10,8 @@
 All open items are filed as GitHub issues (`#9`–`#53`) and carry `roadmap/*` +
 `effort/*` labels synced to the sections below. Level-of-effort indicators:
 `[S]` Small (1-2h), `[M]` Medium (½-1d), `[L]` Large (multi-day). release-please
-is live: `v0.0.1` and `v0.0.2` have been cut automatically with generated
-`CHANGELOG.md` entries; the `v0.1.0` output contracts remain frozen.
+is live: `v0.0.1`, `v0.0.2`, and `v0.1.0` have been cut automatically with
+generated `CHANGELOG.md` entries; the `v0.1.0` output contracts remain frozen.
 
 The load-bearing runtime promises and the test discipline have now **all
 shipped**: bounded config reads (#1), real OTel export + span lifecycle (#2),
@@ -82,7 +82,9 @@ constitution amendment (Principles XI + XII); see
 
 ### AX surface enhancements
 
-*From the AX source audit ([`docs/sources.md`](./docs/sources.md)) — in-scope
+*From the AX source audit
+([`docs/src/content/docs/sources.md`](./docs/src/content/docs/sources.md)) —
+in-scope
 gaps that deepen the machine-contract half of AX.*
 
 - [ ] #27 `ax.Error` recovery/remediation fields (amend ADR-0002) [M] — add

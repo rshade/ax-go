@@ -1,0 +1,33 @@
+---
+title: ax-go
+description: The Agentic Experience (AX) foundation for Go CLIs — predictable for LLM agents, ergonomic for human engineers.
+template: splash
+hero:
+  tagline: The Agentic Experience foundation for Go CLI tools — predictable for LLM agents, ergonomic for human engineers.
+  actions:
+    - text: View on GitHub
+      link: https://github.com/rshade/ax-go
+      icon: external
+      variant: primary
+---
+
+import { Card, CardGrid } from '@astrojs/starlight/components';
+
+<CardGrid>
+	<Card title="Stream separation" icon="seti:powershell">
+		`stdout` carries the final machine payload; logs, progress, and structured
+		error envelopes go to `stderr`.
+	</Card>
+	<Card title="Deterministic by contract" icon="approve-check">
+		The same inputs produce byte-identical `stdout`, modulo documented
+		non-deterministic fields (timestamps, trace IDs).
+	</Card>
+	<Card title="Agent-safety primitives" icon="puzzle">
+		`--idempotency-key`, `--dry-run`, and `--format` mode resolution are
+		first-class on every command.
+	</Card>
+	<Card title="Self-describing" icon="open-book">
+		Every CLI exposes `__schema`; `__schema --as=mcp` adapts it to an
+		MCP-compatible tool description.
+	</Card>
+</CardGrid>
