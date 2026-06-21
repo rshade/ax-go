@@ -150,6 +150,9 @@ conflicts with the constitution, the constitution wins.
 - The release flow (versioning, tags, `CHANGELOG.md`) is owned by
   release-please via `release-please-config.json` and
   `.release-please-manifest.json`. Do not duplicate it manually.
+- When ax-go's minimum Go version changes or a new minor/major is released,
+  update the compatibility matrix in `README.md` → `## Compatibility`. See
+  [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full update process.
 
 ## Testing-First Discipline
 

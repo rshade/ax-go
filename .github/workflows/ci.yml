@@ -85,7 +85,7 @@ jobs:
         run: |
           set -euo pipefail
           npx --yes markdownlint-cli@0.45.0 \
-            AGENTS.md README.md 'docs/**/*.md'
+            AGENTS.md README.md CONTRIBUTING.md 'docs/**/*.md'
 
       - name: Run actionlint
         run: |

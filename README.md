@@ -11,12 +11,14 @@
 📖 **Documentation:** <https://rshade.github.io/ax-go/>
 
 > **Status: Released (pre-v1.0, `0.x`).** The current pinnable release is
-> **v0.1.0**: `go get github.com/rshade/ax-go@v0.1.0`. The v0.1.0 output
-> contracts are frozen in code — core primitives such as `ax.Error`,
-> `ax.Execute`, `ax.NewLogger`, `ax.ParseConfig`, and `ax.NewEntityID` are
-> covered by contract tests, and all public output shapes are pinned by golden
-> fixtures. v0.1.0 was tagged by release-please from the Conventional
-> Commit history; see [CHANGELOG.md](CHANGELOG.md) for release history.
+> **v0.2.0**: `go get github.com/rshade/ax-go@v0.2.0`. Output contracts are
+> frozen in code — core primitives such as `ax.Error`, `ax.Execute`,
+> `ax.NewLogger`, `ax.ParseConfig`, and `ax.NewEntityID` are covered by
+> contract tests, and all public output shapes are pinned by golden fixtures.
+> v0.2.0 adds the import-isolated contract packages (`contract`, `config`,
+> `schema`, `id`) for thin consumers. Releases are tagged by release-please
+> from the Conventional Commit history; see
+> [CHANGELOG.md](CHANGELOG.md) for release history.
 >
 > **Stability guarantee while in `0.x`:** a **patch** upgrade (`0.x.PATCH`) is
 > always safe — patch releases are bug-fixes-only and stay backward-compatible.
@@ -307,12 +309,40 @@ Sequenced from the accepted ADRs and the current scaffold:
    [`examples/integration/`](examples/integration/) current with public API
    changes and benchmark hot paths with `testing.B` / `-benchmem`.
 
+## Compatibility
+
+### ax-go version and Go version
+
+| ax-go version   | Minimum Go version | Notes                                                         |
+| --------------- | ------------------ | ------------------------------------------------------------- |
+| v0.x (current)  | 1.26.4             | Pre-v1.0; `0.x.PATCH` is always safe; `0.MINOR.0` may break |
+| v1.x            | TBD                | Stable API; targeted via the Spec Kit stability workflow      |
+
+The minimum Go version is the `go` directive in [`go.mod`](go.mod). Patch
+releases (`0.x.PATCH`) are always backward-compatible. Minor releases
+(`0.MINOR.0`) may break either the Go API surface or machine-payload shapes
+(`ax.Error`, `__schema`). See
+[Constitution Principle XI](.specify/memory/constitution.md) for the full
+stability and SemVer policy.
+
+### Downstream consumers
+
+| Consumer | Pinned ax-go version | Notes |
+| -------- | -------------------- | ----- |
+| _(no downstream consumers yet — first consumer pinning notes will appear here)_ | — | — |
+
+Once a downstream project tags a release that pins an ax-go version, add a row
+here. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the update process.
+
 ## Contributing
 
 Before changing public behavior, use the Spec Kit feature workflow. Read the
 constitution, absorb any governing frozen ADR decisions into the feature's
 `research.md`, and keep README plus `examples/integration/` current with the
 public contract. Do not create or edit ADRs for new work.
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the compatibility matrix update
+process and release checklist.
 
 ## License
 

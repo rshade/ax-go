@@ -1,0 +1,38 @@
+name: Release PR Checklist
+
+on:
+  pull_request:
+    types: [labeled]
+
+permissions:
+  pull-requests: write
+
+jobs:
+  post-checklist:
+    if: github.event.label.name == 'autorelease: pending'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Find existing checklist comment
+        uses: peter-evans/find-comment@v3
+        id: find-comment
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          comment-author: github-actions[bot]
+          body-includes: '<!-- release-checklist -->'
+
+      - name: Post or update release checklist
+        uses: peter-evans/create-or-update-comment@v4
+        with:
+          comment-id: ${{ steps.find-comment.outputs.comment-id }}
+          issue-number: ${{ github.event.pull_request.number }}
+          body: |
+            <!-- release-checklist -->
+            ## Release checklist
+
+            Before merging this release PR, verify:
+
+            - [ ] `README.md` → `## Compatibility` table reflects the new ax-go version
+            - [ ] If `go.mod`'s `go` directive changed, update the "Minimum Go version" column
+            - [ ] Any new downstream consumer that pinned this release has a row in the "Downstream consumers" table
+            - [ ] `CHANGELOG.md` preview above looks correct (no missing or miscategorised entries)
+          edit-mode: replace
