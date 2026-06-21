@@ -1,5 +1,23 @@
 # Changelog
 
+## [0.2.0](https://github.com/rshade/ax-go/compare/v0.1.0...v0.2.0) (2026-06-21)
+
+
+### Added
+
+* add import-isolated public contract packages for thin consumers ([#79](https://github.com/rshade/ax-go/issues/79)) ([05f0536](https://github.com/rshade/ax-go/commit/05f053618f385c716ffead6309c7b1b26665e3d9)), closes [#78](https://github.com/rshade/ax-go/issues/78)
+
+
+### Fixed
+
+* **deps:** update dependency sharp to ^0.35.0 ([#74](https://github.com/rshade/ax-go/issues/74)) ([4ed45b7](https://github.com/rshade/ax-go/commit/4ed45b77bb2c5d998562c019ca222bc9bdb3f9fd))
+
+
+### Documentation
+
+* bumping version ([15051a4](https://github.com/rshade/ax-go/commit/15051a47c5c13ba22ff4f9de022a33b9089b621e))
+* **site:** scaffold Astro Starlight docs site consuming rshade-theme ([#72](https://github.com/rshade/ax-go/issues/72)) ([30d78b3](https://github.com/rshade/ax-go/commit/30d78b39d41812b9ddefdd4db7e4d012981a9ff3)), closes [#68](https://github.com/rshade/ax-go/issues/68)
+
 ## [0.1.0](https://github.com/rshade/ax-go/compare/v0.0.2...v0.1.0) (2026-06-19)
 
 
