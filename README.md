@@ -6,6 +6,7 @@
 [![Go](https://img.shields.io/badge/Go-1.26-00ADD8?logo=go)](go.mod)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-live-blue)](https://rshade.github.io/ax-go/)
+[![Coverage](https://codecov.io/gh/rshade/ax-go/branch/main/graph/badge.svg)](https://codecov.io/gh/rshade/ax-go)
 
 📖 **Documentation:** <https://rshade.github.io/ax-go/>
 

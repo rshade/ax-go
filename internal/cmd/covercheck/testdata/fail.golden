@@ -1,0 +1,4 @@
+FAIL  3 coverage floor violation(s):
+  github.com/example/bar:  20.0% < 80.0% floor  (-60.0pp)
+  github.com/example/foo:  40.0% < 50.0% floor  (-10.0pp)
+  repo-wide:               30.0% < 70.0% floor  (-40.0pp)

@@ -1,0 +1,21 @@
+# Codecov configuration for ax-go.
+#
+# These status checks are ADVISORY. The authoritative coverage gate is the
+# `internal/cmd/covercheck` step in .github/workflows/ci.yml, which enforces the
+# per-package and repo-wide floors documented in AGENTS.md "Coverage Policy".
+# Codecov surfaces the PR delta comment and the README badge.
+coverage:
+  status:
+    project:
+      default:
+        target: 70%       # matches covercheck's repoWideFloor
+        threshold: 1%     # allow 1pp drift on the PR before flagging
+    patch:
+      default:
+        target: 70%
+        threshold: 5%
+
+comment:
+  layout: "reach,diff,flags,files"
+  behavior: default
+  require_changes: true   # only comment when coverage changes

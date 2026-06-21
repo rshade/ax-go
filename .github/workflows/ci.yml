@@ -36,12 +36,24 @@ jobs:
           go test -v -race -coverprofile=coverage.out -covermode=atomic ./...
           go tool cover -func=coverage.out
 
+      - name: Enforce coverage floors
+        run: go run ./internal/cmd/covercheck -coverage coverage.out
+
+      # always() so the coverage profile is uploaded even when the "Enforce
+      # coverage floors" gate above fails — that is exactly when a developer
+      # needs coverage.out to see which lines are uncovered.
       - name: Upload coverage report
+        if: always()
         uses: actions/upload-artifact@v7
         with:
           name: coverage-report
           path: coverage.out
 
+      # Codecov upload is advisory: the authoritative gate is the
+      # "Enforce coverage floors" step above. Keep fail_ci_if_error: false so a
+      # Codecov outage never blocks a PR. Public repos need no token; if this
+      # repo goes private, add CODECOV_TOKEN to GitHub Secrets and pass
+      # `token: ${{ secrets.CODECOV_TOKEN }}` here.
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v7
         with:
