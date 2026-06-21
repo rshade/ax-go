@@ -106,6 +106,12 @@ in-scope gaps that deepen the machine-contract half of AX.*
   `idempotency_replayed`, `requires_confirmation` (human handoff). Extends #13.
 - [ ] #31 Agent-acceptance test harness [M] — drive the CLI as an agent would
   (parse `__schema` → invoke → assert envelope). Folds into #15.
+- [ ] #66 doccover: cross-validate `requiredSymbols` against pkg.go.dev
+  `/v1beta/symbols` [M] — catch doc-coverage baseline drift against the live
+  published symbol set.
+- [ ] #67 mcp-server: enrich MCP tool descriptions with pkg.go.dev module
+  metadata [M] — deepen `__schema --as=mcp` output so wrapped tools carry richer
+  agent-facing descriptions. Pairs with #10.
 
 ### v1.0 readiness & governance
 

@@ -26,6 +26,12 @@ profile.cov
 go.work
 go.work.sum
 
+# Transient artifacts written by the apidiff CI gate when run locally
+/apidiff-comment.md
+/apidiff.txt
+# Stray binary from `go build ./internal/cmd/apidiff-verdict` (workflow uses `go run`)
+/apidiff-verdict
+
 # env file
 .env
 .env*
