@@ -1,15 +1,20 @@
 package testutil
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
 type tbSpy struct {
 	*testing.T
 
 	errorfCalled bool
+	messages     []string
 }
 
 func (s *tbSpy) Errorf(format string, args ...any) {
 	s.errorfCalled = true
+	s.messages = append(s.messages, fmt.Sprintf(format, args...))
 	s.T.Logf("spy caught Errorf: "+format, args...)
 }
 

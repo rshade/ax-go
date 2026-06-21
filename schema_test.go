@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	"github.com/rshade/ax-go/schema"
 )
 
 func TestBuildSchemaReflectsCommandTree(t *testing.T) {
@@ -45,6 +47,42 @@ func TestBuildMCPSchemaGolden(t *testing.T) {
 		t.Fatalf("WriteJSON returned error: %v", err)
 	}
 	assertGolden(t, "testdata/schema_mcp.golden.json", stdout.Bytes())
+}
+
+func TestRootSchemaOutputMatchesIsolatedPackage(t *testing.T) {
+	root := newSchemaTestCommand()
+
+	var rootOut bytes.Buffer
+	if err := WriteJSON(&rootOut, BuildSchema(root, WithSchemaVersion("v0.1.0"))); err != nil {
+		t.Fatalf("root WriteJSON returned error: %v", err)
+	}
+	var isolatedOut bytes.Buffer
+	if err := WriteJSON(&isolatedOut, schema.BuildSchema(root, schema.WithSchemaVersion("v0.1.0"))); err != nil {
+		t.Fatalf("isolated WriteJSON returned error: %v", err)
+	}
+	if !bytes.Equal(rootOut.Bytes(), isolatedOut.Bytes()) {
+		t.Fatalf(
+			"root schema diverged from isolated schema\nroot:     %s\nisolated: %s",
+			rootOut.Bytes(),
+			isolatedOut.Bytes(),
+		)
+	}
+
+	rootOut.Reset()
+	isolatedOut.Reset()
+	if err := WriteJSON(&rootOut, BuildMCPSchema(root)); err != nil {
+		t.Fatalf("root MCP WriteJSON returned error: %v", err)
+	}
+	if err := WriteJSON(&isolatedOut, schema.BuildMCPSchema(root)); err != nil {
+		t.Fatalf("isolated MCP WriteJSON returned error: %v", err)
+	}
+	if !bytes.Equal(rootOut.Bytes(), isolatedOut.Bytes()) {
+		t.Fatalf(
+			"root MCP schema diverged from isolated schema\nroot:     %s\nisolated: %s",
+			rootOut.Bytes(),
+			isolatedOut.Bytes(),
+		)
+	}
 }
 
 func newSchemaTestCommand() *cobra.Command {

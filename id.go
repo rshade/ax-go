@@ -1,17 +1,13 @@
 package ax
 
-import "github.com/google/uuid"
+import isolatedid "github.com/rshade/ax-go/id"
 
 // NewIdempotencyKey returns a UUID v4 idempotency key.
 func NewIdempotencyKey() string {
-	return uuid.NewString()
+	return isolatedid.NewIdempotencyKey()
 }
 
 // NewEntityID returns a UUID v7 resource/entity identifier.
 func NewEntityID() (string, error) {
-	id, err := uuid.NewV7()
-	if err != nil {
-		return "", err
-	}
-	return id.String(), nil
+	return isolatedid.NewEntityID()
 }

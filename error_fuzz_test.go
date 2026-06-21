@@ -12,7 +12,7 @@ import (
 
 // FuzzErrorEnvelope verifies the ax.Error build -> marshal -> unmarshal
 // round-trip is panic-free, exported fields round-trip, and the WithErrorCause
-// chain is reachable in-process but never serialized (ADR-0002).
+// chain is reachable in-process but never serialized.
 //
 // Note: encoding/json coerces invalid UTF-8 to the replacement rune U+FFFD, so
 // byte-exact field round-trip is asserted only for valid-UTF-8 inputs.
@@ -90,7 +90,7 @@ func FuzzErrorEnvelope(f *testing.F) {
 
 // FuzzErrorEnvelopeUnmarshal verifies ax.Error's json.Unmarshal path never
 // panics on arbitrary bytes and that any value which unmarshals cleanly
-// re-serializes to a byte-for-byte stable fixpoint (Principle II; ADR-0002).
+// re-serializes to a byte-for-byte stable fixpoint (Principle II).
 // A byte-level fixpoint (not struct DeepEqual) is used deliberately: omitempty
 // on Suggestions/Context makes empty-vs-nil indistinguishable at the JSON level.
 func FuzzErrorEnvelopeUnmarshal(f *testing.F) {

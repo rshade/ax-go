@@ -26,6 +26,14 @@ adopting tool inherits them for free:
 - Observability wiring (OpenTelemetry trace context, structured logging) that
   short-lived CLI processes usually get wrong.
 
+The root package `github.com/rshade/ax-go` as `ax` remains the full-runtime
+facade for complete CLIs: execution, telemetry lifecycle, logging, schema
+command wiring, and transport helpers. The narrow public packages
+`contract`, `config`, `schema`, and `id` are additive contract surfaces for
+thin consumers that do not need runtime adapters. Those packages must stay
+import-isolated from root `ax`, telemetry exporters/SDK setup, logger/Loki,
+HTTP instrumentation, and gRPC runtime helpers.
+
 The canonical behavioral authority is the constitution at
 `.specify/memory/constitution.md`. The ADRs in `docs/adr/` are a FROZEN legacy
 decision log being retired through the Spec Kit feature workflow — each ADR's
@@ -147,6 +155,9 @@ To check whether a proposed change respects these boundaries, ask:
    zerolog field methods, reads bounded?
 6. **Dependency discipline:** Does the stdlib or an existing dependency already
    cover this? New dependencies must be justified.
+7. **Import isolation:** If the change touches `contract`, `config`, `schema`,
+   or `id`, do their dependency graphs still exclude root `ax` and runtime
+   adapters?
 
 ## Roadmap Sync Behavior
 

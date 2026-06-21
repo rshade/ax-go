@@ -3,6 +3,19 @@
 `examples/integration` is a runnable Cobra command that exercises the public
 `ax-go` scaffold from outside the root package.
 
+It intentionally uses the root package for full CLI runtime behavior:
+
+```go
+import ax "github.com/rshade/ax-go"
+```
+
+Use the root facade when a CLI needs `ax.Execute`, schema command wiring,
+telemetry lifecycle, logging, and trace-aware envelopes. Thin consumers that
+only need shared machine contracts can instead use the isolated contract packages:
+`github.com/rshade/ax-go/contract`,
+`github.com/rshade/ax-go/config`, `github.com/rshade/ax-go/schema`, and
+`github.com/rshade/ax-go/id`.
+
 Run the default bounded JSON payload:
 
 ```sh
