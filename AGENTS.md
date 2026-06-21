@@ -206,6 +206,81 @@ Test surfaces every change must exercise (where applicable):
 - Output determinism (same input → byte-identical envelope modulo
   documented non-deterministic fields)
 
+## Coverage Policy
+
+Test coverage is gated in CI by `internal/cmd/covercheck`, which enforces both
+per-package and repo-wide floors against the `coverage.out` profile. The gate is
+authoritative; Codecov status checks are advisory. Floors are hardcoded Go
+constants in `internal/cmd/covercheck/main.go`, so every floor change is a
+reviewable commit auditable via `git blame`.
+
+### Floors
+
+| Scope | Initial Floor | Aspirational Target |
+|-------|---------------|---------------------|
+| Repo-wide (aggregate) | 70% | 85% |
+| Per-package default | 25% | 80% |
+
+Per-package overrides (calibrated to the 2026-06-16 baseline):
+
+| Package | Initial Floor |
+|---------|---------------|
+| `github.com/rshade/ax-go` | 80% |
+| `github.com/rshade/ax-go/examples/integration` | 85% |
+| `github.com/rshade/ax-go/internal/cmd/doccover` | 45% |
+| `github.com/rshade/ax-go/internal/config` | 65% |
+| `github.com/rshade/ax-go/internal/telemetry` | 60% |
+| `github.com/rshade/ax-go/internal/testutil` | 25% |
+
+Any package without an explicit override (including newly added packages and
+`internal/cmd/covercheck` itself) faces the 25% per-package default.
+
+### Excluded from Per-Package Floor Enforcement
+
+These packages have 0% baseline coverage and are pending test implementation:
+
+| Package | Reason |
+|---------|--------|
+| `github.com/rshade/ax-go/internal/cli` | No tests written; follow-up issue |
+| `github.com/rshade/ax-go/internal/mcp` | No tests written; follow-up issue |
+| `github.com/rshade/ax-go/internal/schema` | No tests written; follow-up issue |
+
+Excluded packages still count toward the repo-wide aggregate. Their 0%
+contribution is why the repo-wide initial floor is 70%, not 85%.
+
+### Local Verification
+
+Run the exact same check CI runs:
+
+```bash
+make cover-check
+```
+
+Or step by step:
+
+```bash
+go test -race -coverprofile=coverage.out -covermode=atomic ./...
+go run ./internal/cmd/covercheck -coverage coverage.out
+```
+
+`covercheck` exits `0` when all floors are met, `1` on a floor violation (naming
+each offending package with its actual%, floor%, and shortfall on stderr), and
+`2` on bad input (missing or malformed coverage file).
+
+### Raising a Floor
+
+1. Improve coverage in the target package.
+2. Edit the `perPackage` map in the `defaultFloorConfig()` function in `internal/cmd/covercheck/main.go`.
+3. Verify locally with `make cover-check`.
+4. The commit message records why the floor was raised (floor changes are
+   auditable via `git blame`).
+
+### Escalation Path
+
+Floors escalate in 5pp increments as tests are added. The goal is to reach 80%
+per-package and 85% repo-wide by moving the excluded packages into per-package
+enforcement first, which is the most direct path to raising the repo-wide floor.
+
 ## Documentation Discipline (Contracts, Not Narration)
 
 Coding agents read doc comments as much as humans do, and an agent

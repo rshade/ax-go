@@ -32,6 +32,11 @@ test-cover:
 	go test -race -coverprofile=coverage.out -covermode=atomic ./...
 	go tool cover -func=coverage.out
 
+.PHONY: cover-check
+cover-check: test-cover
+	@echo "Checking coverage floors..."
+	go run ./internal/cmd/covercheck -coverage coverage.out
+
 .PHONY: bench
 bench:
 	@echo "Running benchmarks..."
@@ -121,6 +126,7 @@ help:
 	@echo "  build-example - Compile the integration example with version injection"
 	@echo "  test          - Run tests with the race detector"
 	@echo "  test-cover    - Run tests with coverage profile"
+	@echo "  cover-check   - Enforce per-package and repo-wide coverage floors"
 	@echo "  bench         - Run benchmarks with -benchmem"
 	@echo "  doc-coverage  - Check ExampleXxx coverage on the primary API"
 	@echo "  lint          - Run golangci-lint, markdownlint, and actionlint"

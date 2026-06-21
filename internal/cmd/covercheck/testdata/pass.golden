@@ -1,0 +1,6 @@
+PASS  coverage floors met
+  repo-wide:                   83.3% >= 70.0% floor
+  github.com/example/bar:      85.0% >= 80.0% floor
+  github.com/example/foo:      90.0% >= 50.0% floor
+excluded (per-package floor not enforced):
+  github.com/example/excluded  0.0%
