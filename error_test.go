@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+
+	"github.com/rshade/ax-go/contract"
 )
 
 func TestWriteErrorEnvelope(t *testing.T) {
@@ -112,5 +114,46 @@ func TestErrorCauseChain(t *testing.T) {
 	plain := NewError(context.Background(), "validation_error", "bad input")
 	if got := errors.Unwrap(plain); got != nil {
 		t.Fatalf("errors.Unwrap(plain) = %v, want nil", got)
+	}
+}
+
+func TestRootErrorEnvelopeMatchesIsolatedContractShape(t *testing.T) {
+	rootErr := NewError(
+		context.Background(),
+		"validation_error",
+		"bad input",
+		WithErrorTool("app"),
+		WithErrorVersion("v0.1.0"),
+		WithActionableFix("fix the input"),
+		WithErrorContext(map[string]any{"field": "name"}),
+		WithSuggestions("retry with --help"),
+		WithErrorExitCode(ExitValidation),
+	)
+	contractErr := contract.NewError(
+		context.Background(),
+		"validation_error",
+		"bad input",
+		contract.WithErrorTool("app"),
+		contract.WithErrorVersion("v0.1.0"),
+		contract.WithActionableFix("fix the input"),
+		contract.WithErrorContext(map[string]any{"field": "name"}),
+		contract.WithSuggestions("retry with --help"),
+		contract.WithErrorExitCode(contract.ExitValidation),
+	)
+
+	var rootOut bytes.Buffer
+	if err := WriteError(&rootOut, rootErr); err != nil {
+		t.Fatalf("root WriteError returned error: %v", err)
+	}
+	var contractOut bytes.Buffer
+	if err := contract.WriteError(&contractOut, contractErr); err != nil {
+		t.Fatalf("contract WriteError returned error: %v", err)
+	}
+	if !bytes.Equal(rootOut.Bytes(), contractOut.Bytes()) {
+		t.Fatalf(
+			"root error envelope diverged from contract\nroot:     %s\ncontract: %s",
+			rootOut.Bytes(),
+			contractOut.Bytes(),
+		)
 	}
 }

@@ -4,13 +4,15 @@ import (
 	"context"
 
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/rshade/ax-go/contract"
 )
 
 const (
 	// ZeroTraceID is a valid zero-value W3C trace ID for no-active-span cases.
-	ZeroTraceID = "00000000000000000000000000000000"
+	ZeroTraceID = contract.ZeroTraceID
 	// ZeroSpanID is a valid zero-value W3C span ID for no-active-span cases.
-	ZeroSpanID = "0000000000000000"
+	ZeroSpanID = contract.ZeroSpanID
 )
 
 // TraceIDFromContext returns the active W3C trace ID or ZeroTraceID.
@@ -43,4 +45,15 @@ func traceIDs(ctx context.Context) (string, string) {
 		spanID = sc.SpanID().String()
 	}
 	return traceID, spanID
+}
+
+func withTraceMetadata(ctx context.Context) context.Context {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	traceID, spanID := traceIDs(ctx)
+	return contract.WithMetadata(ctx, contract.Metadata{
+		TraceID: traceID,
+		SpanID:  spanID,
+	})
 }

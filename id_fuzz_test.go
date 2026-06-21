@@ -12,7 +12,7 @@ import (
 
 // FuzzIdempotencyKey verifies that an arbitrary user-supplied idempotency key
 // survives the context+envelope round-trip without mutation and that
-// auto-generated keys remain valid UUID v4 (ADR-0007). There is no
+// auto-generated keys remain valid UUID v4. There is no
 // key-validation API; the fuzzed surface is the context store/retrieve plus
 // envelope-marshal round-trip.
 //

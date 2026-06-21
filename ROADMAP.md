@@ -1,9 +1,9 @@
 # ax-go Strategic Roadmap
 
 > Vision and boundaries live in [CONTEXT.md](./CONTEXT.md); behavioral contracts
-> live in [`docs/adr/`](./docs/adr/). This roadmap tracks the gap between
-> *ADR-accepted + shape-stubbed* and *runtime-promise-delivered +
-> test-discipline-satisfied*.
+> live in the constitution, Spec Kit features, and remaining frozen ADRs. This
+> roadmap tracks the gap between *specified contract* and
+> *runtime-promise-delivered + test-discipline-satisfied*.
 
 ## Status note
 
@@ -46,7 +46,7 @@ constitution amendment (Principles XI + XII); see
 - [ ] #12 Dedicated unit tests for `context.go`, `http.go`, `trace.go` [S] —
   quick win; these are currently exercised only indirectly. Parallel-friendly
   with the Immediate Focus keystone.
-- [ ] #27 `ax.Error` recovery/remediation fields (amend ADR-0002) [M] — add
+- [ ] #27 `ax.Error` recovery/remediation fields [M] — add
   optional `retryable` / `recovery` / `next_action` so an agent can self-correct,
   not just report. The AX source audit's #1 in-scope win.
 - [ ] #19 `SECURITY.md` disclosure policy [S] — reporting channel, SLA,
@@ -67,7 +67,7 @@ constitution amendment (Principles XI + XII); see
   while preserving user formatting/comments, since strict-JSON writes can't.
   The retired Hujson input decision's read/write consequences are absorbed in
   [`specs/001-bound-config-reads/research.md`](specs/001-bound-config-reads/research.md).
-- [ ] #10 `ax-go mcp-server` runnable wrapper (ADR-0003) [L] — wrap an ax-go CLI
+- [ ] #10 `ax-go mcp-server` runnable wrapper [L] — wrap an ax-go CLI
   as a live MCP server with no per-tool work, building on the existing
   `__schema --as=mcp` adapter.
 - [ ] #11 Hot-path benchmarks with `-benchmem` [M] — back the zerolog
@@ -87,7 +87,7 @@ constitution amendment (Principles XI + XII); see
 in-scope
 gaps that deepen the machine-contract half of AX.*
 
-- [ ] #27 `ax.Error` recovery/remediation fields (amend ADR-0002) [M] — add
+- [ ] #27 `ax.Error` recovery/remediation fields [M] — add
   optional `retryable` / `recovery` / `next_action` so an agent can self-correct,
   not just report. The audit's #1 in-scope win.
 - [ ] #28 Richer per-flag `__schema` semantics [M] — defaults, enums,
@@ -167,18 +167,18 @@ gaps that deepen the machine-contract half of AX.*
 - [x] #48 Telemetry doc fixes [S] — corrected the understated `Start` doc, dropped
   the stale `WithSyncer` reference, and added the writer rationale. Closed
   2026-06-14.
-- [x] ADRs 0001–0011 accepted [L] — agent-mode trigger, error envelope, schema
-  format, trace-ID format, OTel integration, Loki integration, ID strategy,
-  Cobra framework, zerolog, Hujson input, JSON output.
-- [x] Mode resolution skeleton (ADR-0001) [M] — `--format` > `AGENT_MODE` > TTY,
+- [x] Legacy ADRs 0001–0011 accepted [L] — agent-mode trigger, error envelope,
+  schema format, trace-ID format, OTel integration, Loki integration, ID
+  strategy, Cobra framework, zerolog, Hujson input, JSON output.
+- [x] Mode resolution skeleton [M] — `--format` > `AGENT_MODE` > TTY,
   carried in `context.Context`, fully tested.
-- [x] `ax.Error` envelope shape (ADR-0002) [M] — struct, options, exit-code
+- [x] `ax.Error` envelope shape [M] — struct, options, exit-code
   mapping, `stderr` writer.
-- [x] `__schema` reflection — ax + mcp emit (ADR-0003) [M] — Cobra command-tree
+- [x] `__schema` reflection — ax + mcp emit [M] — Cobra command-tree
   reflection, auto-injected reserved command.
 - [x] `Execute()` Cobra lifecycle wrapper [L] — flag injection, schema
   injection, mode/idempotency/dry-run context, error normalization.
-- [x] ID generation — UUID v4/v7 (ADR-0007) [S].
+- [x] ID generation — UUID v4/v7 [S].
 - [x] JSON + NDJSON envelope writers [S].
 - [x] #1 Hujson read parsing and bounded read cap
   ([specs/001-bound-config-reads](specs/001-bound-config-reads)) [S] — default
@@ -197,8 +197,8 @@ gaps that deepen the machine-contract half of AX.*
   output shapes pinned by `testdata/` fixtures so schema drift breaks CI. Closed
   2026-06-11.
 - [x] Integration example CLI (`examples/integration/`) [M].
-- [x] ADR-0012 directory layout [S] — documents the public root facade,
-  `internal/` implementation packages, `cmd/` runnable binaries, and
+- [x] Directory layout [S] — documents the public root facade, narrow contract
+  packages, `internal/` implementation packages, `cmd/` runnable binaries, and
   `testdata/` public contract fixtures.
 
 ## Boundary Safeguards
@@ -212,4 +212,4 @@ From [CONTEXT.md](./CONTEXT.md) — roadmap items must never:
 - Add a pluggable logger backend while ADR-0009 stands.
 - Add a second CLI framework, skip TLS, log PII/secrets, or read unbounded input.
 - Ship `dev`/`unknown` versions to production agents.
-- Change public API or runtime behavior without an ADR first.
+- Change public API or runtime behavior without a Spec Kit feature first.

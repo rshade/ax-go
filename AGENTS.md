@@ -24,8 +24,13 @@ conflicts with the constitution, the constitution wins.
   not create or edit ADRs. When a Spec Kit feature is governed by one, absorb its
   decisions into the feature's `research.md` and delete it as the final task.
 - `internal/` contains private implementation packages behind the public
-  package `ax`. Do not move code into public subpackages without a Spec Kit
-  feature or constitution amendment.
+  package `ax` and the narrow public contract packages. Do not move code into
+  additional public subpackages without a Spec Kit feature or constitution
+  amendment.
+- `contract/`, `config/`, `schema/`, and `id/` are approved public contract
+  packages for thin consumers. They must remain import-isolated from the root
+  runtime facade, telemetry exporters/SDK setup, logger/Loki, HTTP
+  instrumentation, and gRPC runtime adapters.
 - `testdata/` contains golden fixtures for stable public JSON contracts.
 - `cmd/` is reserved for runnable support binaries such as the future
   `ax-go mcp-server`; do not create placeholder commands before behavior
@@ -52,9 +57,8 @@ conflicts with the constitution, the constitution wins.
   - `4`: authentication/permission
 - Every CLI built on ax-go must expose `__schema`, emitting a structured JSON
   description of command tree, flags, types, and examples. A companion
-  `__schema --as=mcp` adapter emits MCP-tool-compatible output (ADR-0003) so
-  an ax-go CLI can be wrapped as an MCP server via `ax-go mcp-server` with
-  no per-tool work.
+  `__schema --as=mcp` adapter emits MCP-tool-compatible output so an ax-go CLI
+  can be wrapped as an MCP server via `ax-go mcp-server` with no per-tool work.
 - Input accepts Hujson for human convenience on **reads only** — writes emit
   strict JSON (Hujson cannot Marshal comments). To mutate an existing Hujson
   file while preserving user formatting, use the AST `Patch` path
@@ -95,8 +99,8 @@ conflicts with the constitution, the constitution wins.
   and resource IDs are payload (never promoted to labels).
 - Use OpenTelemetry trace/span IDs for observability. Use **UUID v7** (via
   `github.com/google/uuid`) for resource and entity IDs, and **UUID v4**
-  (same library) for auto-generated idempotency keys. ULID was rejected
-  (ADR-0007). Never mix observability IDs with resource/entity IDs.
+  (same library) for auto-generated idempotency keys. Never mix observability
+  IDs with resource/entity IDs.
 - Use `github.com/rs/zerolog` for structured logging. The canonical
   constructor is `ax.NewLogger(ctx)`, returning an `ax.Logger` (initially
   backed by `*zerolog.Logger`) with trace correlation wired in.
@@ -296,5 +300,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/006-output-determinism-harness/plan.md
+at specs/010-import-isolated-contracts/plan.md
 <!-- SPECKIT END -->

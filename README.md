@@ -39,6 +39,40 @@ emits data, reports errors, exposes its command tree, and stays safe under
 retries — ax-go encodes those conventions once so the whole portfolio shares
 the same predictable behavior.
 
+## Public Import Surfaces
+
+Use the root package for full CLI runtime behavior:
+
+```go
+import ax "github.com/rshade/ax-go"
+```
+
+The root `ax` facade remains the ergonomic surface for complete Cobra CLIs:
+`ax.Execute`, telemetry lifecycle, structured logging, `__schema` command
+wiring, HTTP/gRPC helpers, and trace-aware envelopes.
+
+Use isolated contract packages for thin consumers that only need stable machine
+contracts without root runtime adapters:
+
+```go
+import (
+    "github.com/rshade/ax-go/config"
+    "github.com/rshade/ax-go/contract"
+    "github.com/rshade/ax-go/id"
+    "github.com/rshade/ax-go/schema"
+)
+```
+
+- `contract`: exit codes, mode resolution, context metadata, success/error
+  envelopes, and strict JSON/NDJSON writers.
+- `config`: bounded Hujson reads and comment-preserving RFC 6902 patches.
+- `schema`: ax-native and MCP-compatible command schema shapes/builders.
+- `id`: UUID v4 idempotency keys and UUID v7 entity/resource IDs.
+
+Import-isolation tests keep those public contract packages free of the root
+facade, telemetry exporters/SDK setup, logger/Loki, HTTP instrumentation, and
+gRPC runtime adapters.
+
 ## Core Standards
 
 These are the non-negotiable mandates every tool built on ax-go must follow.
@@ -76,8 +110,9 @@ literature demands, and it is the project's clearest differentiator.
 Every tool implements a `__schema` command that emits a structured JSON map of
 its command tree, flags, types, and examples — so agents can ground themselves
 without guessing. The primary format is ax-native JSON, with
-`__schema --as=mcp` available as an MCP-compatible adapter
-([ADR-0003](docs/adr/0003-schema-output-format.md)).
+`__schema --as=mcp` available as an MCP-compatible adapter. The discoverability
+contract is now owned by the `schema` package and the absorbed decisions in
+[`specs/010-import-isolated-contracts/research.md`](specs/010-import-isolated-contracts/research.md).
 
 ### Asymmetric JSON flow
 
@@ -115,12 +150,13 @@ failed patch operation uses the frozen `error_code` `config_patch_invalid`
 - **`--dry-run`** — universal middleware that emits the same envelope with
   `dry_run: true` and performs no side effects.
 - **`--format` flag / `AGENT_MODE` env var / TTY auto-detect** — selects machine
-  vs. human output mode ([ADR-0001](docs/adr/0001-agent-mode-trigger.md)).
+  vs. human output mode. The precedence is `--format` flag, then `AGENT_MODE`,
+  then TTY detection.
 
 ### Standard `ax.Error` envelope
 
 A structured, machine-readable error format emitted to `stderr`. Schema defined
-in [ADR-0002](docs/adr/0002-error-envelope-schema.md).
+by the root `ax.Error` facade and the isolated `contract.Error` type.
 
 ## Engineering Standards
 
@@ -137,9 +173,8 @@ in [ADR-0002](docs/adr/0002-error-envelope-schema.md).
   [`specs/007-loki-direct-push/research.md`](specs/007-loki-direct-push/research.md));
   Tempo / Jaeger / Honeycomb-compatible for traces via OTel.
 - **ID strategy:** OTel trace/span IDs for observability; UUID v4 for
-  idempotency keys; UUID v7 for resource and entity IDs
-  ([ADR-0007](docs/adr/0007-id-strategy.md)). Never mix observability IDs with
-  resource/entity IDs.
+  idempotency keys; UUID v7 for resource and entity IDs. Never mix
+  observability IDs with resource/entity IDs.
 - **CLI framework:** built on Cobra ([ADR-0008](docs/adr/0008-cli-framework-cobra.md)).
   `ax.Execute()` wraps Cobra execution for mode resolution, schema wiring,
   error-envelope output, and OTel flush-on-exit.
@@ -170,26 +205,24 @@ deleted.
 
 | ADR | Title | Status |
 | --- | --- | --- |
-| [0001](docs/adr/0001-agent-mode-trigger.md) | Agent-Mode Trigger | **Accepted (2026-05-28)** |
-| [0002](docs/adr/0002-error-envelope-schema.md) | JSON Error Envelope Schema | **Accepted (2026-05-28)** |
-| [0003](docs/adr/0003-schema-output-format.md) | `__schema` Output Format | **Accepted (2026-05-28)** |
 | [0004](docs/adr/0004-trace-id-format.md) | Trace ID Format | **Accepted (2026-05-28)** |
-| [0007](docs/adr/0007-id-strategy.md) | ID Strategy | **Accepted (2026-05-28)** |
 | [0008](docs/adr/0008-cli-framework-cobra.md) | CLI Framework — Cobra | **Accepted (2026-05-28)** |
 | [0009](docs/adr/0009-logger-zerolog.md) | Structured Logger — ZeroLog | **Accepted (2026-05-28)** |
-| [0012](docs/adr/0012-directory-layout.md) | Directory Layout | **Accepted (2026-05-30)** |
 
-Full text and rationale live in [`docs/adr/`](docs/adr/).
+Absorbed decisions for mode resolution, error envelopes, schema output, ID
+strategy, and import layout live in
+[`specs/010-import-isolated-contracts/research.md`](specs/010-import-isolated-contracts/research.md).
+Remaining frozen ADR text and rationale live in [`docs/adr/`](docs/adr/).
 
 ## Repository Layout
 
-The public import path remains one package: `github.com/rshade/ax-go` as `ax`.
-Per Go's official module layout guidance, public package files stay at the
-module root. Private implementation mechanics live under [`internal/`](internal/)
-so they do not become accidental public API before v1.0. Public JSON contract
-fixtures live under [`testdata/`](testdata/). Runnable support binaries belong
-under `cmd/` when real command behavior exists. `pkg/`, `src/`, and broad
-public subpackages are intentionally avoided.
+The primary public import path remains `github.com/rshade/ax-go` as `ax`.
+Narrow public contract packages exist only for thin consumers:
+`contract`, `config`, `schema`, and `id`. Private implementation mechanics live
+under [`internal/`](internal/) so they do not become accidental public API.
+Public JSON contract fixtures live under [`testdata/`](testdata/). Runnable
+support binaries belong under `cmd/` when real command behavior exists. `pkg/`,
+`src/`, and broad public subpackages remain intentionally avoided.
 
 ## Examples
 
@@ -265,8 +298,7 @@ The same resolved value feeds `__schema.version`, the `ax.Error` envelope
 Sequenced from the accepted ADRs and the current scaffold:
 
 1. **Harden `__schema`** — enforce example coverage, expand output-mode
-   declarations, and mature the MCP adapter from
-   [ADR-0003](docs/adr/0003-schema-output-format.md).
+   declarations, and mature the MCP adapter owned by the `schema` package.
 2. **Implement Loki direct push** — keep stderr shipping as the default and add
    opt-in `AX_LOKI_URL` direct push from
    [ADR-0006](docs/adr/0006-loki-integration.md).
