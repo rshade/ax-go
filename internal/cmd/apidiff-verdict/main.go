@@ -43,6 +43,21 @@ const commentMarker = "<!-- apidiff-report -->"
 // .github/apidiff-comment.sh.
 const commentFile = "apidiff-comment.md"
 
+const (
+	// minArgs is the minimum os.Args length for a valid invocation: the program
+	// name plus a subcommand name.
+	minArgs = 2
+	// scanBufInitial and scanBufMax size the report scanner's per-line buffer.
+	// go-apidiff change lines carry full type signatures and can exceed
+	// bufio.Scanner's 64 KiB default, so the buffer is allowed to grow to
+	// scanBufMax.
+	scanBufInitial = 64 * 1024 // 64 KiB
+	scanBufMax     = 1 << 20   // 1 MiB
+	// goListFieldCount is the number of whitespace-separated fields in a
+	// `go list -f '{{.ImportPath}} {{.Name}}'` line: "<import-path> <name>".
+	goListFieldCount = 2
+)
+
 // allowedPackages is the single source of truth for ax-go's public API surface:
 // the root package ax plus the import-isolated contract packages. go-apidiff
 // findings for any other package (notably internal/ and examples/) are ignored
@@ -76,7 +91,7 @@ type section struct {
 }
 
 func main() {
-	if len(os.Args) < 2 {
+	if len(os.Args) < minArgs {
 		failf("usage: apidiff-verdict <verdict|check-packages>")
 	}
 	switch os.Args[1] {
@@ -94,9 +109,9 @@ func main() {
 // 0: the gate decision belongs to the workflow, which reads the recorded
 // outputs.
 func runVerdict() {
-	sections, err := parseReport(os.Stdin)
-	if err != nil {
-		failf("parsing go-apidiff report: %v", err)
+	sections, parseErr := parseReport(os.Stdin)
+	if parseErr != nil {
+		failf("parsing go-apidiff report: %v", parseErr)
 	}
 	public := filterPublic(sections, allowSet())
 	rendered := render(public)
@@ -104,7 +119,7 @@ func runVerdict() {
 	if err := emitSummary(rendered); err != nil {
 		failf("writing summary: %v", err)
 	}
-	if err := os.WriteFile(commentFile, []byte(rendered), 0o644); err != nil {
+	if err := os.WriteFile(commentFile, []byte(rendered), 0o600); err != nil {
 		failf("writing %s: %v", commentFile, err)
 	}
 	if err := emitOutput("public_breaking", hasBreaking(public)); err != nil {
@@ -139,7 +154,7 @@ func parseReport(r io.Reader) ([]section, error) {
 	sc := bufio.NewScanner(r)
 	// go-apidiff change lines can be long (full type signatures); raise the
 	// scanner's line cap well above the 64 KiB default.
-	sc.Buffer(make([]byte, 0, 64*1024), 1024*1024)
+	sc.Buffer(make([]byte, 0, scanBufInitial), scanBufMax)
 
 	for sc.Scan() {
 		raw := sc.Text()
@@ -269,7 +284,7 @@ func checkAllowlist(r io.Reader, allow []string) error {
 			continue
 		}
 		fields := strings.Fields(line)
-		if len(fields) < 2 {
+		if len(fields) < goListFieldCount {
 			return fmt.Errorf("malformed `go list` line: %q (want '<import-path> <package-name>')", line)
 		}
 		importPath, pkgName := fields[0], fields[1]
@@ -367,7 +382,10 @@ func emitOutput(key string, value bool) error {
 
 // appendFile appends data to the file at path, creating it if absent.
 func appendFile(path, data string) (err error) {
-	f, openErr := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o644)
+	// #nosec G703 -- path is only the GITHUB_STEP_SUMMARY / GITHUB_OUTPUT file
+	// set by the GitHub Actions runner (see emitSummary/emitOutput), never
+	// user-controlled input.
+	f, openErr := os.OpenFile(path, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0o600)
 	if openErr != nil {
 		return openErr
 	}
