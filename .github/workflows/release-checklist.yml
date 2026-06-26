@@ -9,7 +9,7 @@ permissions:
 
 jobs:
   post-checklist:
-    if: github.event.label.name == 'autorelease: pending'
+    if: "github.event.label.name == 'autorelease: pending'"
     runs-on: ubuntu-latest
     steps:
       - name: Find existing checklist comment

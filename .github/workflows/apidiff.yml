@@ -1,0 +1,93 @@
+name: API Diff
+
+# Detects breaking changes to ax-go's PUBLIC API surface on PRs and gates the
+# merge behind an explicit acknowledgment label. Lives in its own workflow
+# (separate from ci.yml) for two reasons: it needs pull-requests:write to post
+# the diff comment (ci.yml stays least-privilege contents:read), and it needs
+# labeled/unlabeled triggers so adding the override label re-evaluates the gate
+# without re-running the rest of CI.
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apidiff-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  GO_VERSION: '1.26.4'
+  # Bypass the Go proxy for rshade modules - fetch directly from GitHub.
+  GOPRIVATE: github.com/rshade/*
+
+jobs:
+  apidiff:
+    name: Public API Diff
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+        with:
+          # Full history so the PR base commit is available to diff against.
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Verify public package allowlist is current
+        run: |
+          go list -f '{{.ImportPath}} {{.Name}}' ./... |
+            go run ./internal/cmd/apidiff-verdict check-packages
+
+      - name: Install go-apidiff
+        run: |
+          go install github.com/joelanford/go-apidiff@v0.8.3
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      - name: Compute public API verdict
+        id: verdict
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          # Write the report OUTSIDE the repo working tree. go-apidiff diffs the
+          # base commit by checking it out in-place with `git clean -fd`
+          # (go-git wt.Clean{Dir:true}), which deletes every untracked file in
+          # the tree — a report written to the repo root is wiped before we can
+          # read it back. A mktemp path under $TMPDIR is out of go-apidiff's reach.
+          report="$(mktemp)"
+          # go-apidiff exits non-zero when it finds incompatible changes; that is
+          # expected input here, not a failure, so do not let it abort the step.
+          go-apidiff "$BASE_SHA" --print-compatible --repo-path=. >"$report" || true
+          go run ./internal/cmd/apidiff-verdict verdict <"$report"
+
+      - name: Upsert PR comment
+        # Best-effort: same-repo PRs only (fork PRs get a read-only token that
+        # cannot comment) and never fails the job. Fork/Dependabot PRs still see
+        # the diff in the step summary and are still gated below.
+        if: >-
+          steps.verdict.outputs.has_public_changes == 'true' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+        run: bash .github/apidiff-comment.sh apidiff-comment.md
+
+      - name: Gate on unacknowledged breaking change
+        # Token-independent: this exit code gates the merge for every PR
+        # (including forks and Dependabot), regardless of comment success.
+        if: >-
+          steps.verdict.outputs.public_breaking == 'true' &&
+          !contains(github.event.pull_request.labels.*.name, 'breaking-change-approved')
+        run: |
+          echo "::error::Breaking public API change detected without the 'breaking-change-approved' label. If the break is intentional, add the label and use a feat!: / BREAKING CHANGE: commit so release-please bumps the minor digit. See AGENTS.md > Go Discipline."
+          exit 1

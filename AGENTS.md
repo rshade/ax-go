@@ -346,6 +346,20 @@ follows them.
   CLIs inject a real version into `__schema`'s `version` field via
   `-ldflags "-X ..."`. Never ship `dev` or `unknown` to production
   agents.
+- **Public API diffing in CI.** The `API Diff` workflow
+  (`.github/workflows/apidiff.yml`) runs `go-apidiff` on every PR and scopes
+  the result to the public surface — the root package `ax` plus the contract
+  packages `contract`, `config`, `schema`, and `id`. `internal/` is exempt
+  (Constitution Principle XI; the toolchain blocks external import). An
+  incompatible change to that surface **fails CI** unless the PR carries the
+  `breaking-change-approved` label. Applying the label acknowledges the break
+  is intentional and MUST be paired with a `feat!:` / `BREAKING CHANGE:`
+  commit so release-please rides the break on the minor digit (pre-v1.0,
+  `0.MINOR.0` MAY break). The public-package allowlist is the single source of
+  truth in `internal/cmd/apidiff-verdict`; adding a public package requires
+  updating it (a `check-packages` guard fails CI otherwise). The breaking-change
+  definition itself lives in Constitution Principle XI, which supersedes the
+  never-written ADR-0013 that originally gated this work.
 
 ## Guardrails For Agents
 
