@@ -49,8 +49,9 @@ matches what the existing static MCP adapter produces for the same command tree.
    and completes the protocol handshake, **Then** the server reports its identity,
    the injected build version, and its supported capabilities.
 2. **Given** the connected client requests the tool list, **When** the server
-   responds, **Then** every non-hidden command is present as a tool with the same
-   name, description, and input fields the static MCP adapter would emit.
+   responds, **Then** every non-hidden, flag-satisfiable command is present as a tool with
+   the same name, description, and input fields the static MCP adapter would emit
+   (commands that require positional arguments are excluded — see research D12).
 3. **Given** a CLI that later adds a new command or flag, **When** the server is run
    again, **Then** the new command/flag appears in the tool list with no additional
    per-tool authoring.
@@ -133,6 +134,10 @@ behave identically to the local transport.
 
 - **Reserved commands**: the schema command and the server-launcher command must not
   appear as callable tools; hidden commands are excluded from the tool list.
+- **Positional-argument commands**: a command that requires positional arguments (its
+  Cobra `Args` validator rejects an empty argument vector) is excluded from the tool list,
+  because the flat MCP argument object maps only onto flags and such a tool could never be
+  satisfied (research D12); positional-argument mapping is deferred.
 - **Unknown tool / bad arguments**: an unknown tool name or arguments that fail
   validation return a structured tool error (validation exit-code mapping) without
   crashing the server.
@@ -174,21 +179,24 @@ behave identically to the local transport.
   per-command or per-tool authoring required.
 - **FR-003**: The server MUST implement the MCP protocol handshake, reporting server
   identity, the injected build version, and supported capabilities.
-- **FR-004**: A tool-list request MUST return exactly the non-hidden, non-reserved
-  commands the static MCP adapter would emit for the same command tree — i.e.
-  `schema.BuildMCPSchema(root)` minus hidden commands and the reserved `__schema` and
-  `mcp-server` commands (FR-005) — each with the same name, description, and input
-  fields. (The static `__schema --as=mcp` adapter does not itself drop the reserved
-  commands; the live server layers that exclusion on top. That single carve-out is the
+- **FR-004**: A tool-list request MUST return exactly the non-hidden, non-reserved,
+  flag-satisfiable commands the static MCP adapter would emit for the same command tree —
+  i.e. `schema.BuildMCPSchema(root)` minus hidden commands, the reserved `__schema` and
+  `mcp-server` commands (FR-005), and commands that require positional arguments (research
+  D12) — each with the same name, description, and input fields. (The static
+  `__schema --as=mcp` adapter does not itself drop the reserved or positional-argument
+  commands; the live server layers those exclusions on top. Those two carve-outs are the
   only sanctioned divergence from the static output.)
 - **FR-005**: Reserved commands (the schema command and the server-launcher command
-  itself) and hidden commands MUST NOT be exposed as callable tools. These three
-  exclusions (hidden, `__schema`, `mcp-server`) are the ONLY filtering the server applies
-  on top of `schema.BuildMCPSchema`; every other command — including the root command and
-  any parent/group commands — is projected exactly as the static adapter projects it,
-  preserving discovery parity (FR-004/SC-002). An adopting CLI that does not want a bare
-  root or parent command exposed as a tool marks it hidden (the existing `Hidden`
-  mechanism), rather than relying on server-side special-casing.
+  itself), hidden commands, and commands that require positional arguments MUST NOT be
+  exposed as callable tools. These four exclusions — hidden, `__schema`, `mcp-server`, and
+  positional-argument-requiring commands (the last because the flat MCP argument object
+  maps only onto flags; see research D12) — are the ONLY filtering the server applies on
+  top of `schema.BuildMCPSchema`; every other command — including the root command and any
+  parent/group commands — is projected exactly as the static adapter projects it,
+  preserving discovery parity for callable commands (FR-004/SC-002). An adopting CLI that
+  does not want a bare root or parent command exposed as a tool marks it hidden (the
+  existing `Hidden` mechanism), rather than relying on server-side special-casing.
 - **FR-006**: The exposed tool set MUST stay in sync with the CLI automatically —
   adding or changing a command or flag changes the exposed tools with no extra work.
 
@@ -292,9 +300,10 @@ behave identically to the local transport.
 - **MCP Server surface**: the runnable wrapper that hosts an ax-go CLI as an MCP
   endpoint; owns the handshake, tool list, tool-call dispatch, transport, and
   lifecycle.
-- **MCP Tool**: a one-to-one projection of a single non-hidden, non-reserved command,
-  carrying the command's name, description, and input fields, sourced from the existing
-  tool-discovery adapter.
+- **MCP Tool**: a one-to-one projection of a single non-hidden, non-reserved,
+  flag-satisfiable command (commands requiring positional arguments are excluded — see
+  research D12), carrying the command's name, description, and input fields, sourced from
+  the existing tool-discovery adapter.
 - **Tool Call**: a client request naming a tool plus its arguments (which may include
   the dry-run and idempotency-key safety inputs).
 - **Tool Result**: the response to a tool call — either the command's machine payload
@@ -311,11 +320,12 @@ behave identically to the local transport.
 - **SC-001**: A developer can expose an existing ax-go CLI as a live MCP server whose
   tool list covers all of its non-hidden commands with zero per-command code (only
   enabling the server surface).
-- **SC-002**: 100% of the non-hidden, non-reserved commands present in the CLI's static
-  `__schema --as=mcp` output are also discoverable through the live server's tool list
-  (discovery parity). The live tool list equals that static set minus the reserved
-  `__schema` and `mcp-server` commands (FR-005), which the static adapter does not itself
-  drop; that single carve-out is the only permitted difference.
+- **SC-002**: 100% of the non-hidden, non-reserved, flag-satisfiable commands present in
+  the CLI's static `__schema --as=mcp` output are also discoverable through the live
+  server's tool list (discovery parity). The live tool list equals that static set minus
+  the reserved `__schema` and `mcp-server` commands and minus commands that require
+  positional arguments (FR-005, research D12), which the static adapter does not itself
+  drop; those two carve-outs are the only permitted difference.
 - **SC-003**: An MCP client can complete handshake → tool list → tool call → receive
   the command's machine payload end-to-end over the default transport.
 - **SC-004**: A failing command returns a structured error to the client and the

@@ -16,15 +16,17 @@ ax-go-specific guarantees layered on top.
 ## Discovery (`tools/list`)
 
 - **C-2**: `tools/list` returns exactly the tools produced by `schema.BuildMCPSchema(root)`
-  for the command tree, **minus** hidden commands and the reserved `__schema` and
-  `mcp-server` commands (FR-004/FR-005, D8). Those three are the only exclusions; the root
-  command and any parent/group commands are projected exactly as `BuildMCPSchema` projects
-  them (an adopter suppresses a bare root/parent by marking it `Hidden`).
+  for the command tree, **minus** hidden commands, the reserved `__schema` and
+  `mcp-server` commands, and commands that require positional arguments (FR-004/FR-005, D8,
+  research D12). Those four are the only exclusions; the root command and any parent/group
+  commands are projected exactly as `BuildMCPSchema` projects them (an adopter suppresses a
+  bare root/parent by marking it `Hidden`).
 - **C-3**: For a fixed command tree, `tools/list` is byte-identical across runs (modulo
   documented non-deterministic fields) and is guarded by a golden file:
   `testdata/mcp_tools_list.golden.json` (FR-019, SC-006).
-- **C-4**: The live tool set equals the non-hidden set emitted by `__schema --as=mcp`
-  (discovery parity, SC-002).
+- **C-4**: The live tool set equals the non-hidden, flag-satisfiable set emitted by
+  `__schema --as=mcp` — that set minus commands that require positional arguments
+  (discovery parity, SC-002, research D12).
 
 ## Execution (`tools/call`)
 

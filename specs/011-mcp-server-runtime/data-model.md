@@ -30,9 +30,10 @@ protocol channel), and telemetry is flushed before `Serve` returns `nil` (FR-020
 
 ## Entity: Tool (projection, derived — not stored)
 
-A one-to-one projection of a non-hidden, non-reserved command, produced by
-`schema.BuildMCPSchema(root)`. The feature does not define a new tool shape; it reuses
-the existing `schema.MCPTool`.
+A one-to-one projection of a non-hidden, non-reserved, flag-satisfiable command, produced
+by `schema.BuildMCPSchema(root)` (commands requiring positional arguments are excluded; see
+the exclusion rules below). The feature does not define a new tool shape; it reuses the
+existing `schema.MCPTool`.
 
 | Field | Source | Notes |
 |-------|--------|-------|
@@ -40,12 +41,15 @@ the existing `schema.MCPTool`.
 | `description` | command `Short` | May be empty. |
 | `inputSchema` | command flags | JSON-schema object: `{type: object, properties: {<flag>: {type, description, default}}}`. Cobra multi-value flags are advertised as JSON arrays with an `items` schema, so MCP clients can preserve repeated values. |
 
-**Exclusion rules** (FR-005, D8): hidden commands, the `__schema` command, and the
-`mcp-server` command itself are NOT exposed as callable tools. These three are the ONLY
-exclusions layered on top of `schema.BuildMCPSchema`; every other command — including the
-root command and any parent/group commands — is projected exactly as the static adapter
-projects it (an adopter suppresses a bare root/parent by marking it `Hidden`). Selection
-parity with `__schema --as=mcp` (minus the reserved commands) is guarded by a golden file
+**Exclusion rules** (FR-005, D8, research D12): hidden commands, the `__schema` command,
+the `mcp-server` command itself, and commands that require positional arguments are NOT
+exposed as callable tools. These four are the ONLY exclusions layered on top of
+`schema.BuildMCPSchema`; every other command — including the root command and any
+parent/group commands — is projected exactly as the static adapter projects it (an adopter
+suppresses a bare root/parent by marking it `Hidden`). Commands requiring positional
+arguments are excluded because the flat MCP argument object maps only onto flags, so such a
+tool could never be satisfied (research D12). Selection parity with `__schema --as=mcp`
+(minus the reserved and positional-argument commands) is guarded by a golden file
 (SC-002, SC-006).
 
 ## Entity: ToolCall (request, MCP wire — SDK-owned)
@@ -101,9 +105,10 @@ Transport {stdio | http} ──carries──▶ MCP protocol  (logs/diagnostics 
 - **INV-2** (determinism): `tools/list` is byte-identical across runs for a fixed command
   tree, modulo documented non-deterministic fields (FR-019, SC-006).
 - **INV-3** (discovery parity): the live `tools/list` set equals the static
-  `__schema --as=mcp` set minus the reserved `__schema`/`mcp-server` commands — i.e. the
-  non-hidden, non-reserved set (FR-004/FR-005, SC-002). The static adapter does not drop
-  the reserved commands; the server layers that single exclusion on top.
+  `__schema --as=mcp` set minus the reserved `__schema`/`mcp-server` commands and minus
+  commands that require positional arguments — i.e. the non-hidden, non-reserved,
+  flag-satisfiable set (FR-004/FR-005, SC-002, research D12). The static adapter does not
+  drop those commands; the server layers those exclusions on top.
 - **INV-4** (fail-soft): a single tool call's failure never terminates the server
   (FR-010, SC-004).
 - **INV-5** (isolation): concurrent tool calls share no mutable command/flag state and

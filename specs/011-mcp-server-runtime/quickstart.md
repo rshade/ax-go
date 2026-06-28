@@ -73,7 +73,7 @@ err := mcp.Serve(ctx, root,
 
 | Guarantee | Behavior |
 |-----------|----------|
-| Discovery | All non-hidden commands become tools automatically (reuses `BuildMCPSchema`); `__schema` and `mcp-server` are excluded. |
+| Discovery | Non-hidden commands become tools automatically (reuses `BuildMCPSchema`); `__schema`, `mcp-server`, and commands that require positional arguments are excluded. |
 | Execution | `tools/call` runs the command in machine/JSON mode and returns its verbatim `stdout` bytes. |
 | Errors | A non-zero exit returns a structured tool error (the `ax.Error` envelope); the server keeps serving. |
 | Safety | `--dry-run` and `--idempotency-key` flow through; HTTP defaults to loopback. |

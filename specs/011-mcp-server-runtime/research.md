@@ -248,10 +248,39 @@ Test-first, per Constitution Principle VII:
 pinned independently. Record the SDK version in `go.mod` and `research.md`; upgrades ride
 the normal dependency-update flow.
 
+## D12: Positional-argument commands excluded from the live tool list
+
+**Decision**: The live server excludes from `tools/list` any command whose Cobra `Args`
+validator rejects an empty argument vector (i.e. a command that requires positional
+arguments), in addition to the three reserved/hidden exclusions of D8. This is a fourth,
+sanctioned exclusion layered on top of `schema.BuildMCPSchema`.
+
+**Rationale**: The MCP `tools/call` argument object is flat and maps only onto command
+flags (see the arg-mapping rules in `data-model.md`); positional-argument mapping is a
+deferred open item (below). A command that requires positional arguments therefore could
+never be satisfied through a flag-only argument object — every such call would fail
+argument validation. Advertising it as a tool would hand an agent a tool that always
+fails. Omitting it keeps the tool list to commands an agent can actually invoke, which is
+the more useful contract until positional-argument mapping is designed. The adopting CLI
+loses nothing it can act on, and discovery parity is preserved for every *callable*
+command.
+
+**Contract impact**: This supersedes the earlier "the three reserved/hidden exclusions are
+the ONLY filtering" framing. FR-004/FR-005/SC-002 (`spec.md`), C-2/C-4
+(`contracts/mcp-server.md`), and the exclusion rules / INV-3 (`data-model.md`) are
+reconciled to describe four sanctioned exclusions (hidden, `__schema`, `mcp-server`,
+positional-argument-requiring commands). When positional-argument mapping is implemented,
+this exclusion is expected to be lifted and the framing revisited.
+
+**Implementation**: `mcpserver.discoverTools` /
+`mcpserver.commandsRequiringPositionalArgs`; covered by
+`TestDiscoverToolsExcludesPositionalArgCommands`.
+
 ## Open items for `/speckit-tasks`
 
 - Confirm the SDK's exact dynamic tool-registration entry point (non-generic
   `Server.AddTool` with a raw input schema + a handler receiving raw arguments) during
   implementation; the contracts describe the behavior, not the SDK's internal signature.
 - Decide the precise flag/arg-mapping rules for positional args vs. flags when the MCP
-  input object is flat (documented in `data-model.md`).
+  input object is flat (documented in `data-model.md`). Until this lands, commands that
+  require positional arguments are excluded from the live tool list (see D12).
