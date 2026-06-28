@@ -69,6 +69,7 @@ func allowedPackages() []string {
 		"github.com/rshade/ax-go/config",
 		"github.com/rshade/ax-go/contract",
 		"github.com/rshade/ax-go/id",
+		"github.com/rshade/ax-go/mcp",
 		"github.com/rshade/ax-go/schema",
 	}
 }

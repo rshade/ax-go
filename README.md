@@ -76,6 +76,17 @@ Import-isolation tests keep those public contract packages free of the root
 facade, telemetry exporters/SDK setup, logger/Loki, HTTP instrumentation, and
 gRPC runtime adapters.
 
+Use the `mcp` package to run a CLI as a live MCP server (see
+[Running as an MCP server](#running-as-an-mcp-server)):
+
+```go
+import "github.com/rshade/ax-go/mcp"
+```
+
+- `mcp`: a thin entry point (`mcp.Serve`, `mcp.NewCommand`) that exposes an
+  ax-go command tree as a live MCP server over the official MCP Go SDK. The SDK
+  and all protocol/transport/dispatch mechanics stay behind `internal/mcpserver`.
+
 ## Core Standards
 
 These are the non-negotiable mandates every tool built on ax-go must follow.
@@ -116,6 +127,50 @@ without guessing. The primary format is ax-native JSON, with
 `__schema --as=mcp` available as an MCP-compatible adapter. The discoverability
 contract is now owned by the `schema` package and the absorbed decisions in
 [`specs/010-import-isolated-contracts/research.md`](specs/010-import-isolated-contracts/research.md).
+
+### Running as an MCP server
+
+The same command tree that powers `__schema --as=mcp` can run as a **live MCP
+server** with no per-tool work, via the `mcp` package. Mount the reserved
+`mcp-server` subcommand (an explicit opt-in — it executes commands, so it is not
+auto-mounted like `__schema`):
+
+```go
+import (
+    "github.com/rshade/ax-go"
+    "github.com/rshade/ax-go/mcp"
+)
+
+func main() {
+    root := newRootCommand()
+    root.AddCommand(mcp.NewCommand(root, mcp.WithVersion(version)))
+    os.Exit(ax.Execute(context.Background(), root))
+}
+```
+
+Run it over **stdio** (the default; the idiomatic MCP subprocess model) or a
+**streamable HTTP** transport:
+
+```sh
+mycli mcp-server                                            # stdio
+mycli mcp-server --transport=http --addr=127.0.0.1:8080     # loopback HTTP
+mycli mcp-server --transport=http --addr=0.0.0.0:8080 --allow-non-loopback
+```
+
+- **Discovery**: every non-hidden command becomes a tool (reusing
+  `schema.BuildMCPSchema`); `__schema` and `mcp-server` are excluded.
+- **Execution**: `tools/call` runs the command in machine/JSON mode and returns
+  its verbatim `stdout` payload; a non-zero exit returns the `ax.Error` envelope
+  with `IsError` set, and the server keeps serving.
+- **Safety**: HTTP binds **loopback by default** and fails closed (exit 2) on a
+  non-loopback bind without `--allow-non-loopback`; ax-go holds no credentials
+  and runs no auth flow, so put authn/authz in front of an exposed endpoint.
+- **Streams & tracing**: protocol I/O stays on the transport channel and logs
+  on `stderr`; each call is a span that continues the caller's W3C trace.
+- **Out of scope (MVP)**: incremental MCP streaming/progress notifications, an
+  auth flow, and a standalone `cmd/` launcher (the runnable instance is any
+  adopting CLI's mounted subcommand). A real build version is required
+  (`WithVersion` or `-ldflags`); `dev`/`unknown` is rejected at startup.
 
 ### Asymmetric JSON flow
 

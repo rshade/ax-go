@@ -46,6 +46,38 @@ func TestBuildMCPSchemaGolden(t *testing.T) {
 	assertGolden(t, filepath.Join("..", "testdata", "schema_mcp.golden.json"), stdout.Bytes())
 }
 
+func TestBuildMCPSchemaAdvertisesMultiValueFlagsAsArrays(t *testing.T) {
+	root := &cobra.Command{Use: "app", Short: "test app"}
+	root.Flags().StringSlice("tags", []string{"default"}, "tags to apply")
+
+	built := BuildMCPSchema(root)
+	props, ok := built.Tools[0].InputSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("properties is %T, want map[string]any", built.Tools[0].InputSchema["properties"])
+	}
+	tags, ok := props["tags"].(map[string]any)
+	if !ok {
+		t.Fatalf("tags schema is %T, want map[string]any", props["tags"])
+	}
+	if tags["type"] != "array" {
+		t.Fatalf("tags.type = %q, want array", tags["type"])
+	}
+	items, ok := tags["items"].(map[string]any)
+	if !ok {
+		t.Fatalf("tags.items is %T, want map[string]any", tags["items"])
+	}
+	if items["type"] != "string" {
+		t.Fatalf("tags.items.type = %q, want string", items["type"])
+	}
+	defaultValue, ok := tags["default"].([]any)
+	if !ok {
+		t.Fatalf("tags.default is %T, want []any", tags["default"])
+	}
+	if len(defaultValue) != 1 || defaultValue[0] != "default" {
+		t.Fatalf("tags.default = %#v, want %#v", defaultValue, []any{"default"})
+	}
+}
+
 func TestNewSchemaCommandRejectsUnknownFormat(t *testing.T) {
 	root := newSchemaTestCommand()
 	cmd := NewSchemaCommand(root)

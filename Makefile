@@ -1,7 +1,7 @@
 GOLANGCI_LINT?=$(HOME)/go/bin/golangci-lint
 GOLANGCI_LINT_VERSION?=2.12.2
 MARKDOWNLINT?=markdownlint
-MARKDOWNLINT_FILES?=AGENTS.md README.md docs/**/*.md
+MARKDOWNLINT_FILES?=AGENTS.md README.md .github/copilot-instructions.md docs/**/*.md
 ACTIONLINT?=$(HOME)/go/bin/actionlint
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.0-unknown)
 

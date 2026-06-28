@@ -6,6 +6,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Persistent agent-safety/output flag names installed on every ax-go root
+// command. They live here, in the package both ax.Execute and the MCP
+// dispatcher already depend on, so the engine's flag installer and the MCP
+// server resolve the same flags from a single source of truth.
+const (
+	// FlagFormat selects the output mode (json or human).
+	FlagFormat = "format"
+	// FlagDryRun emits the envelope without performing side effects.
+	FlagDryRun = "dry-run"
+	// FlagIdempotencyKey carries an opaque key that suppresses duplicate-create
+	// retries.
+	FlagIdempotencyKey = "idempotency-key"
+)
+
 // EnsurePersistentStringFlag adds a persistent string flag unless it exists.
 func EnsurePersistentStringFlag(root *cobra.Command, name, value, usage string) {
 	if root.PersistentFlags().Lookup(name) != nil {

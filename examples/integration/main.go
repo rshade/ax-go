@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rshade/ax-go"
+	"github.com/rshade/ax-go/mcp"
 )
 
 var version string
@@ -137,6 +138,10 @@ func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string
 	root.AddCommand(newStreamCommand())
 	root.AddCommand(newPatchConfigCommand())
 	root.AddCommand(newFailCommand())
+
+	// Opt in to the MCP server: `ax-integration mcp-server` exposes this CLI's
+	// command tree as a live MCP server with no per-tool work (feature 011).
+	root.AddCommand(mcp.NewCommand(root, mcp.WithVersion(resolved)))
 
 	return root
 }
