@@ -207,6 +207,7 @@ func TestCheckAllowlist(t *testing.T) {
 				"github.com/rshade/ax-go/config config\n" +
 				"github.com/rshade/ax-go/contract contract\n" +
 				"github.com/rshade/ax-go/id id\n" +
+				"github.com/rshade/ax-go/mcp mcp\n" +
 				"github.com/rshade/ax-go/schema schema\n" +
 				"github.com/rshade/ax-go/internal/cli cli\n" +
 				"github.com/rshade/ax-go/internal/cmd/doccover main\n" +
@@ -219,6 +220,7 @@ func TestCheckAllowlist(t *testing.T) {
 				"github.com/rshade/ax-go/config config\n" +
 				"github.com/rshade/ax-go/contract contract\n" +
 				"github.com/rshade/ax-go/id id\n" +
+				"github.com/rshade/ax-go/mcp mcp\n" +
 				"github.com/rshade/ax-go/schema schema\n" +
 				"github.com/rshade/ax-go/telemetry telemetry\n",
 			wantErr:  true,
@@ -229,7 +231,8 @@ func TestCheckAllowlist(t *testing.T) {
 			goList: "github.com/rshade/ax-go ax\n" +
 				"github.com/rshade/ax-go/config config\n" +
 				"github.com/rshade/ax-go/contract contract\n" +
-				"github.com/rshade/ax-go/id id\n",
+				"github.com/rshade/ax-go/id id\n" +
+				"github.com/rshade/ax-go/mcp mcp\n",
 			wantErr:  true,
 			errMatch: "github.com/rshade/ax-go/schema is in the allowlist but is no longer a public package",
 		},
@@ -239,9 +242,11 @@ func TestCheckAllowlist(t *testing.T) {
 				"github.com/rshade/ax-go/config config\n" +
 				"github.com/rshade/ax-go/contract contract\n" +
 				"github.com/rshade/ax-go/id id\n" +
+				"github.com/rshade/ax-go/mcp mcp\n" +
 				"github.com/rshade/ax-go/schema schema\n" +
 				"github.com/rshade/ax-go/internal/config config\n" +
-				"github.com/rshade/ax-go/internal/schema schema\n",
+				"github.com/rshade/ax-go/internal/schema schema\n" +
+				"github.com/rshade/ax-go/internal/mcpserver mcpserver\n",
 			wantErr: false,
 		},
 		{

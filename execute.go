@@ -143,11 +143,11 @@ func prepareCommand(root *cobra.Command, cfg executeConfig) {
 	root.SilenceUsage = true
 	root.SilenceErrors = true
 
-	cli.EnsurePersistentStringFlag(root, "format", "", "output format: json or human")
-	cli.EnsurePersistentBoolFlag(root, "dry-run", false, "emit the envelope without side effects")
+	cli.EnsurePersistentStringFlag(root, cli.FlagFormat, "", "output format: json or human")
+	cli.EnsurePersistentBoolFlag(root, cli.FlagDryRun, false, "emit the envelope without side effects")
 	cli.EnsurePersistentStringFlag(
 		root,
-		"idempotency-key",
+		cli.FlagIdempotencyKey,
 		"",
 		"opaque key used to prevent duplicate-create retries",
 	)
@@ -169,9 +169,9 @@ func wrapPersistentPreRun(root *cobra.Command, cfg executeConfig) {
 	previous := root.PersistentPreRun
 
 	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		format := cli.LookupFlagString(cmd, "format")
-		dryRun := cli.LookupFlagBool(cmd, "dry-run")
-		idempotencyKey := cli.LookupFlagString(cmd, "idempotency-key")
+		format := cli.LookupFlagString(cmd, cli.FlagFormat)
+		dryRun := cli.LookupFlagBool(cmd, cli.FlagDryRun)
+		idempotencyKey := cli.LookupFlagString(cmd, cli.FlagIdempotencyKey)
 		if idempotencyKey == "" {
 			idempotencyKey = NewIdempotencyKey()
 		}

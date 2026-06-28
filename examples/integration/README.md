@@ -88,3 +88,16 @@ Return a structured error envelope on `stderr`:
 ```sh
 go run ./examples/integration fail --format=json
 ```
+
+Run this CLI as a live MCP server (it mounts `mcp.NewCommand`, so every
+non-hidden command becomes an MCP tool with no per-tool work):
+
+```sh
+go run ./examples/integration mcp-server                          # stdio
+go run ./examples/integration mcp-server --transport=http --addr=127.0.0.1:8080
+```
+
+The server speaks MCP over the transport channel and keeps logs on `stderr`. A
+non-loopback HTTP bind is fail-closed without `--allow-non-loopback`. See the
+[Running as an MCP server](../../README.md#running-as-an-mcp-server) section for
+the full contract.
