@@ -185,6 +185,18 @@ func applyLabels(ctx zerolog.Context, labels Labels) zerolog.Context {
 	return ctx
 }
 
+// tracingHook stamps trace_id and span_id onto every emitted log line so log
+// output correlates with traces (AGENTS.md: trace_id/span_id on every line when
+// a span is active). It runs once per enabled event at Msg time; events filtered
+// out by level never construct, so disabled logs skip the hook entirely.
+//
+// Allocation contract (verified by BenchmarkLogger, the source of truth for the
+// ADR-0009 zero/near-zero-allocation claim):
+//   - No active span: the IDs are the ZeroTraceID/ZeroSpanID package constants,
+//     so the hot path is allocation-free.
+//   - Active span: trace.TraceID.String()/SpanID.String() hex-encode each ID
+//     into a fresh string — a fixed, bounded per-line cost independent of the
+//     number of labels or structured fields on the line.
 type tracingHook struct{}
 
 func (tracingHook) Run(e *zerolog.Event, _ zerolog.Level, _ string) {

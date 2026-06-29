@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -324,6 +325,32 @@ func TestRunPatchConfigCommand(t *testing.T) {
 	}
 }
 
+// captureProcessStderr swaps os.Stderr for a pipe while fn runs and returns
+// what was written. ax.NewLogger writes the dry-run suppression line to the
+// process os.Stderr, so this is how an end-to-end test observes it. It mutates
+// the global os.Stderr, so callers MUST NOT be parallel.
+func captureProcessStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("os.Pipe: %v", err)
+	}
+	orig := os.Stderr
+	os.Stderr = w //nolint:reassign // redirect process stderr to capture the canonical logger's suppression line
+	defer func() {
+		os.Stderr = orig //nolint:reassign // restore process stderr after capture
+	}()
+	fn()
+	if cerr := w.Close(); cerr != nil {
+		t.Fatalf("close pipe writer: %v", cerr)
+	}
+	out, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read pipe: %v", err)
+	}
+	return string(out)
+}
+
 func TestRunPatchConfigCommandDryRunHasNoSideEffects(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.hujson")
@@ -339,24 +366,38 @@ func TestRunPatchConfigCommandDryRunHasNoSideEffects(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	code := run(
-		context.Background(),
-		[]string{
-			"patch-config",
-			"--format=json",
-			"--dry-run",
-			"--idempotency-key=test-key",
-			"--config=" + path,
-			`--patch=[{"op":"replace","path":"/count","value":5}]`,
-		},
-		strings.NewReader(""),
-		&stdout,
-		&stderr,
-		func(string) string { return "" },
-	)
+	// ax.Perform writes the dry-run suppression line to the process os.Stderr via
+	// the canonical logger (not the Execute-configured stderr buffer), so capture
+	// os.Stderr to observe it end-to-end and to keep it out of test output.
+	var code int
+	processStderr := captureProcessStderr(t, func() {
+		code = run(
+			context.Background(),
+			[]string{
+				"patch-config",
+				"--format=json",
+				"--dry-run",
+				"--idempotency-key=test-key",
+				"--config=" + path,
+				`--patch=[{"op":"replace","path":"/count","value":5}]`,
+			},
+			strings.NewReader(""),
+			&stdout,
+			&stderr,
+			func(string) string { return "" },
+		)
+	})
 
 	if code != ax.ExitSuccess {
 		t.Fatalf("exit code = %d, want %d; stderr=%s", code, ax.ExitSuccess, stderr.String())
+	}
+
+	// SC-007: the suppressed commit emits exactly one diagnostic line to stderr.
+	if got := strings.Count(processStderr, "side effect suppressed"); got != 1 {
+		t.Fatalf("want exactly one suppression line on stderr, got %d: %q", got, processStderr)
+	}
+	if !strings.Contains(processStderr, `"ax_helper":"Perform"`) {
+		t.Fatalf("suppression line missing ax_helper=Perform; got: %q", processStderr)
 	}
 
 	result, err := os.ReadFile(path)

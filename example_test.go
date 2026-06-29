@@ -300,3 +300,51 @@ func ExampleFlush() {
 	_ = ax.Flush(ctx, logger)
 	// Output:
 }
+
+// ExampleGuard shows the skip-only guard: the effect runs normally, but under
+// --dry-run it is suppressed entirely and Guard reports executed=false. The
+// suppression line Guard writes to stderr is not shown here (examples capture
+// stdout only).
+func ExampleGuard() {
+	effect := func(context.Context) error {
+		fmt.Println("writing report")
+		return nil
+	}
+
+	// Real run: the effect executes.
+	executed, err := ax.Guard(context.Background(), effect)
+	fmt.Printf("executed=%v err=%v\n", executed, err)
+
+	// Dry-run: the effect is skipped.
+	dryRun := ax.WithDryRun(context.Background(), true)
+	executed, err = ax.Guard(dryRun, effect)
+	fmt.Printf("executed=%v err=%v\n", executed, err)
+	// Output:
+	// writing report
+	// executed=true err=<nil>
+	// executed=false err=<nil>
+}
+
+// ExamplePerform shows the rehearse/commit pair: a real run performs commit,
+// while --dry-run runs the read-only rehearse preview instead (surfacing the
+// same validation errors) without performing the mutation.
+func ExamplePerform() {
+	rehearse := func(context.Context) error {
+		fmt.Println("validating only")
+		return nil
+	}
+	commit := func(context.Context) error {
+		fmt.Println("committing")
+		return nil
+	}
+
+	// Real run: commit executes, rehearse is ignored.
+	_ = ax.Perform(context.Background(), rehearse, commit)
+
+	// Dry-run: rehearse executes, commit is skipped.
+	dryRun := ax.WithDryRun(context.Background(), true)
+	_ = ax.Perform(dryRun, rehearse, commit)
+	// Output:
+	// committing
+	// validating only
+}

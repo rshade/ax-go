@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"go.opentelemetry.io/otel"
+
+	"github.com/rshade/ax-go/contract"
 )
 
 func TestTraceIDFromContextWithNoSpanReturnsZeroTraceID(t *testing.T) {
@@ -89,5 +91,27 @@ func TestZeroIDConstantFormats(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// TestWithTraceMetadataNilContextFallsBackToBackground exercises the nil-context
+// guard in withTraceMetadata. A nil context.Context (supplied via a typed
+// variable rather than the nil literal, so it is the real interface-nil the
+// guard checks for) must not panic: the helper substitutes context.Background()
+// and still returns a usable context carrying the zero-value trace and span IDs.
+func TestWithTraceMetadataNilContextFallsBackToBackground(t *testing.T) {
+	var nilCtx context.Context
+
+	got := withTraceMetadata(nilCtx)
+	if got == nil {
+		t.Fatal("withTraceMetadata(nil) returned a nil context")
+	}
+
+	meta := contract.MetadataFromContext(got)
+	if meta.TraceID != ZeroTraceID {
+		t.Fatalf("TraceID = %q, want ZeroTraceID %q", meta.TraceID, ZeroTraceID)
+	}
+	if meta.SpanID != ZeroSpanID {
+		t.Fatalf("SpanID = %q, want ZeroSpanID %q", meta.SpanID, ZeroSpanID)
 	}
 }
