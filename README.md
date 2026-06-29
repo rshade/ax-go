@@ -207,6 +207,28 @@ failed patch operation uses the frozen `error_code` `config_patch_invalid`
   output envelope, killing duplicate-create from agent retries.
 - **`--dry-run`** — universal middleware that emits the same envelope with
   `dry_run: true` and performs no side effects.
+- **`ax.Guard` / `ax.Perform`** — helpers that guard a side-effecting operation
+  on the dry-run flag, so commands stop hand-rolling
+  `if ax.DryRunFromContext(ctx) { ... } else { ... }`. `Guard` runs an effect
+  unless dry-run is active (and reports whether it ran); `Perform` runs the real
+  `commit`, or a read-only `rehearse` preview under dry-run that surfaces the same
+  validation errors without mutating. Each writes a single suppression line to
+  `stderr` (never `stdout`) when it skips. The envelope's `dry_run: true` still
+  flows automatically.
+
+  ```go
+  // Skip-only: writeReport runs for real, is suppressed under --dry-run.
+  wrote, err := ax.Guard(ctx, func(ctx context.Context) error {
+      return writeReport(ctx, path)
+  })
+
+  // Faithful preview: validate under --dry-run, mutate for real.
+  err = ax.Perform(ctx,
+      func(ctx context.Context) error { return validatePatch(ctx, path, doc) }, // dry-run
+      func(ctx context.Context) error { return ax.PatchConfigFile(ctx, path, doc) }, // real
+  )
+  ```
+
 - **`--format` flag / `AGENT_MODE` env var / TTY auto-detect** — selects machine
   vs. human output mode. The precedence is `--format` flag, then `AGENT_MODE`,
   then TTY detection.

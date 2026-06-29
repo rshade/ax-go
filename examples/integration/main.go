@@ -207,11 +207,13 @@ func newPatchConfigCommand() *cobra.Command {
 				)
 			}
 
-			if ax.DryRunFromContext(cmd.Context()) {
-				if err := dryRunPatchConfig(cmd.Context(), configPath, patchDoc); err != nil {
-					return err
-				}
-			} else if err := ax.PatchConfigFile(cmd.Context(), configPath, []byte(patchDoc)); err != nil {
+			if err := ax.Perform(
+				cmd.Context(),
+				func(ctx context.Context) error { return rehearsePatchConfig(ctx, configPath, patchDoc) },
+				func(ctx context.Context) error {
+					return ax.PatchConfigFile(ctx, configPath, []byte(patchDoc))
+				},
+			); err != nil {
 				return err
 			}
 
@@ -226,11 +228,12 @@ func newPatchConfigCommand() *cobra.Command {
 	return cmd
 }
 
-// dryRunPatchConfig rehearses a patch without writing: it reads the config and
-// applies the patch in memory so dry-run surfaces the same errors as a real run
-// (missing file, invalid Hujson, invalid patch), then discards the result. The
-// success envelope is byte-identical to a real run apart from meta.dry_run.
-func dryRunPatchConfig(ctx context.Context, configPath, patchDoc string) error {
+// rehearsePatchConfig is the dry-run rehearsal passed to ax.Perform: it reads
+// the config and applies the patch in memory so a dry-run surfaces the same
+// errors as a real run (missing file, invalid Hujson, invalid patch), then
+// discards the result. The success envelope is byte-identical to a real run
+// apart from meta.dry_run.
+func rehearsePatchConfig(ctx context.Context, configPath, patchDoc string) error {
 	file, err := os.Open(configPath)
 	if err != nil {
 		return err
