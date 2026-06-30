@@ -76,3 +76,7 @@ make ci                    # test + validate + lint + doc-coverage
 
 `CHANGELOG.md` is owned by release-please from Conventional Commits — never hand-edit it.
 Capture user-facing changes in the commit message (`feat:`, `fix:`, `feat!:`).
+
+`ROADMAP.md` is maintained by the `/roadmap` sync workflow and reconciled to GitHub
+issue/label state out-of-band, not in feature PRs. Do not flag scope, status, or
+"documentation drift" in it, and do not suggest edits to it in review.
