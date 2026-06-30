@@ -33,8 +33,14 @@ func FuzzErrorEnvelope(f *testing.F) {
 
 	f.Fuzz(func(t *testing.T, code, message, cause string) {
 		sentinel := errors.New(causeMarker + cause)
+		// Derive recovery fields deterministically from the inputs so the
+		// retryable/retry_after_seconds marshal path is fuzzed without changing
+		// the corpus signature. retryAfter stays non-negative.
+		retryable := len(code)%2 == 0
+		retryAfter := int64(len(message))
 		e := NewError(context.Background(), code, message,
-			WithErrorCause(sentinel), WithErrorExitCode(ExitValidation))
+			WithErrorCause(sentinel), WithErrorExitCode(ExitValidation),
+			WithRetryable(retryable), WithRetryAfterSeconds(retryAfter))
 
 		if !errors.Is(e, sentinel) {
 			t.Fatalf("cause not reachable via errors.Is before marshal")
@@ -65,6 +71,16 @@ func FuzzErrorEnvelope(f *testing.F) {
 		}
 		if got.SchemaVersion != e.SchemaVersion {
 			t.Fatalf("schema_version %q != %q", got.SchemaVersion, e.SchemaVersion)
+		}
+		if got.Retryable == nil || *got.Retryable != retryable {
+			t.Fatalf("retryable round-trip mismatch: %v -> %v", retryable, got.Retryable)
+		}
+		if got.RetryAfterSeconds != retryAfter {
+			t.Fatalf(
+				"retry_after_seconds round-trip mismatch: %d -> %d",
+				retryAfter,
+				got.RetryAfterSeconds,
+			)
 		}
 		if got.Unwrap() != nil {
 			t.Fatalf("cause must not survive serialization, got %v", got.Unwrap())
@@ -100,8 +116,12 @@ func FuzzErrorEnvelopeUnmarshal(f *testing.F) {
 	f.Add([]byte("   "))
 	f.Add([]byte("}{"))
 	f.Add([]byte(`{"context":{"nested":{"deep":[1,2,3]}}}`))
-	f.Add([]byte(`{"error_code":1}`))        // wrong field type — string field given a number
-	f.Add([]byte(`{"error_code":"x","mess`)) // truncated mid-key
+	f.Add([]byte(`{"error_code":1}`))                            // wrong field type — string field given a number
+	f.Add([]byte(`{"error_code":"x","mess`))                     // truncated mid-key
+	f.Add([]byte(`{"retryable":true,"retry_after_seconds":30}`)) // recovery fields populated
+	f.Add([]byte(`{"retryable":false}`))                         // explicit non-retryable, no backoff
+	f.Add([]byte(`{"retry_after_seconds":-5}`))                  // negative backoff survives the unmarshal fixpoint
+	f.Add([]byte(`{"retryable":"yes"}`))                         // wrong type — bool field given a string
 
 	f.Fuzz(func(t *testing.T, data []byte) {
 		var e Error

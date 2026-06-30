@@ -238,6 +238,24 @@ failed patch operation uses the frozen `error_code` `config_patch_invalid`
 A structured, machine-readable error format emitted to `stderr`. Schema defined
 by the root `ax.Error` facade and the isolated `contract.Error` type.
 
+Required fields: `error_code`, `message`, `trace_id`, `tool`, `version`,
+`schema_version`. Optional remediation fields let an agent self-correct instead
+of just reporting:
+
+- **`actionable_fix`** (string) — a best-effort human/machine hint for fixing the
+  failure.
+- **`suggestions`** (string array) — candidate recovery actions.
+- **`retryable`** (bool) — whether a naive retry of the same command is safe.
+  Tri-state: `true` (safe), `false` (do **not** retry), or absent (unspecified);
+  absence is distinguishable from explicit `false`, set via `ax.WithRetryable`.
+- **`retry_after_seconds`** (integer) — relative backoff, in whole seconds, before
+  a retry should be attempted (delta-seconds, never an absolute timestamp, so
+  output stays byte-identical across runs); meaningful only when `retryable` is
+  `true`, set via `ax.WithRetryAfterSeconds`.
+
+All optional fields are omitted when unset, so a default error envelope is
+byte-identical to one emitted before these fields existed.
+
 ## Engineering Standards
 
 - **Allocation discipline:** track allocations via standard `testing.B`

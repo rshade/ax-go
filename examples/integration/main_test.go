@@ -203,6 +203,9 @@ func TestRunFailCommandWritesErrorEnvelopeToStderr(t *testing.T) {
 	if got.Version != want {
 		t.Fatalf("version = %q, want %q", got.Version, want)
 	}
+	if got.Retryable == nil || *got.Retryable {
+		t.Fatalf("retryable = %v, want explicit false (validation failures are not retryable)", got.Retryable)
+	}
 }
 
 func TestRunUsesResolvedVersionAcrossSchemaAndLogger(t *testing.T) {
