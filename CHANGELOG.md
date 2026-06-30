@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.3.0](https://github.com/rshade/ax-go/compare/v0.2.0...v0.3.0) (2026-06-30)
+
+
+### Added
+
+* **ax:** add Guard and Perform dry-run side-effect guards ([#93](https://github.com/rshade/ax-go/issues/93)) ([a6f09c7](https://github.com/rshade/ax-go/commit/a6f09c7e0805a9e9d4f0b7d65d9aa52aaf400549)), closes [#13](https://github.com/rshade/ax-go/issues/13)
+* **ci:** enforce per-package and repo-wide coverage floors ([#80](https://github.com/rshade/ax-go/issues/80)) ([7b09049](https://github.com/rshade/ax-go/commit/7b09049d652b3b7201cc122041a332a2f9fc2e30)), closes [#21](https://github.com/rshade/ax-go/issues/21)
+* **error:** add retryable and retry_after_seconds recovery fields to… ([#95](https://github.com/rshade/ax-go/issues/95)) ([e707c68](https://github.com/rshade/ax-go/commit/e707c684e445fbe39fe84145c056a3ec0a767216))
+* **mcp:** run any ax-go CLI as a live MCP server ([#89](https://github.com/rshade/ax-go/issues/89)) ([85bfc13](https://github.com/rshade/ax-go/commit/85bfc139bdc7c6a08eaa59acefbef92d905c2bff))
+
+
+### Fixed
+
+* **deps:** update astro monorepo ([#85](https://github.com/rshade/ax-go/issues/85)) ([d7fca4b](https://github.com/rshade/ax-go/commit/d7fca4bb307c34f1daf4e7107fc762a957a2b208))
+* **deps:** update dependency @astrojs/starlight to ^0.41.0 ([#86](https://github.com/rshade/ax-go/issues/86)) ([7231fab](https://github.com/rshade/ax-go/commit/7231fab619459ddebfd8d752cddefbf7212cd35a))
+
+
+### Documentation
+
+* **readme:** add compatibility matrix and CONTRIBUTING guide ([9fab58f](https://github.com/rshade/ax-go/commit/9fab58f1f78deeb810536670c201c98bb5c01dcd)), closes [#23](https://github.com/rshade/ax-go/issues/23)
+
 ## [0.2.0](https://github.com/rshade/ax-go/compare/v0.1.0...v0.2.0) (2026-06-21)
 
 
