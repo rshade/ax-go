@@ -13,15 +13,19 @@ labels synced to the sections below. Level-of-effort indicators: `[S]` Small
 `v0.0.1`–`v0.2.0` have been cut automatically with generated `CHANGELOG.md`
 entries; the `v0.1.0` output contracts remain frozen.
 
-The governance foundations have now all shipped: the stability + deprecation
+The governance foundations have all shipped: the stability + deprecation
 policy (#17, Principles XI + XII), the coverage policy + CI gate (#21), the
 README compatibility matrix (#23), the import-isolated public contract packages
-(#78, spec/010), and the release-please flow confirmation (#14). With #17 in
-place, `go-apidiff` (#26) and the `internal/` boundary migration (#18) are
-unblocked. The Immediate Focus slot is open pending the next promotion — #27
-(`ax.Error` recovery) is the natural candidate as the AX audit's highest-value
-in-scope win. The coverage escalation queue (#63–#65, #69) provides parallel
-quick wins that directly raise the repo-wide coverage floor toward 85%.
+(#78, spec/010), the release-please flow confirmation (#14), and `go-apidiff`
+in CI (#26). A wave of runtime contracts also landed — the Hujson AST `Patch`
+write path (#9), the `ax-go mcp-server` runnable wrapper (#10), and the
+`--dry-run` side-effect guards (#13, spec/012) — alongside dedicated unit tests
+for `context.go`/`http.go`/`trace.go` (#12) and hot-path logger benchmarks (#11,
+which now unblocks #22). **#27 (`ax.Error`
+recovery/remediation) is now the active single-WIP** in Immediate Focus,
+promoted as the AX audit's highest-value in-scope win. The coverage escalation
+queue (#63–#65, #69) remains a parallel set of quick wins that directly raise
+the repo-wide coverage floor toward 85%.
 
 ## Vision
 
@@ -32,32 +36,35 @@ primitives, and short-lived-process-correct observability.
 
 ## Immediate Focus (v0.3.0 — v1.0 readiness & governance)
 
-Single-WIP per the Promotion Gate (`target_focus_depth: 1`). **#17 (stability +
-deprecation policy) shipped 2026-06-17**, delivering Principles XI + XII to the
-constitution and unblocking #18 and #26. The focus slot is now open.
-
-**Next promotion candidate: #27** (`ax.Error` recovery/remediation fields) — the
-AX source audit's #1 in-scope win. It deepens the machine-contract half of AX and
-enables agent self-correction without breaking the existing envelope shape.
-
-## Near-Term Vision (v0.3.0 — governance queue)
+Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
 
 - [ ] #27 `ax.Error` recovery/remediation fields [M] — add optional `retryable` /
   `recovery` / `next_action` so an agent can self-correct, not just report. The
-  AX source audit's #1 in-scope win. *Candidate for next single-WIP promotion.*
-- [ ] #12 Dedicated unit tests for `context.go`, `http.go`, `trace.go` [S] —
-  quick win; these are currently exercised only indirectly. Parallel-friendly.
-- [ ] #19 `SECURITY.md` disclosure policy [S] — reporting channel, SLA,
-  supported-versions, out-of-scope (giant-Hujson DoS is a validation error).
-- [ ] #69 `covercheck` type-design hardening — derived fields as methods +
-  integer floor comparison [S] — two deferred refactors from spec/009; no
-  public-API impact.
+  AX source audit's #1 in-scope win; deepens the machine-contract half of AX
+  without breaking the existing envelope shape.
+  *Promoted by /roadmap sync on 2026-06-29 — fills the single open WIP slot with
+  the highest-leverage in-scope AX contract.*
+
+## Near-Term Vision (v0.3.0 — governance queue)
+
+**On deck — next promotion batch:** #63 / #64 / #65 (the `internal/cli`,
+`internal/mcp`, `internal/schema` coverage trio). Queued by /roadmap sync on
+2026-06-29 to promote together as the next single-WIP unit when #27 closes:
+near-identical work that removes three packages from `excludedPackages` and is
+the most direct lever on the repo-wide coverage floor toward 85%. They remain
+`roadmap/next` (not `roadmap/current`) to preserve `target_focus_depth: 1`.
+
 - [ ] #63 `internal/cli` unit tests + coverage floor enrollment [S] — remove
   from `excludedPackages`; direct path toward raising repo-wide floor to 85%.
 - [ ] #64 `internal/mcp` unit tests + coverage floor enrollment [S] — same
   pattern; unlocks coverage improvement on the MCP adapter.
 - [ ] #65 `internal/schema` unit tests + coverage floor enrollment [S] — same
   pattern; unlocks coverage improvement on the schema reflection layer.
+- [ ] #19 `SECURITY.md` disclosure policy [S] — reporting channel, SLA,
+  supported-versions, out-of-scope (giant-Hujson DoS is a validation error).
+- [ ] #69 `covercheck` type-design hardening — derived fields as methods +
+  integer floor comparison [S] — two deferred refactors from spec/009; no
+  public-API impact.
 
 ## Future Vision (Long-Term)
 
@@ -68,20 +75,6 @@ enables agent self-correction without breaking the existing envelope shape.
   keeping output constitutionally strict. Widens the input contract beyond
   Hujson, so it is governed through a Spec Kit feature **and** a Constitution
   Principle V amendment. Reuse existing parsers, not hand-rolled dialects.
-- [ ] #9 Hujson AST `Patch` write path [L] — mutate an existing Hujson file
-  while preserving user formatting/comments, since strict-JSON writes can't.
-  The retired Hujson input decision's read/write consequences are absorbed in
-  [`specs/001-bound-config-reads/research.md`](specs/001-bound-config-reads/research.md).
-- [ ] #10 `ax-go mcp-server` runnable wrapper [L] — wrap an ax-go CLI
-  as a live MCP server with no per-tool work, building on the existing
-  `__schema --as=mcp` adapter.
-- [ ] #67 `ax-go mcp-server` — pkg.go.dev module metadata enrichment [M] —
-  enrich MCP tool descriptions with synopsis, vuln summary, and version status at
-  startup. *Blocked on #10 and pkg.go.dev `v1` stable API.*
-- [ ] #11 Hot-path benchmarks with `-benchmem` [M] — back the zerolog
-  "zero/near-zero allocation" claim (ADR-0009) with a real `testing.B`.
-- [ ] #13 Agent-safety helpers for `--dry-run` side-effect suppression [M] —
-  make it hard to accidentally cause side effects when `dry_run: true`.
 
 ### AX surface enhancements
 
@@ -103,7 +96,8 @@ in-scope gaps that deepen the machine-contract half of AX.*
   deferred until the first real downstream consumer needs a published `llms.txt`.
   Pairs with #29 (the emit-vs-delegate decision it implements).
 - [ ] #30 Envelope runtime trust signals [M] — `side_effects_performed`,
-  `idempotency_replayed`, `requires_confirmation` (human handoff). Extends #13.
+  `idempotency_replayed`, `requires_confirmation` (human handoff). Extends the
+  now-shipped #13 `--dry-run` guards.
 - [ ] #31 Agent-acceptance test harness [M] — drive the CLI as an agent would
   (parse `__schema` → invoke → assert envelope). Folds into #15.
 - [ ] #66 doccover: cross-validate `requiredSymbols` against pkg.go.dev
@@ -111,7 +105,8 @@ in-scope gaps that deepen the machine-contract half of AX.*
   published symbol set.
 - [ ] #67 mcp-server: enrich MCP tool descriptions with pkg.go.dev module
   metadata [M] — deepen `__schema --as=mcp` output so wrapped tools carry richer
-  agent-facing descriptions. Pairs with #10.
+  agent-facing descriptions (synopsis, vuln summary, version status). Builds on
+  the now-shipped #10 wrapper; *blocked on pkg.go.dev `v1` stable API.*
 
 ### v1.0 readiness & governance
 
@@ -123,24 +118,46 @@ in-scope gaps that deepen the machine-contract half of AX.*
   with #5.
 - [ ] #18 Move remaining non-public helpers under `internal/` before v1.0 [L] —
   keep drawing the public-API boundary while it's still cheap. *Unblocked by #17.*
-- [ ] #20 ADR-0012: directory layout [S] — document the flat-root-plus-internal
-  layout decision before v1.0 locks it in.
 - [ ] #22 benchstat regression budget in CI [M] — track hot-path benchmark
-  deltas against a baseline. *Blocked on #11.*
+  deltas against a baseline. *Unblocked: #11 hot-path benchmarks shipped
+  2026-06-29 (`a6f09c7`); epic-parent now closed → epic-promotion-eligible.*
 - [ ] #24 Supply chain: SBOM + signed releases [M] — CycloneDX SBOM and cosign
   keyless signing on release artifacts.
 - [ ] #25 CI cross-compile matrix [S] — `GOOS`/`GOARCH` build+vet across
   linux/darwin/windows × amd64/arm64.
-- [ ] #26 go-apidiff in CI [M] — catch breaking public-API changes on PRs with a
-  label-gated override. *Unblocked by #17.*
-- [ ] #66 `doccover` — cross-validate `requiredSymbols` against pkg.go.dev
-  `/v1/symbols` [M] — surface exported-but-ungated symbols automatically.
-  *Blocked on pkg.go.dev `v1` stable API.*
 
 ## Completed Milestones
 
 ### 2026-Q2
 
+- [x] #13 Agent-safety helpers for `--dry-run` side-effect suppression [M] —
+  `ax.Guard` / `ax.Perform` make it hard to accidentally cause side effects when
+  `dry_run: true`; suppressed actions log to `stderr`. Shipped via
+  [`specs/012-dry-run-guards`](specs/012-dry-run-guards/). Closed 2026-06-29.
+- [x] #11 Hot-path benchmarks with `-benchmem` [M] — `BenchmarkLogger*` (incl.
+  the tracing hook) and `BenchmarkLoggerDisabledLevel` in `logger_bench_test.go`
+  back ADR-0009's "zero/near-zero allocation" claim: 0 allocs/op on the no-span
+  and disabled paths, an honest 48 B / 2 allocs on active-span (OTel ID
+  hex-encoding). Landed in `a6f09c7`. Closed 2026-06-29.
+- [x] #20 Directory-layout decision recorded [S] — the flat-root public `ax`
+  facade + narrow contract packages + `internal/` implementation layout is
+  documented in `AGENTS.md` "Repository Layout" and README. The originally
+  requested ADR-0012 is obsolete under the ADR freeze (decisions are absorbed
+  into Spec Kit features / the constitution, not new ADRs). Closed 2026-06-29.
+- [x] #12 Dedicated unit tests for `context.go`, `http.go`, `trace.go` [S] —
+  direct coverage for helpers previously exercised only indirectly. Closed
+  2026-06-28.
+- [x] #10 `ax-go mcp-server` runnable wrapper [L] — wrap any ax-go CLI as a live
+  MCP server with no per-tool work, building on the `__schema --as=mcp` adapter.
+  Closed 2026-06-28.
+- [x] #9 Hujson AST `Patch` write path [L] — mutate an existing Hujson file while
+  preserving user formatting/comments, since strict-JSON writes can't. The
+  read/write consequences of the retired Hujson input decision are absorbed in
+  [`specs/001-bound-config-reads/research.md`](specs/001-bound-config-reads/research.md).
+  Closed 2026-06-27.
+- [x] #26 go-apidiff in CI [M] — catch breaking public-API changes on PRs with a
+  label-gated override; scoped to the public surface (`ax` + the `contract`,
+  `config`, `schema`, `id` packages). Closed 2026-06-26.
 - [x] #78 Import-isolated public contract packages (`contract/`, `config/`,
   `schema/`, `id/`) [L] — narrow public packages for thin consumers, fully
   import-isolated from the root runtime facade, telemetry, and gRPC adapters.

@@ -48,6 +48,16 @@ func WithSuggestions(suggestions ...string) ErrorOption {
 	return contract.WithSuggestions(suggestions...)
 }
 
+// WithRetryable records whether a naive retry of the failed command is safe.
+func WithRetryable(retryable bool) ErrorOption {
+	return contract.WithRetryable(retryable)
+}
+
+// WithRetryAfterSeconds sets a relative backoff hint, in whole seconds, before a retry.
+func WithRetryAfterSeconds(seconds int64) ErrorOption {
+	return contract.WithRetryAfterSeconds(seconds)
+}
+
 // WithErrorExitCode sets the deterministic process exit code.
 func WithErrorExitCode(code int) ErrorOption {
 	return contract.WithErrorExitCode(code)

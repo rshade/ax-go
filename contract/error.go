@@ -25,6 +25,17 @@ type Error struct {
 	Context       map[string]any `json:"context,omitempty"`
 	Suggestions   []string       `json:"suggestions,omitempty"`
 
+	// Retryable is a tri-state retry-safety signal: a non-nil true means a naive
+	// re-run of the same command is safe, a non-nil false means it MUST NOT be
+	// retried, and nil (omitted) means unspecified. Absence is distinguishable
+	// from explicit false so a consumer can tell "do not retry" from "unknown".
+	Retryable *bool `json:"retryable,omitempty"`
+	// RetryAfterSeconds is an advisory, relative backoff in whole seconds before
+	// a retry should be attempted (delta-seconds, never an absolute timestamp, so
+	// output stays byte-identical across runs). Meaningful only when Retryable is
+	// true; omitted when unset or zero.
+	RetryAfterSeconds int64 `json:"retry_after_seconds,omitempty"`
+
 	exitCode int
 	cause    error
 }
@@ -111,6 +122,29 @@ func WithErrorContext(fields map[string]any) ErrorOption {
 func WithSuggestions(suggestions ...string) ErrorOption {
 	return func(e *Error) {
 		e.Suggestions = append(e.Suggestions, suggestions...)
+	}
+}
+
+// WithRetryable records whether a naive retry of the failed command is safe.
+// Passing true marks the failure as retryable, false marks it as explicitly
+// non-retryable; not calling the option leaves the signal unspecified (omitted).
+// The bool is stored as a tri-state so an explicit false is distinguishable from
+// absence on the wire.
+func WithRetryable(retryable bool) ErrorOption {
+	return func(e *Error) {
+		e.Retryable = &retryable
+	}
+}
+
+// WithRetryAfterSeconds sets a relative backoff hint, in whole seconds, before a
+// retry should be attempted. The value is relative (delta-seconds), never an
+// absolute timestamp, to preserve byte-identical output. A negative value is
+// treated as no hint.
+func WithRetryAfterSeconds(seconds int64) ErrorOption {
+	return func(e *Error) {
+		if seconds >= 0 {
+			e.RetryAfterSeconds = seconds
+		}
 	}
 }
 

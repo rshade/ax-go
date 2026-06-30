@@ -105,6 +105,30 @@ func ExampleError() {
 	// 2
 }
 
+// ExampleWithRetryable shows a producer attaching machine-readable recovery
+// guidance to a failure: an explicit retry-safety signal plus a relative backoff
+// hint, so an agent can decide to retry (and how long to wait) without parsing
+// human-facing text. The envelope is rendered to a buffer here for illustration;
+// in a real CLI it is written to stderr.
+func ExampleWithRetryable() {
+	err := ax.NewError(
+		context.Background(),
+		"network_timeout",
+		"upstream timed out",
+		ax.WithErrorTool("app"),
+		ax.WithErrorVersion("v0.1.0"),
+		ax.WithErrorExitCode(ax.ExitNetwork),
+		ax.WithRetryable(true),
+		ax.WithRetryAfterSeconds(30),
+	)
+
+	var buf bytes.Buffer
+	_ = ax.WriteError(&buf, err)
+	fmt.Print(buf.String())
+	// Output:
+	// {"error_code":"network_timeout","message":"upstream timed out","trace_id":"00000000000000000000000000000000","tool":"app","version":"v0.1.0","schema_version":"1.0.0","retryable":true,"retry_after_seconds":30}
+}
+
 // ExampleNewEnvelope wraps a payload in the standard success envelope, carrying
 // trace metadata from the context. With no active span the IDs are the zero
 // W3C values, so the output is deterministic.

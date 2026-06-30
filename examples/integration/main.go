@@ -258,6 +258,7 @@ func newFailCommand() *cobra.Command {
 				"intentional integration failure",
 				ax.WithActionableFix("run a non-failing subcommand"),
 				ax.WithErrorContext(map[string]any{"example": failCommandName}),
+				ax.WithRetryable(false),
 				ax.WithErrorExitCode(ax.ExitValidation),
 			)
 		},
