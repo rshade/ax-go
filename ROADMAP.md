@@ -38,10 +38,12 @@ primitives, and short-lived-process-correct observability.
 
 Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
 
-- [ ] #27 `ax.Error` recovery/remediation fields [M] — add optional `retryable` /
-  `recovery` / `next_action` so an agent can self-correct, not just report. The
-  AX source audit's #1 in-scope win; deepens the machine-contract half of AX
-  without breaking the existing envelope shape.
+- [ ] #27 `ax.Error` recovery/remediation fields [M] — add optional `retryable`
+  (tri-state) and `retry_after_seconds` (relative backoff) so an agent can
+  self-correct, not just report; existing `actionable_fix`/`suggestions` stay the
+  free-text recovery hints (no separate `next_action` field). The AX source
+  audit's #1 in-scope win; deepens the machine-contract half of AX without
+  breaking the existing envelope shape.
   *Promoted by /roadmap sync on 2026-06-29 — fills the single open WIP slot with
   the highest-leverage in-scope AX contract.*
 

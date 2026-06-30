@@ -14,13 +14,13 @@ import (
 
 func TestErrorRetryable(t *testing.T) {
 	cases := []struct {
-		name   string
-		opts   []ErrorOption
-		want   string
-		absent bool
+		name      string
+		opts      []ErrorOption
+		wantValue bool
+		absent    bool
 	}{
-		{name: "explicit true", opts: []ErrorOption{WithRetryable(true)}, want: `"retryable":true`},
-		{name: "explicit false", opts: []ErrorOption{WithRetryable(false)}, want: `"retryable":false`},
+		{name: "explicit true", opts: []ErrorOption{WithRetryable(true)}, wantValue: true},
+		{name: "explicit false", opts: []ErrorOption{WithRetryable(false)}, wantValue: false},
 		{name: "unspecified", opts: nil, absent: true},
 	}
 
@@ -35,15 +35,22 @@ func TestErrorRetryable(t *testing.T) {
 			if writeErr := WriteError(&buf, err); writeErr != nil {
 				t.Fatalf("WriteError returned error: %v", writeErr)
 			}
-			got := buf.String()
+			var got map[string]any
+			if decodeErr := json.Unmarshal(buf.Bytes(), &got); decodeErr != nil {
+				t.Fatalf("WriteError output was not valid JSON: %v", decodeErr)
+			}
+			value, present := got["retryable"]
 			if tc.absent {
-				if strings.Contains(got, "retryable") {
-					t.Fatalf("expected no retryable key, got %s", got)
+				if present {
+					t.Fatalf("expected no retryable key, got %s", buf.String())
 				}
 				return
 			}
-			if !strings.Contains(got, tc.want) {
-				t.Fatalf("expected %q in %s", tc.want, got)
+			if !present {
+				t.Fatalf("expected retryable key, got %s", buf.String())
+			}
+			if value != tc.wantValue {
+				t.Fatalf("retryable = %v, want %v", value, tc.wantValue)
 			}
 		})
 	}
@@ -53,10 +60,9 @@ func TestErrorRetryAfterSeconds(t *testing.T) {
 	cases := []struct {
 		name    string
 		seconds int64
-		want    string
 		absent  bool
 	}{
-		{name: "positive", seconds: 30, want: `"retry_after_seconds":30`},
+		{name: "positive", seconds: 30},
 		{name: "zero omitted", seconds: 0, absent: true},
 		{name: "negative ignored", seconds: -5, absent: true},
 	}
@@ -73,15 +79,22 @@ func TestErrorRetryAfterSeconds(t *testing.T) {
 			if writeErr := WriteError(&buf, err); writeErr != nil {
 				t.Fatalf("WriteError returned error: %v", writeErr)
 			}
-			got := buf.String()
+			var got map[string]any
+			if decodeErr := json.Unmarshal(buf.Bytes(), &got); decodeErr != nil {
+				t.Fatalf("WriteError output was not valid JSON: %v", decodeErr)
+			}
+			value, present := got["retry_after_seconds"]
 			if tc.absent {
-				if strings.Contains(got, "retry_after_seconds") {
-					t.Fatalf("expected no retry_after_seconds key, got %s", got)
+				if present {
+					t.Fatalf("expected no retry_after_seconds key, got %s", buf.String())
 				}
 				return
 			}
-			if !strings.Contains(got, tc.want) {
-				t.Fatalf("expected %q in %s", tc.want, got)
+			if !present {
+				t.Fatalf("expected retry_after_seconds key, got %s", buf.String())
+			}
+			if value != float64(tc.seconds) {
+				t.Fatalf("retry_after_seconds = %v, want %v", value, float64(tc.seconds))
 			}
 		})
 	}
