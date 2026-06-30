@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -18,9 +19,19 @@ var version string
 const defaultStreamCount = 3
 const appName = "ax-integration"
 const failCommandName = "fail"
+const fetchCommandName = "fetch"
+const authzCommandName = "authz"
+const crashCommandName = "crash"
 const patchConfigCommandName = "patch-config"
 const streamCommandName = "stream"
 const lokiFlushBudget = 3 * time.Second
+const fetchRetryAfterSeconds = 5
+
+// errSimulatedCrash is the sentinel cause wrapped by the crash command. It is a
+// bare (non-ax) error on purpose: it shows how ax.Execute maps any unexpected
+// error a downstream RunE returns into the framework's internal_error envelope
+// with exit code 1.
+var errSimulatedCrash = errors.New("simulated downstream component failure")
 
 type integrationConfig struct {
 	Name  string `json:"name"`
@@ -50,18 +61,21 @@ func main() {
 }
 
 func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, env func(string) string) int {
-	return runWithEntityID(ctx, args, stdin, stdout, stderr, env, ax.NewEntityID)
+	return runWithEntityID(ctx, args, stdin, stdout, stderr, env, ax.ResolveVersion(version), ax.NewEntityID)
 }
 
+// runWithEntityID is the test seam for run: it injects the resolved version and
+// entity-ID generator so golden and determinism tests can pin both. Production
+// run passes ax.ResolveVersion(version) and ax.NewEntityID.
 func runWithEntityID(
 	ctx context.Context,
 	args []string,
 	stdin io.Reader,
 	stdout, stderr io.Writer,
 	env func(string) string,
+	resolved string,
 	newEntityID func() (string, error),
 ) int {
-	resolved := ax.ResolveVersion(version)
 	root := newRootCommand(stdin, resolved, newEntityID)
 	root.SetArgs(args)
 
@@ -90,6 +104,9 @@ func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string
   ax-integration stream --count=3
   ax-integration patch-config --config=config.hujson --patch='[{"op":"replace","path":"/count","value":5}]'
   ax-integration fail
+  ax-integration fetch
+  ax-integration authz
+  ax-integration crash
   ax-integration __schema`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			logger := ax.NewLogger(
@@ -138,6 +155,9 @@ func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string
 	root.AddCommand(newStreamCommand())
 	root.AddCommand(newPatchConfigCommand())
 	root.AddCommand(newFailCommand())
+	root.AddCommand(newFetchCommand())
+	root.AddCommand(newAuthzCommand())
+	root.AddCommand(newCrashCommand())
 
 	// Opt in to the MCP server: `ax-integration mcp-server` exposes this CLI's
 	// command tree as a live MCP server with no per-tool work (feature 011).
@@ -261,6 +281,67 @@ func newFailCommand() *cobra.Command {
 				ax.WithRetryable(false),
 				ax.WithErrorExitCode(ax.ExitValidation),
 			)
+		},
+	}
+}
+
+// newFetchCommand models a network/timeout failure: exit code 3 (ExitNetwork).
+// It demonstrates the feature 013 recovery fields — a network failure is
+// retryable, so the envelope advertises retryable=true and a retry_after_seconds
+// backoff hint an agent can honor before retrying.
+func newFetchCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   fetchCommandName,
+		Short: "Model a network/timeout failure with retry recovery fields (exit 3)",
+		Example: `  ax-integration fetch --format=json
+  ax-integration fetch --idempotency-key=demo-key`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return ax.NewError(
+				cmd.Context(),
+				"upstream_unreachable",
+				"upstream service did not respond within the timeout",
+				ax.WithActionableFix("retry after the backoff window or check upstream health"),
+				ax.WithRetryable(true),
+				ax.WithRetryAfterSeconds(fetchRetryAfterSeconds),
+				ax.WithErrorExitCode(ax.ExitNetwork),
+			)
+		},
+	}
+}
+
+// newAuthzCommand models an authentication/permission failure: exit code 4
+// (ExitAuth). A permission failure is not fixable by a naive retry, so the
+// envelope advertises retryable=false.
+func newAuthzCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   authzCommandName,
+		Short: "Model an authentication/permission failure (exit 4)",
+		Example: `  ax-integration authz --format=json
+  ax-integration authz --idempotency-key=demo-key`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return ax.NewError(
+				cmd.Context(),
+				"permission_denied",
+				"the supplied credentials lack permission for this action",
+				ax.WithActionableFix("re-authenticate or request access to the resource"),
+				ax.WithRetryable(false),
+				ax.WithErrorExitCode(ax.ExitAuth),
+			)
+		},
+	}
+}
+
+// newCrashCommand models an unexpected internal error: exit code 1
+// (ExitInternal). It returns a bare (non-ax) error so ax.Execute wraps it into
+// the framework's internal_error envelope — the pattern any downstream bug
+// follows.
+func newCrashCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:     crashCommandName,
+		Short:   "Return an unexpected non-ax error to demonstrate the internal_error mapping (exit 1)",
+		Example: `  ax-integration crash --format=json`,
+		RunE: func(_ *cobra.Command, _ []string) error {
+			return fmt.Errorf("processing the request: %w", errSimulatedCrash)
 		},
 	}
 }

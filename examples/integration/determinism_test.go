@@ -42,6 +42,7 @@ func runWithArgs(t *testing.T, args []string) []byte {
 		&stdout,
 		&stderr,
 		func(string) string { return "" },
+		ax.ResolveVersion(version),
 		func() (string, error) { return deterministicEntityID, nil },
 	)
 	if code != ax.ExitSuccess {

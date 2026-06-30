@@ -83,11 +83,21 @@ reproducible builds:
 make build-example VERSION=v1.2.3
 ```
 
-Return a structured error envelope on `stderr`:
+Return a structured error envelope on `stderr`. Each command below maps to a
+distinct deterministic exit code so an agent can branch on the category:
 
 ```sh
-go run ./examples/integration fail --format=json
+go run ./examples/integration fail --format=json    # exit 2 — validation
+go run ./examples/integration fetch --format=json    # exit 3 — network (retryable + retry_after_seconds)
+go run ./examples/integration authz --format=json    # exit 4 — auth/permission (not retryable)
+go run ./examples/integration crash --format=json    # exit 1 — internal (bare error → internal_error envelope)
 ```
+
+`fetch` carries the feature 013 recovery fields (`retryable: true`,
+`retry_after_seconds: 5`) so an agent knows it is safe to back off and retry;
+`authz` sets `retryable: false`. `crash` returns a plain Go error to show how
+`ax.Execute` wraps any unexpected error into the framework's `internal_error`
+envelope with exit code 1.
 
 Run this CLI as a live MCP server (it mounts `mcp.NewCommand`, so every
 non-hidden command becomes an MCP tool with no per-tool work):
@@ -101,3 +111,18 @@ The server speaks MCP over the transport channel and keeps logs on `stderr`. A
 non-loopback HTTP bind is fail-closed without `--allow-non-loopback`. See the
 [Running as an MCP server](../../README.md#running-as-an-mcp-server) section for
 the full contract.
+
+## Mandate audit and golden fixtures
+
+[`AUDIT.md`](AUDIT.md) maps every Core AX Mandate to the subcommand and test that
+exercises it — this example covers each mandate exactly once. The `testdata/`
+golden fixtures pin `__schema`, `__schema --as=mcp`, and every subcommand's
+success and error envelope; any drift fails CI under `go test ./...`. Because
+`ax.Execute` generates fresh `trace_id`/`span_id` per run, the fixtures mask
+those (and `idempotency_key`) to `MASKED` while pinning everything else. Inject a
+fixed version so `version` stays stable, then regenerate after an intentional
+contract change:
+
+```sh
+go test ./examples/integration -run TestGolden -update
+```

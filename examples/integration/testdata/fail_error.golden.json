@@ -1,0 +1,1 @@
+{"error_code":"integration_failure","message":"intentional integration failure","trace_id":"MASKED","tool":"ax-integration","version":"v9.9.9-golden","schema_version":"1.0.0","actionable_fix":"run a non-failing subcommand","context":{"example":"fail"},"retryable":false}
