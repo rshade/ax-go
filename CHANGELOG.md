@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.3.1](https://github.com/rshade/ax-go/compare/v0.3.0...v0.3.1) (2026-07-01)
+
+
+### Fixed
+
+* **deps:** update module google.golang.org/grpc to v1.82.0 ([#97](https://github.com/rshade/ax-go/issues/97)) ([b6744c8](https://github.com/rshade/ax-go/commit/b6744c8f95e4044fb0c0c9dda75e0cf78325c091))
+
+
+### Documentation
+
+* add Diátaxis tutorial, how-to, and explanation pages ([#98](https://github.com/rshade/ax-go/issues/98)) ([5bf703a](https://github.com/rshade/ax-go/commit/5bf703a7c8bf040ad3bdf60e05544b860cd35642))
+
 ## [0.3.0](https://github.com/rshade/ax-go/compare/v0.2.0...v0.3.0) (2026-06-30)
 
 
