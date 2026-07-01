@@ -15,7 +15,10 @@ export default defineConfig({
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/rshade/ax-go' }],
 			plugins: [starlightLinksValidator()],
 			sidebar: [
+				{ label: 'Tutorials', items: [{ autogenerate: { directory: 'tutorials' } }] },
+				{ label: 'How-to Guides', items: [{ autogenerate: { directory: 'guides' } }] },
 				{ label: 'Reference', items: [{ label: 'Sources', slug: 'sources' }] },
+				{ label: 'Explanation', items: [{ autogenerate: { directory: 'explanation' } }] },
 			],
 		}),
 		sitemap({ filter: (page) => !/\/adr\//.test(page) }),
