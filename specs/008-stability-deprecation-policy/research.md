@@ -14,15 +14,15 @@ GitHub issue #17 requested creating `docs/adr/0013-stability-semver-policy.md` a
 *"They MUST NOT be created or edited going forward."* Those two ADRs therefore do not exist
 and will not be created (verified absent). Their intended decisions are instead recorded here
 (Phase 0) and elevated to constitution principles by amendment. **No existing ADR governs this
-feature**, so the ADR-absorption gate is not triggered. ADR-0009 (`logger-zerolog`) is the
+feature**, so the ADR-absorption gate is not triggered. The structured-logger decision is the
 *subject* of the retroactive evaluation in Decision 5 below — it is read, not absorbed or
-deleted.
+deleted by this feature.
 
-**ADR-0009 retirement is explicitly OUT OF SCOPE** for this feature. `docs/adr/0009-*` remains
-in place; this feature only *applies the new policy to* the historical change it records, and
-does not absorb its decision into `research.md` or delete it. Retiring ADR-0009 (per the
-§Governance feature workflow) is the job of a separate, logger-focused feature. A future
-reviewer should NOT expect a `docs/adr/` deletion in this PR (consistent with SC-004:
+Structured-logger retirement was explicitly OUT OF SCOPE for this feature. This feature only
+*applies the new policy to* the historical change it records, and does not absorb or delete
+the logger decision. The later absorption and retirement are recorded in
+`../011-hot-path-benchmarks/research.md` per the §Governance feature workflow. A reviewer of
+this feature should NOT expect a `docs/adr/` deletion in this PR (consistent with SC-004:
 zero new ADR files, and — here — zero ADR deletions).
 
 ---
@@ -135,11 +135,11 @@ instead of relying on reviewer discipline.
 - *Leave `bump-patch-for-minor-pre-major: true` and rely on review* — rejected: tooling and
   policy would disagree (SC-007 would fail); the guarantee would be unenforceable.
 
-## Decision 5 — Retroactive verdict: `*zerolog.Logger → ax.Logger` (ADR-0009 revision)
+## Decision 5 — Retroactive verdict: `*zerolog.Logger → ax.Logger` (structured-logger revision)
 
 **Question (from issue #17 / User Story 3)**: Under the policy in Decisions 1–2, was the change
-from a concrete `*zerolog.Logger` return to the `ax.Logger` **interface** return (the ADR-0009
-revision) a breaking change requiring a major bump?
+from a concrete `*zerolog.Logger` return to the `ax.Logger` **interface** return (the
+structured-logger revision) a breaking change requiring a major bump?
 
 **Verdict**: **Breaking under the Go-API-surface rule (Decision 2.1) — but NOT requiring a
 major bump, because the change occurred pre-v1.0 where breaks ride the minor digit
@@ -165,8 +165,8 @@ major bump, because the change occurred pre-v1.0 where breaks ride the minor dig
 correctly absorbed by a pre-v1.0 minor bump. Going forward, once the `ax.Logger` interface is
 itself part of a published surface, *further* changes to it (e.g., adding a method, which
 breaks external implementers) are governed by the same rules — and the constitution's existing
-ADR-0009 guardrail (no second logger backend, interface is a migration seam only) limits how
-often that surface churns.
+structured-logger guardrail (no second logger backend, interface is a migration seam only)
+limits how often that surface churns.
 
 ## Decision 6 — Confirmation: `staticcheck SA1019` already enabled
 

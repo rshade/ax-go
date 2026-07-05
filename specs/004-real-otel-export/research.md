@@ -354,7 +354,8 @@ the 2026-06-10 clarification); (iv) setup is fail-open (D7).
 `ROADMAP.md:165` (the "no-op scaffold (ADR-0005, partial)" line — resolve to
 done); and the sibling-ADR cross-references in `docs/adr/0004-trace-id-format.md:61`,
 `docs/adr/0007-id-strategy.md:35`, `docs/adr/0008-cli-framework-cobra.md:70`, and
-`docs/adr/0009-logger-zerolog.md:11,64`. Per the precedent set retiring ADR-0010
+the structured-logger decision now absorbed in
+`../011-hot-path-benchmarks/research.md`. Per the precedent set retiring ADR-0010
 (feature 001), editing a sibling frozen ADR **solely to remove/redirect a dangling
 cross-reference** to a deleted ADR is reference hygiene, not a substantive ADR
 edit — redirect each to constitution §VIII or `specs/004-real-otel-export/`. **No

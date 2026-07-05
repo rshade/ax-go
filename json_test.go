@@ -4,8 +4,6 @@ import (
 	"bytes"
 	"context"
 	"testing"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 func TestNewEnvelopeUsesContextMetadata(t *testing.T) {
@@ -32,22 +30,7 @@ func TestNewEnvelopeUsesContextMetadata(t *testing.T) {
 // omitempty and would vanish from a zero-context fixture.
 func pinnedEnvelopeContext(t *testing.T, idempotencyKey string) context.Context {
 	t.Helper()
-
-	traceID, err := oteltrace.TraceIDFromHex("0102030405060708090a0b0c0d0e0f10")
-	if err != nil {
-		t.Fatalf("TraceIDFromHex returned error: %v", err)
-	}
-	spanID, err := oteltrace.SpanIDFromHex("0102030405060708")
-	if err != nil {
-		t.Fatalf("SpanIDFromHex returned error: %v", err)
-	}
-	ctx := oteltrace.ContextWithSpanContext(
-		context.Background(),
-		oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
-			TraceID: traceID,
-			SpanID:  spanID,
-		}),
-	)
+	ctx := newTraceContext(t, "0102030405060708090a0b0c0d0e0f10", "0102030405060708")
 	return WithIdempotencyKey(ctx, idempotencyKey)
 }
 

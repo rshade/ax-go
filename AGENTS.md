@@ -105,9 +105,9 @@ conflicts with the constitution, the constitution wins.
   constructor is `ax.NewLogger(ctx)`, returning an `ax.Logger` (initially
   backed by `*zerolog.Logger`) with trace correlation wired in.
 - The `ax.Logger` interface exists ONLY as a migration seam for a future
-  superseding ADR. Do not introduce parallel-pluggable logger backends, an
+  superseding decision. Do not introduce parallel-pluggable logger backends, an
   `ax.WithLogger(...)`-style runtime selection API, or a second concrete
-  logger implementation while ADR-0009 stands.
+  logger implementation (Constitution Principle VI).
 - Stability and deprecation are governed by Constitution Principle XI
   (**Stability & SemVer**) and Principle XII (**Deprecation Lifecycle**).
   Pre-v1.0 (`0.x`): a `0.x.PATCH` release is bug-fixes-only and always safe to
