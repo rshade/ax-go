@@ -140,11 +140,11 @@ func defaultFloorConfig() floorConfig {
 			"github.com/rshade/ax-go/internal/cli":          100.0,
 			"github.com/rshade/ax-go/internal/cmd/doccover": 45.0,
 			"github.com/rshade/ax-go/internal/config":       65.0,
+			"github.com/rshade/ax-go/internal/mcp":          90.0,
 			"github.com/rshade/ax-go/internal/telemetry":    60.0,
 			"github.com/rshade/ax-go/internal/testutil":     25.0,
 		},
 		excluded: map[string]bool{
-			"github.com/rshade/ax-go/internal/mcp":    true,
 			"github.com/rshade/ax-go/internal/schema": true,
 		},
 	}

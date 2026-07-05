@@ -346,6 +346,7 @@ func TestDefaultFloorConfig(t *testing.T) {
 		"github.com/rshade/ax-go/internal/cli":          100.0,
 		"github.com/rshade/ax-go/internal/cmd/doccover": 45.0,
 		"github.com/rshade/ax-go/internal/config":       65.0,
+		"github.com/rshade/ax-go/internal/mcp":          90.0,
 		"github.com/rshade/ax-go/internal/telemetry":    60.0,
 		"github.com/rshade/ax-go/internal/testutil":     25.0,
 	}
@@ -358,15 +359,14 @@ func TestDefaultFloorConfig(t *testing.T) {
 		t.Fatalf("perPackage has %d entries, want %d", len(cfg.perPackage), len(wantPerPackage))
 	}
 	for _, path := range []string{
-		"github.com/rshade/ax-go/internal/mcp",
 		"github.com/rshade/ax-go/internal/schema",
 	} {
 		if !cfg.excluded[path] {
 			t.Fatalf("expected %q to be excluded", path)
 		}
 	}
-	if len(cfg.excluded) != 2 {
-		t.Fatalf("excluded has %d entries, want 2", len(cfg.excluded))
+	if len(cfg.excluded) != 1 {
+		t.Fatalf("excluded has %d entries, want 1", len(cfg.excluded))
 	}
 }
 
