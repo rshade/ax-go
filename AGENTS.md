@@ -232,6 +232,7 @@ Per-package overrides (calibrated to the 2026-06-16 baseline):
 | `github.com/rshade/ax-go/examples/integration` | 85% |
 | `github.com/rshade/ax-go/internal/cmd/doccover` | 45% |
 | `github.com/rshade/ax-go/internal/config` | 65% |
+| `github.com/rshade/ax-go/internal/schema` | 95% |
 | `github.com/rshade/ax-go/internal/telemetry` | 60% |
 | `github.com/rshade/ax-go/internal/testutil` | 25% |
 
@@ -246,7 +247,6 @@ These packages have 0% baseline coverage and are pending test implementation:
 |---------|--------|
 | `github.com/rshade/ax-go/internal/cli` | No tests written; follow-up issue |
 | `github.com/rshade/ax-go/internal/mcp` | No tests written; follow-up issue |
-| `github.com/rshade/ax-go/internal/schema` | No tests written; follow-up issue |
 
 Excluded packages still count toward the repo-wide aggregate. Their 0%
 contribution is why the repo-wide initial floor is 70%, not 85%.
