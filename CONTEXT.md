@@ -66,9 +66,9 @@ constitution wins.
   IDs are UUID v7 and idempotency keys are UUID v4, both via `google/uuid`.
   Observability IDs and resource IDs are never interchanged.
 - **Offer a pluggable logger backend.** The `ax.Logger` interface exists *only*
-  as a migration seam for a future superseding ADR. No
+  as a migration seam for a future superseding decision. No
   `ax.WithLogger(...)`-style runtime backend selection, no second concrete
-  logger, while ADR-0009 stands.
+  logger (Constitution Principles VI and VIII).
 - **Add a second CLI framework.** Cobra is the only framework (ADR-0008).
 - **Compromise security defaults.** Never skip TLS verification, never log PII /
   secrets / tokens, never compose log messages from un-sanitized user input,

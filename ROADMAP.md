@@ -229,7 +229,7 @@ in-scope gaps that deepen the machine-contract half of AX.*
   ([specs/001-bound-config-reads](specs/001-bound-config-reads)) [S] — default
   1 MiB `io.LimitReader`; an oversized config is an `ExitValidation` error, not
   an OOM. Shipped 2026-06-06 (`ea74c7d`).
-- [x] zerolog logger + trace-correlation hook (ADR-0009) [M].
+- [x] zerolog logger + trace-correlation hook (Constitution Principle VIII) [M].
 - [x] #2 Real OTel export + span lifecycle
   ([specs/004-real-otel-export](specs/004-real-otel-export)) [L] —
   recording root span around `Execute`, log correlation with no collector,
@@ -254,7 +254,8 @@ From [CONTEXT.md](./CONTEXT.md) — roadmap items must never:
 - Persist state or introduce mutable package-level globals.
 - Couple a log-shipping backend (Loki) into the core logger.
 - Invent ID schemes or interchange observability and resource IDs.
-- Add a pluggable logger backend while ADR-0009 stands.
+- Add a pluggable logger backend (Constitution Principle VI: the `ax.Logger`
+  interface is a migration seam, not a backend selector).
 - Add a second CLI framework, skip TLS, log PII/secrets, or read unbounded input.
 - Ship `dev`/`unknown` versions to production agents.
 - Change public API or runtime behavior without a Spec Kit feature first.

@@ -27,7 +27,10 @@ const (
 	labelFieldVersion     = "version"
 )
 
-// Logger is the ADR-0009 logging surface, initially backed by zerolog.
+// Logger is the canonical structured-logging surface, initially backed by
+// zerolog. The single-backend guardrail (this interface is a migration seam, not
+// a pluggable-backend selector) and the trace-correlation contract are governed
+// by Constitution Principles VI and VIII.
 type Logger interface {
 	Debug(ctx context.Context) *zerolog.Event
 	Info(ctx context.Context) *zerolog.Event

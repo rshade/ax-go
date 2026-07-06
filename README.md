@@ -29,6 +29,11 @@
 > **Stability & SemVer** and **Deprecation Lifecycle** principles
 > ([`.specify/memory/constitution.md`](.specify/memory/constitution.md)).
 
+**Security:** please report suspected vulnerabilities privately through
+[GitHub Security Advisories](https://github.com/rshade/ax-go/security/advisories/new).
+See [`SECURITY.md`](SECURITY.md) for the full policy. Do not open public
+issues for unpatched vulnerabilities.
+
 ## Mission
 
 ax-go is the shared foundation that standardizes **Agentic Experience (AX)**
@@ -259,8 +264,14 @@ byte-identical to one emitted before these fields existed.
 ## Engineering Standards
 
 - **Allocation discipline:** track allocations via standard `testing.B`
-  benchmarks; target zero or near-zero allocations on hot paths. Benchmark
-  serializer choices rather than asserting numeric bars.
+  benchmarks rather than asserting numeric bars. The logger hot path is
+  measured by `BenchmarkLogger*` (see
+  [spec 011](specs/011-hot-path-benchmarks/)): the enabled emit path, the
+  filtered fast path, the no-trace-context path, typed fields, and labelled
+  loggers all measure **0 allocs/op**. The single allocating path is emitting
+  with an active trace context (**2 allocs/op**, ~48 B/op) from formatting the
+  hex trace/span IDs — a bounded, documented exception, not a regression. Run
+  `go test -run '^$' -bench '^BenchmarkLogger' -benchmem ./...` to reproduce.
 - **Trace propagation:** contexts carry and propagate W3C Trace Context IDs by
   default, via the OpenTelemetry SDK
   ([ADR-0004](docs/adr/0004-trace-id-format.md);
@@ -277,8 +288,8 @@ byte-identical to one emitted before these fields existed.
   `ax.Execute()` wraps Cobra execution for mode resolution, schema wiring,
   error-envelope output, and OTel flush-on-exit.
 - **Structured logging:** `ax.NewLogger(ctx)` returns an `ax.Logger` backed by
-  zerolog with trace correlation wired in
-  ([ADR-0009](docs/adr/0009-logger-zerolog.md)).
+  zerolog with trace correlation wired in (Constitution Principle VIII; the
+  single-backend guardrail is Principle VI).
 - **Telemetry lifecycle:** `ax.Execute()` opens a recording root span around the
   command, so logs written with `cmd.Context()` carry non-zero `trace_id` and
   `span_id` even when no collector is configured. Set
@@ -305,11 +316,13 @@ deleted.
 | --- | --- | --- |
 | [0004](docs/adr/0004-trace-id-format.md) | Trace ID Format | **Accepted (2026-05-28)** |
 | [0008](docs/adr/0008-cli-framework-cobra.md) | CLI Framework — Cobra | **Accepted (2026-05-28)** |
-| [0009](docs/adr/0009-logger-zerolog.md) | Structured Logger — ZeroLog | **Accepted (2026-05-28)** |
 
 Absorbed decisions for mode resolution, error envelopes, schema output, ID
 strategy, and import layout live in
 [`specs/010-import-isolated-contracts/research.md`](specs/010-import-isolated-contracts/research.md).
+The structured-logging (zerolog) choice is now governed by Constitution
+Principles VI and VIII; its full decision record is absorbed into
+[`specs/011-hot-path-benchmarks/research.md`](specs/011-hot-path-benchmarks/research.md).
 Remaining frozen ADR text and rationale live in [`docs/adr/`](docs/adr/).
 
 ## Repository Layout

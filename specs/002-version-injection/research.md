@@ -133,8 +133,10 @@ change to `execute.go`/`schema.go`/`logger.go` is needed — only correct usage.
 **Alternatives considered**: Auto-injecting the resolved version into the logger
 from inside `ax.Execute` — rejected: it would couple logger construction to
 Execute, the logger is constructed by the consumer with its own labels, and the
-constitution warns against widening the logger seam (Principle VI / ADR-0009
-boundary). Documentation + example is the proportional fix.
+constitution warns against widening the logger seam (Principle VI; the
+structured-logger decision is now absorbed in
+`../011-hot-path-benchmarks/research.md`). Documentation + example is the
+proportional fix.
 
 ### D7 — Public API shape, naming, and doc-coverage gating
 

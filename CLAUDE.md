@@ -3,5 +3,5 @@
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan:
-`specs/013-error-recovery-fields/plan.md`
+`specs/011-hot-path-benchmarks/plan.md`
 <!-- SPECKIT END -->

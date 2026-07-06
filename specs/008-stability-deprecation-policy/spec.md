@@ -109,7 +109,7 @@ principle.
 ### User Story 3 — Retroactive Evaluation of the ax.Logger Interface Change (Priority: P3)
 
 The issue specifically asks: under the new policy, was the `concrete *zerolog.Logger →
-ax.Logger interface` change introduced in the ADR-0009 revision a breaking change
+ax.Logger interface` change introduced in the structured-logger revision a breaking change
 requiring a major bump? The policy must be evaluated against this concrete example
 and the verdict recorded.
 

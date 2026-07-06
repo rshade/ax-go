@@ -118,3 +118,86 @@ func BenchmarkLoggerDisabledLevel(b *testing.B) {
 		logger.Debug(activeCtx).Msg("benchmark log line")
 	}
 }
+
+// benchDiscardLogger builds an InfoLevel logger that writes to io.Discard so the
+// measured profile reflects logger allocations, not OS write cost or console
+// formatting (FR-007, research Decision 3). Extra options layer on top of the
+// discard writer.
+func benchDiscardLogger(opts ...LoggerOption) Logger {
+	return NewLogger(context.Background(), append([]LoggerOption{WithLoggerWriter(io.Discard)}, opts...)...)
+}
+
+// BenchmarkLoggerEmit substantiates the enabled-level emit versus filtered
+// fast-path allocation profile. The enabled/no_fields sub-case measures the
+// common "log one line" path; disabled_level measures zerolog's early-return
+// path for a level below the configured threshold, reported separately so the
+// cheaper filtered path is not blended into the emitted-line number (FR-003,
+// FR-005, SC-001, SC-002; FR-011 doc convention).
+func BenchmarkLoggerEmit(b *testing.B) {
+	logger := benchDiscardLogger()
+	ctx := context.Background()
+
+	b.Run("enabled/no_fields", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			logger.Info(ctx).Msg("benchmark log line")
+		}
+	})
+
+	b.Run("disabled_level", func(b *testing.B) {
+		b.ReportAllocs()
+		for b.Loop() {
+			logger.Debug(ctx).Msg("benchmark log line")
+		}
+	})
+}
+
+// BenchmarkLoggerTracingHook isolates the always-on tracing hook's
+// context-dependent allocation cost. The no_trace_context sub-case takes the
+// zero-ID constant path; active_trace_context carries a populated SpanContext
+// and so formats hex trace/span IDs, which allocate. Reporting them separately
+// keeps the hook's marginal cost visible (FR-004, SC-002; research Decision 2).
+func BenchmarkLoggerTracingHook(b *testing.B) {
+	logger := benchDiscardLogger()
+
+	b.Run("no_trace_context", func(b *testing.B) {
+		ctx := context.Background()
+		b.ReportAllocs()
+		for b.Loop() {
+			logger.Info(ctx).Msg("benchmark log line")
+		}
+	})
+
+	b.Run("active_trace_context", func(b *testing.B) {
+		ctx := activeTraceContext(b)
+		b.ReportAllocs()
+		for b.Loop() {
+			logger.Info(ctx).Msg("benchmark log line")
+		}
+	})
+}
+
+// BenchmarkLoggerFieldShapes captures the representative field-shape and
+// labeled-logger profiles so the suite reflects realistic usage, not just the
+// emptiest call. The typed_fields sub-case attaches typed payload fields to a
+// plain logger; with_labels emits on a logger constructed with low-cardinality
+// labels (FR-006).
+func BenchmarkLoggerFieldShapes(b *testing.B) {
+	ctx := context.Background()
+
+	b.Run("typed_fields", func(b *testing.B) {
+		logger := benchDiscardLogger()
+		b.ReportAllocs()
+		for b.Loop() {
+			logger.Info(ctx).Str("k", "v").Int("n", 1).Msg("benchmark log line")
+		}
+	})
+
+	b.Run("with_labels", func(b *testing.B) {
+		logger := benchDiscardLogger(WithLoggerLabels(Labels{Application: "app", Environment: "test"}))
+		b.ReportAllocs()
+		for b.Loop() {
+			logger.Info(ctx).Msg("benchmark log line")
+		}
+	})
+}

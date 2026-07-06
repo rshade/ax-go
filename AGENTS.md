@@ -105,9 +105,9 @@ conflicts with the constitution, the constitution wins.
   constructor is `ax.NewLogger(ctx)`, returning an `ax.Logger` (initially
   backed by `*zerolog.Logger`) with trace correlation wired in.
 - The `ax.Logger` interface exists ONLY as a migration seam for a future
-  superseding ADR. Do not introduce parallel-pluggable logger backends, an
+  superseding decision. Do not introduce parallel-pluggable logger backends, an
   `ax.WithLogger(...)`-style runtime selection API, or a second concrete
-  logger implementation while ADR-0009 stands.
+  logger implementation (Constitution Principle VI).
 - Stability and deprecation are governed by Constitution Principle XI
   (**Stability & SemVer**) and Principle XII (**Deprecation Lifecycle**).
   Pre-v1.0 (`0.x`): a `0.x.PATCH` release is bug-fixes-only and always safe to
@@ -230,8 +230,11 @@ Per-package overrides (calibrated to the 2026-06-16 baseline):
 |---------|---------------|
 | `github.com/rshade/ax-go` | 80% |
 | `github.com/rshade/ax-go/examples/integration` | 85% |
+| `github.com/rshade/ax-go/internal/cli` | 100% |
 | `github.com/rshade/ax-go/internal/cmd/doccover` | 45% |
 | `github.com/rshade/ax-go/internal/config` | 65% |
+| `github.com/rshade/ax-go/internal/mcp` | 90% |
+| `github.com/rshade/ax-go/internal/schema` | 95% |
 | `github.com/rshade/ax-go/internal/telemetry` | 60% |
 | `github.com/rshade/ax-go/internal/testutil` | 25% |
 
@@ -240,16 +243,8 @@ Any package without an explicit override (including newly added packages and
 
 ### Excluded from Per-Package Floor Enforcement
 
-These packages have 0% baseline coverage and are pending test implementation:
-
-| Package | Reason |
-|---------|--------|
-| `github.com/rshade/ax-go/internal/cli` | No tests written; follow-up issue |
-| `github.com/rshade/ax-go/internal/mcp` | No tests written; follow-up issue |
-| `github.com/rshade/ax-go/internal/schema` | No tests written; follow-up issue |
-
-Excluded packages still count toward the repo-wide aggregate. Their 0%
-contribution is why the repo-wide initial floor is 70%, not 85%.
+No packages are currently excluded from the per-package floor gate; every
+package has an explicit override or falls back to the 25% default.
 
 ### Local Verification
 

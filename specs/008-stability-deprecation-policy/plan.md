@@ -56,10 +56,11 @@ feature's own `research.md`. Zero source files.
 
 **Governing ADR(s)**: N/A. The issue proposed creating `docs/adr/0013-*` and
 `docs/adr/0014-*`; the constitution prohibits new ADRs, so they do not and will not exist
-(verified: `docs/adr/0013*`, `docs/adr/0014*` absent). ADR-0009 (`logger-zerolog`) is the
+(verified: `docs/adr/0013*`, `docs/adr/0014*` absent). The structured-logger decision is the
 *subject* of this feature's retroactive evaluation (User Story 3), **not** a governing ADR
-of this feature; it is not absorbed or retired here. Therefore the ADR-absorption gate and
-the ADR-retirement final task do NOT apply.
+of this feature; it is not absorbed or retired here. Its later absorption is recorded in
+`../011-hot-path-benchmarks/research.md`. Therefore the ADR-absorption gate and the
+ADR-retirement final task do NOT apply here.
 
 ## Constitution Check
 
@@ -83,8 +84,9 @@ principles are N/A. Each is evaluated explicitly:
 
 **ADR absorption gate (Constitution §Governance)**: Governing ADR(s) = N/A → gate does NOT
 apply. `research.md` does not require a "Decision Records Absorbed" section and `tasks.md`
-does not require an ADR-retirement task. (If a future reviewer disagrees and treats ADR-0009
-as in-scope, that would be a separate feature; this feature only *evaluates* it.)
+does not require an ADR-retirement task. (If a future reviewer disagrees and treats the
+structured-logger decision as in-scope, that would be a separate feature; this feature only
+*evaluates* it.)
 
 **Amendment-procedure gate (Constitution §Governance)**: The amendment MUST (a) edit
 `.specify/memory/constitution.md`, (b) prepend/append a Sync Impact Report, (c) apply a MINOR

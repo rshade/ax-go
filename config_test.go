@@ -14,8 +14,6 @@ import (
 	"sync"
 	"testing"
 	"time"
-
-	oteltrace "go.opentelemetry.io/otel/trace"
 )
 
 func TestParseConfigAcceptsHujson(t *testing.T) {
@@ -544,27 +542,13 @@ func TestParseConfigErrorGoldens(t *testing.T) {
 }
 
 func TestParseConfigErrorUsesCallerTraceContext(t *testing.T) {
-	const traceIDHex = "4bf92f3577b34da6a3ce929d0e0e4736"
-	const spanIDHex = "00f067aa0ba902b7"
-
-	traceID, err := oteltrace.TraceIDFromHex(traceIDHex)
-	if err != nil {
-		t.Fatalf("TraceIDFromHex returned error: %v", err)
-	}
-	spanID, err := oteltrace.SpanIDFromHex(spanIDHex)
-	if err != nil {
-		t.Fatalf("SpanIDFromHex returned error: %v", err)
-	}
-	ctx := oteltrace.ContextWithSpanContext(context.Background(), oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
-		TraceID: traceID,
-		SpanID:  spanID,
-	}))
+	ctx := activeTraceContext(t)
 
 	var got struct{}
-	err = ParseConfig(ctx, strings.NewReader("{}"), &got, WithMaxConfigBytes(1))
+	err := ParseConfig(ctx, strings.NewReader("{}"), &got, WithMaxConfigBytes(1))
 	axErr := assertConfigError(t, err, "config_too_large")
-	if axErr.TraceID != traceIDHex {
-		t.Fatalf("TraceID = %q, want %q", axErr.TraceID, traceIDHex)
+	if axErr.TraceID != exampleTraceIDHex {
+		t.Fatalf("TraceID = %q, want %q", axErr.TraceID, exampleTraceIDHex)
 	}
 }
 
