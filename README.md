@@ -29,6 +29,11 @@
 > **Stability & SemVer** and **Deprecation Lifecycle** principles
 > ([`.specify/memory/constitution.md`](.specify/memory/constitution.md)).
 
+**Security:** please report suspected vulnerabilities privately through
+[GitHub Security Advisories](https://github.com/rshade/ax-go/security/advisories/new).
+See [`SECURITY.md`](SECURITY.md) for the full policy. Do not open public
+issues for unpatched vulnerabilities.
+
 ## Mission
 
 ax-go is the shared foundation that standardizes **Agentic Experience (AX)**
