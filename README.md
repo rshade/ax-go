@@ -7,6 +7,7 @@
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 [![Docs](https://img.shields.io/badge/docs-live-blue)](https://rshade.github.io/ax-go/)
 [![Coverage](https://codecov.io/gh/rshade/ax-go/branch/main/graph/badge.svg)](https://codecov.io/gh/rshade/ax-go)
+[![Cross-Compile](https://github.com/rshade/ax-go/actions/workflows/crosscompile.yml/badge.svg)](https://github.com/rshade/ax-go/actions/workflows/crosscompile.yml)
 
 📖 **Documentation:** <https://rshade.github.io/ax-go/>
 

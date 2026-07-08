@@ -18,14 +18,16 @@ policy (#17, Principles XI + XII), the coverage policy + CI gate (#21), the
 README compatibility matrix (#23), the import-isolated public contract packages
 (#78, spec/010), the release-please flow confirmation (#14), and `go-apidiff`
 in CI (#26). A wave of runtime contracts also landed — the Hujson AST `Patch`
-write path (#9), the `ax-go mcp-server` runnable wrapper (#10), and the
-`--dry-run` side-effect guards (#13, spec/012) — alongside dedicated unit tests
-for `context.go`/`http.go`/`trace.go` (#12) and hot-path logger benchmarks (#11,
-which now unblocks #22). **#27 (`ax.Error`
-recovery/remediation) is now the active single-WIP** in Immediate Focus,
-promoted as the AX audit's highest-value in-scope win. The coverage escalation
-queue (#63–#65, #69) remains a parallel set of quick wins that directly raise
-the repo-wide coverage floor toward 85%.
+write path (#9), the `ax-go mcp-server` runnable wrapper (#10), the
+`--dry-run` side-effect guards (#13, spec/012), and `ax.Error`
+recovery/remediation fields (#27) — alongside dedicated unit tests for
+`context.go`/`http.go`/`trace.go` (#12), hot-path logger benchmarks (#11), the
+`examples/integration` Common DNA audit (#15), `SECURITY.md` (#19), and the
+coverage-floor escalation trio for `internal/cli`/`internal/mcp`/`internal/schema`
+(#63–#65). **#22 (benchstat regression budget in CI) is now the active
+single-WIP** in Immediate Focus, promoted after sitting epic-promotion-eligible
+for the full 7-day window since #11 shipped. #18 (`internal/` migration audit)
+is next on deck.
 
 ## Vision
 
@@ -38,32 +40,25 @@ primitives, and short-lived-process-correct observability.
 
 Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
 
-- [ ] #27 `ax.Error` recovery/remediation fields [M] — add optional `retryable`
-  (tri-state) and `retry_after_seconds` (relative backoff) so an agent can
-  self-correct, not just report; existing `actionable_fix`/`suggestions` stay the
-  free-text recovery hints (no separate `next_action` field). The AX source
-  audit's #1 in-scope win; deepens the machine-contract half of AX without
-  breaking the existing envelope shape.
-  *Promoted by /roadmap sync on 2026-06-29 — fills the single open WIP slot with
-  the highest-leverage in-scope AX contract.*
+- [ ] #22 Performance regression budget: benchstat in CI [M] — track hot-path
+  benchmark deltas (logger hook, `__schema` reflection, error-envelope marshal,
+  Hujson parse) against a committed baseline; fail PRs beyond a defined
+  regression budget (>5% ns/op or >1 alloc/op). Unblocked when #11 hot-path
+  benchmarks shipped 2026-06-29.
+  *Promoted by /roadmap sync on 2026-07-06 — fills the single open WIP slot
+  after #27 (`ax.Error` recovery/remediation) shipped 2026-06-30. Had sat
+  epic-promotion-eligible for the full 7-day `procrastination_threshold_days`
+  window, so `epic_promotion: enforce` forces the promotion now.*
 
 ## Near-Term Vision (v0.3.0 — governance queue)
 
-**On deck — next promotion batch:** #63 / #64 / #65 (the `internal/cli`,
-`internal/mcp`, `internal/schema` coverage trio). Queued by /roadmap sync on
-2026-06-29 to promote together as the next single-WIP unit when #27 closes:
-near-identical work that removes three packages from `excludedPackages` and is
-the most direct lever on the repo-wide coverage floor toward 85%. They remain
-`roadmap/next` (not `roadmap/current`) to preserve `target_focus_depth: 1`.
+**On deck — next promotion:** #18 is now epic-promotion-eligible — its
+blocking directory-layout decision (#17/#20) closed 2026-06-29 — and is the
+leading candidate for Immediate Focus when #22 closes.
 
-- [ ] #63 `internal/cli` unit tests + coverage floor enrollment [S] — remove
-  from `excludedPackages`; direct path toward raising repo-wide floor to 85%.
-- [ ] #64 `internal/mcp` unit tests + coverage floor enrollment [S] — same
-  pattern; unlocks coverage improvement on the MCP adapter.
-- [ ] #65 `internal/schema` unit tests + coverage floor enrollment [S] — same
-  pattern; unlocks coverage improvement on the schema reflection layer.
-- [ ] #19 `SECURITY.md` disclosure policy [S] — reporting channel, SLA,
-  supported-versions, out-of-scope (giant-Hujson DoS is a validation error).
+- [ ] #18 Move remaining non-public helpers under `internal/` before v1.0 [L]
+  — keep drawing the public-API boundary while it's still cheap. Unblocked by
+  #17/#20 (directory-layout decision, closed 2026-06-29).
 - [ ] #69 `covercheck` type-design hardening — derived fields as methods +
   integer floor comparison [S] — two deferred refactors from spec/009; no
   public-API impact.
@@ -112,17 +107,9 @@ in-scope gaps that deepen the machine-contract half of AX.*
 
 ### v1.0 readiness & governance
 
-- [ ] #15 `examples/integration` audit + extend to full Common DNA surface [L] —
-  exercise every Core AX Mandate in the reference CLI; pin `__schema` and
-  envelope shapes with golden files. Pairs with #3/#5.
 - [ ] #16 `__schema` non-deterministic-field enumeration [M] — declare a
   `non_deterministic_fields` array per command so agents diff safely. Pairs
   with #5.
-- [ ] #18 Move remaining non-public helpers under `internal/` before v1.0 [L] —
-  keep drawing the public-API boundary while it's still cheap. *Unblocked by #17.*
-- [ ] #22 benchstat regression budget in CI [M] — track hot-path benchmark
-  deltas against a baseline. *Unblocked: #11 hot-path benchmarks shipped
-  2026-06-29 (`a6f09c7`); epic-parent now closed → epic-promotion-eligible.*
 - [ ] #24 Supply chain: SBOM + signed releases [M] — CycloneDX SBOM and cosign
   keyless signing on release artifacts.
 - [ ] #25 CI cross-compile matrix [S] — `GOOS`/`GOARCH` build+vet across
@@ -130,8 +117,29 @@ in-scope gaps that deepen the machine-contract half of AX.*
 
 ## Completed Milestones
 
+### 2026-Q3
+
+- [x] #65 `internal/schema` unit tests + coverage floor enrollment [S] —
+  removed from `excludedPackages`; calibrated a 95% per-package floor. Closed
+  2026-07-06.
+- [x] #64 `internal/mcp` unit tests + coverage floor enrollment [S] — removed
+  from `excludedPackages`; calibrated a 90% per-package floor. Closed
+  2026-07-06.
+- [x] #63 `internal/cli` unit tests + coverage floor enrollment [S] — removed
+  from `excludedPackages`; calibrated a 100% per-package floor. Closed
+  2026-07-06.
+- [x] #19 `SECURITY.md` disclosure policy [S] — vulnerability disclosure
+  policy, reporting channel, and supported-versions table. Closed 2026-07-06.
+
 ### 2026-Q2
 
+- [x] #27 `ax.Error` recovery/remediation fields [M] — added optional
+  `retryable` (tri-state) and `retry_after_seconds` (relative backoff) so an
+  agent can self-correct, not just report; `actionable_fix`/`suggestions` stay
+  the free-text recovery hints. Shipped via PR #95. Closed 2026-06-30.
+- [x] #15 `examples/integration` audit + extend to full Common DNA surface [L]
+  — exercises every Core AX Mandate in the reference CLI; pins `__schema` and
+  envelope shapes with golden files. Closed 2026-06-30.
 - [x] #13 Agent-safety helpers for `--dry-run` side-effect suppression [M] —
   `ax.Guard` / `ax.Perform` make it hard to accidentally cause side effects when
   `dry_run: true`; suppressed actions log to `stderr`. Shipped via

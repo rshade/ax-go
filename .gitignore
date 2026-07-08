@@ -57,3 +57,4 @@ Thumbs.db
 vendor/
 PR_MESSAGE.md
 .claude/agent-memory/
+.superpowers/

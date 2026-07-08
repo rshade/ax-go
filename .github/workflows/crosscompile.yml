@@ -1,0 +1,63 @@
+name: Cross-Compile Matrix
+
+# Verifies ax-go builds cleanly across the standard Go target matrix
+# (linux/darwin/windows x amd64/arm64). Isolated from ci.yml, mirroring
+# apidiff.yml's pattern of separating distinct CI concerns into their own
+# file. Runs on a single ubuntu-latest runner per combination: Go
+# cross-compiles pure-Go code via GOOS/GOARCH env vars and this module has
+# no cgo dependencies, so native macOS/Windows runners aren't needed.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  GO_VERSION: '1.26.4'
+  # Bypass the Go proxy for rshade modules - fetch directly from GitHub.
+  GOPRIVATE: github.com/rshade/*
+
+jobs:
+  crosscompile:
+    name: Cross-compile (${{ matrix.goos }}/${{ matrix.goarch }})
+    runs-on: ubuntu-latest
+    strategy:
+      # fail-fast: false so one broken combination doesn't cancel the
+      # others - the point of the matrix is visibility into which
+      # specific platform broke, not just that "something" broke.
+      fail-fast: false
+      matrix:
+        goos: [linux, darwin, windows]
+        goarch: [amd64, arm64]
+    env:
+      GOOS: ${{ matrix.goos }}
+      GOARCH: ${{ matrix.goarch }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Build all packages
+        run: go build ./...
+
+      - name: Build integration example with version injection
+        # Mirrors `make build-example`'s ldflags path explicitly - the
+        # plain `./...` build above already covers examples/integration,
+        # but the version-injection ldflags is a separate code path worth
+        # its own check. Output is discarded; nothing executes this binary.
+        run: |
+          go build -ldflags "-X main.version=ci-crosscompile" \
+            -o /dev/null ./examples/integration
+
+      - name: Vet all packages
+        run: go vet ./...
