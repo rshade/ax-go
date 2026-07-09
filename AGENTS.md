@@ -7,7 +7,7 @@
 and still ergonomic for human engineers.
 
 The module is `github.com/rshade/ax-go`, the package name should be `ax`, and
-the project currently targets Go `1.26.4`. The canonical source of truth for
+the project currently targets Go `1.26.5`. The canonical source of truth for
 behavior and public API decisions is the constitution at
 `.specify/memory/constitution.md`. The ADRs in `docs/adr/` are a FROZEN legacy
 decision log being retired through the Spec Kit feature workflow; where an ADR

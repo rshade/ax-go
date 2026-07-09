@@ -2,7 +2,7 @@
 
 `ax-go` (module `github.com/rshade/ax-go`, package `ax`) is the Agentic Experience
 foundation for Go CLIs: it makes Go command-line tools predictable for LLM agents while
-staying ergonomic for humans. It targets **Go 1.26.4**.
+staying ergonomic for humans. It targets **Go 1.26.5**.
 
 ## Source of truth (read before flagging a "divergence")
 
@@ -20,7 +20,7 @@ Authority runs **constitution → feature spec → agent docs → code**:
 
 ## Go version facts (avoid stale-Go false positives)
 
-This is modern Go (1.26.4). The following are valid and must not be flagged as errors:
+This is modern Go (1.26.5). The following are valid and must not be flagged as errors:
 
 - `for i := range n` where `n` is an integer ranges `i` from `0` to `n-1` (Go 1.22+).
 - Generics, the `min`/`max`/`clear` builtins, and `errors.Join` are available.
