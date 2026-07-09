@@ -22,12 +22,12 @@ write path (#9), the `ax-go mcp-server` runnable wrapper (#10), the
 `--dry-run` side-effect guards (#13, spec/012), and `ax.Error`
 recovery/remediation fields (#27) — alongside dedicated unit tests for
 `context.go`/`http.go`/`trace.go` (#12), hot-path logger benchmarks (#11), the
-`examples/integration` Common DNA audit (#15), `SECURITY.md` (#19), and the
+`examples/integration` Common DNA audit (#15), `SECURITY.md` (#19), the
 coverage-floor escalation trio for `internal/cli`/`internal/mcp`/`internal/schema`
-(#63–#65). **#22 (benchstat regression budget in CI) is now the active
-single-WIP** in Immediate Focus, promoted after sitting epic-promotion-eligible
-for the full 7-day window since #11 shipped. #18 (`internal/` migration audit)
-is next on deck.
+(#63–#65), and the CI performance regression budget (#22, `benchstat` via
+`internal/cmd/benchcheck`). **The single-WIP slot in Immediate Focus is now
+open**; #18 (`internal/` migration audit) is the leading epic-promotion
+candidate for the next `/roadmap sync`.
 
 ## Vision
 
@@ -40,21 +40,14 @@ primitives, and short-lived-process-correct observability.
 
 Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
 
-- [ ] #22 Performance regression budget: benchstat in CI [M] — track hot-path
-  benchmark deltas (logger hook, `__schema` reflection, error-envelope marshal,
-  Hujson parse) against a committed baseline; fail PRs beyond a defined
-  regression budget (>5% ns/op or >1 alloc/op). Unblocked when #11 hot-path
-  benchmarks shipped 2026-06-29.
-  *Promoted by /roadmap sync on 2026-07-06 — fills the single open WIP slot
-  after #27 (`ax.Error` recovery/remediation) shipped 2026-06-30. Had sat
-  epic-promotion-eligible for the full 7-day `procrastination_threshold_days`
-  window, so `epic_promotion: enforce` forces the promotion now.*
+*No active WIP — #22 (performance regression budget) shipped 2026-07-08.
+Awaiting the next `/roadmap sync` to promote #18 (see Near-Term Vision).*
 
 ## Near-Term Vision (v0.3.0 — governance queue)
 
 **On deck — next promotion:** #18 is now epic-promotion-eligible — its
 blocking directory-layout decision (#17/#20) closed 2026-06-29 — and is the
-leading candidate for Immediate Focus when #22 closes.
+leading candidate for Immediate Focus now that #22 has closed.
 
 - [ ] #18 Move remaining non-public helpers under `internal/` before v1.0 [L]
   — keep drawing the public-API boundary while it's still cheap. Unblocked by
@@ -119,6 +112,15 @@ in-scope gaps that deepen the machine-contract half of AX.*
 
 ### 2026-Q3
 
+- [x] #22 Performance regression budget: `benchstat` in CI [M] —
+  `internal/cmd/benchcheck` compares hot-path benchmark deltas (logger hook,
+  `__schema` reflection, error-envelope marshal, Hujson parse) against a
+  same-host run from the pull request base ref using
+  `golang.org/x/perf/benchstat`; fails CI beyond the regression budget (>5%
+  ns/op, significant-only; >1 alloc/op).
+  Shipped via
+  [`specs/014-bench-regression-budget`](specs/014-bench-regression-budget/).
+  Closed 2026-07-08.
 - [x] #65 `internal/schema` unit tests + coverage floor enrollment [S] —
   removed from `excludedPackages`; calibrated a 95% per-package floor. Closed
   2026-07-06.

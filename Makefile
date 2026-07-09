@@ -4,12 +4,17 @@ MARKDOWNLINT?=markdownlint
 MARKDOWNLINT_FILES?=AGENTS.md README.md .github/copilot-instructions.md docs/**/*.md
 ACTIONLINT?=$(HOME)/go/bin/actionlint
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.0-unknown)
+BENCH_CPU?=1
+BENCH_COUNT?=10
+BENCH_BASE_REF?=$(shell git merge-base HEAD origin/main 2>/dev/null || git rev-parse --verify --quiet HEAD~1 2>/dev/null || echo origin/main)
+BENCH_FLAGS=-run='^$$' -bench=. -benchmem -cpu=$(BENCH_CPU)
+BENCH_COMPARE_FLAGS=$(BENCH_FLAGS) -count=$(BENCH_COUNT)
 
 .PHONY: all
 all: build
 
 .PHONY: ci
-ci: test validate lint doc-coverage
+ci: test validate lint doc-coverage bench-check
 
 .PHONY: build
 build:
@@ -39,8 +44,45 @@ cover-check: test-cover
 
 .PHONY: bench
 bench:
-	@echo "Running benchmarks..."
-	go test -run='^$$' -bench=. -benchmem ./...
+	@echo "Running benchmarks with -cpu=$(BENCH_CPU)..."
+	go test $(BENCH_FLAGS) ./...
+
+.PHONY: bench-check
+bench-check:
+	@echo "Checking performance regression budget against $(BENCH_BASE_REF) with -cpu=$(BENCH_CPU)..."
+	@base_ref="$(BENCH_BASE_REF)"; \
+	tmpdir=$$(mktemp -d); \
+	base_worktree="$$tmpdir/base"; \
+	base_out="$$tmpdir/bench-base.txt"; \
+	current_out="$$tmpdir/bench-current.txt"; \
+	cleanup() { \
+		git worktree remove --force "$$base_worktree" >/dev/null 2>&1 || true; \
+		rm -rf "$$tmpdir"; \
+	}; \
+	trap cleanup EXIT INT TERM; \
+	if ! git rev-parse --verify --quiet "$$base_ref^{commit}" >/dev/null; then \
+		echo "bench-check: baseline ref '$$base_ref' not found; fetch main or set BENCH_BASE_REF=<ref>" >&2; \
+		exit 2; \
+	fi; \
+	if ! git worktree add --detach --quiet "$$base_worktree" "$$base_ref"; then \
+		echo "bench-check: could not create baseline worktree for '$$base_ref'" >&2; \
+		exit 2; \
+	fi; \
+	echo "bench-check: capturing baseline from $$base_ref"; \
+	if ! (cd "$$base_worktree" && go test $(BENCH_COMPARE_FLAGS) ./...) > "$$base_out"; then \
+		echo "bench-check: baseline benchmark run failed (see output below); performance budget was not checked" >&2; \
+		cat "$$base_out" >&2; \
+		exit 1; \
+	fi; \
+	echo "bench-check: capturing current worktree"; \
+	if ! go test $(BENCH_COMPARE_FLAGS) ./... > "$$current_out"; then \
+		echo "bench-check: current benchmark run failed (see output below); performance budget was not checked" >&2; \
+		cat "$$current_out" >&2; \
+		exit 1; \
+	fi; \
+	go run ./internal/cmd/benchcheck -baseline "$$base_out" -current "$$current_out"; \
+	status=$$?; \
+	exit $$status
 
 .PHONY: doc-coverage
 doc-coverage:
@@ -128,6 +170,7 @@ help:
 	@echo "  test-cover    - Run tests with coverage profile"
 	@echo "  cover-check   - Enforce per-package and repo-wide coverage floors"
 	@echo "  bench         - Run benchmarks with -benchmem"
+	@echo "  bench-check   - Enforce the performance regression budget against BENCH_BASE_REF"
 	@echo "  doc-coverage  - Check ExampleXxx coverage on the primary API"
 	@echo "  lint          - Run golangci-lint, markdownlint, and actionlint"
 	@echo "  lint-actions  - Run actionlint on GitHub workflows"
