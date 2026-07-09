@@ -341,15 +341,16 @@ func TestDefaultFloorConfig(t *testing.T) {
 		t.Fatalf("defaultFloor = %v, want %v", cfg.defaultFloor, defaultPackageFloor)
 	}
 	wantPerPackage := map[string]float64{
-		"github.com/rshade/ax-go":                       80.0,
-		"github.com/rshade/ax-go/examples/integration":  85.0,
-		"github.com/rshade/ax-go/internal/cli":          100.0,
-		"github.com/rshade/ax-go/internal/cmd/doccover": 45.0,
-		"github.com/rshade/ax-go/internal/config":       65.0,
-		"github.com/rshade/ax-go/internal/mcp":          90.0,
-		"github.com/rshade/ax-go/internal/schema":       95.0,
-		"github.com/rshade/ax-go/internal/telemetry":    60.0,
-		"github.com/rshade/ax-go/internal/testutil":     25.0,
+		"github.com/rshade/ax-go":                         80.0,
+		"github.com/rshade/ax-go/examples/integration":    85.0,
+		"github.com/rshade/ax-go/internal/cli":            100.0,
+		"github.com/rshade/ax-go/internal/cmd/benchcheck": 80.0,
+		"github.com/rshade/ax-go/internal/cmd/doccover":   45.0,
+		"github.com/rshade/ax-go/internal/config":         65.0,
+		"github.com/rshade/ax-go/internal/mcp":            90.0,
+		"github.com/rshade/ax-go/internal/schema":         95.0,
+		"github.com/rshade/ax-go/internal/telemetry":      60.0,
+		"github.com/rshade/ax-go/internal/testutil":       25.0,
 	}
 	for path, want := range wantPerPackage {
 		if got, ok := cfg.perPackage[path]; !ok || got != want {

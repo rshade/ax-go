@@ -231,6 +231,7 @@ Per-package overrides (calibrated to the 2026-06-16 baseline):
 | `github.com/rshade/ax-go` | 80% |
 | `github.com/rshade/ax-go/examples/integration` | 85% |
 | `github.com/rshade/ax-go/internal/cli` | 100% |
+| `github.com/rshade/ax-go/internal/cmd/benchcheck` | 80% |
 | `github.com/rshade/ax-go/internal/cmd/doccover` | 45% |
 | `github.com/rshade/ax-go/internal/config` | 65% |
 | `github.com/rshade/ax-go/internal/mcp` | 90% |
@@ -278,6 +279,102 @@ each offending package with its actual%, floor%, and shortfall on stderr), and
 Floors escalate in 5pp increments as tests are added. The goal is to reach 80%
 per-package and 85% repo-wide by moving the excluded packages into per-package
 enforcement first, which is the most direct path to raising the repo-wide floor.
+
+## Performance Regression Budget
+
+Performance is gated in CI by `internal/cmd/benchcheck`, which compares a
+fresh current-worktree `-count=10` benchmark run against a same-host
+benchmark run from the PR's base commit using
+`golang.org/x/perf/benchstat`'s statistical comparison. The gate is
+authoritative. Both benchmark runs use `-cpu=1` so benchmark names do not
+depend on host core count (`BenchmarkFoo-1` on every machine), and no
+committed benchmark output bakes in one developer laptop or one GitHub
+runner generation. Budget thresholds are hardcoded Go constants in
+`internal/cmd/benchcheck/main.go`, so every threshold change is a reviewable
+commit auditable via `git blame`.
+
+### Tracked Benchmarks
+
+| Benchmark | Hot path |
+|-----------|----------|
+| `BenchmarkLoggerEmit/*`, `BenchmarkLoggerTracingHook/*`, `BenchmarkLoggerFieldShapes/*`, `BenchmarkLogger/*`, `BenchmarkLoggerDisabledLevel` | Logger emit path |
+| `BenchmarkParseConfigBoundedRead/*`, `BenchmarkParseConfigDefaultCapRead` | Hujson/config parse path |
+| `BenchmarkBuildCommand` | `__schema` reflection path |
+| `BenchmarkWriteError` | Error envelope marshal path |
+
+A benchmark added on the current branch but absent from `BENCH_BASE_REF` is
+absent from the comparison until it lands on the base branch — this is not a
+failure condition.
+
+Conversely, a benchmark present in `BENCH_BASE_REF` that is **absent from
+the current run** (its package failed to build, it panicked, or it was
+renamed/deleted) is always a hard failure — `benchcheck` detects this case
+explicitly rather than letting it silently vanish from the comparison, since
+`benchstat` itself only compares rows present on both sides and would
+otherwise drop a missing benchmark without any signal.
+
+### Budget
+
+| Metric | Budget | Notes |
+|--------|--------|-------|
+| `ns/op` | 5% increase | Counted only when `benchstat` marks the delta statistically significant (α=0.05) |
+| `allocs/op` | +1 increase | Absolute, not percentage — most tracked benchmarks report 0 allocs/op, where a percentage threshold is undefined |
+
+A benchmark failing either budget independently fails the check; a
+benchmark can fail on time, allocations, or both, and the failure message
+identifies each independently.
+
+### Local Verification (Benchmarks)
+
+Run the exact same check CI runs:
+
+```bash
+make bench-check
+```
+
+`make bench-check` creates a temporary git worktree for `BENCH_BASE_REF`,
+runs `go test -run='^$' -bench=. -cpu=1 -count=10 -benchmem ./...` there,
+runs the same command in the current worktree, and compares the two files.
+CI sets `BENCH_BASE_REF` to the pull request base SHA. Locally, it defaults
+to `git merge-base HEAD origin/main`, then `HEAD~1` if `origin/main` is not
+available; override it when needed:
+
+```bash
+BENCH_BASE_REF=HEAD~1 make bench-check
+```
+
+Or step by step:
+
+```bash
+BENCH_BASE_REF="${BENCH_BASE_REF:-$(git merge-base HEAD origin/main 2>/dev/null || git rev-parse --verify --quiet HEAD~1)}"
+git worktree add --detach /tmp/ax-go-bench-base "$BENCH_BASE_REF"
+(cd /tmp/ax-go-bench-base && go test -run='^$' -bench=. -cpu=1 -count=10 -benchmem ./... > /tmp/bench-base.txt)
+go test -run='^$' -bench=. -cpu=1 -count=10 -benchmem ./... > /tmp/bench-current.txt
+go run ./internal/cmd/benchcheck -baseline /tmp/bench-base.txt -current /tmp/bench-current.txt
+git worktree remove --force /tmp/ax-go-bench-base
+```
+
+`benchcheck` exits `0` when every tracked benchmark is within budget, `1` on
+a budget violation (naming each offending benchmark, the exceeded metric,
+and the measured delta on stderr), and `2` on bad input (missing or
+malformed baseline/current file).
+
+### Adjusting the Budget
+
+1. Edit `maxNsOpRegressionPercent` and/or `maxAllocsOpIncrease` in
+   `internal/cmd/benchcheck/main.go`.
+2. Verify locally with `make bench-check`.
+3. The commit message records why the budget changed (budget changes are
+   auditable via `git blame`).
+
+### Accepting Trade-Offs
+
+There is no committed benchmark baseline to update. A reviewed,
+intentional performance trade-off is handled as a policy decision: either
+keep the code within the existing budget or change the budget constants in
+`internal/cmd/benchcheck/main.go` with the rationale in the commit message.
+After the trade-off lands on the base branch, future PRs compare against
+that branch state on their own runner.
 
 ## Documentation Discipline (Contracts, Not Narration)
 
