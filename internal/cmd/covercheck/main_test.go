@@ -343,12 +343,12 @@ func TestDefaultFloorConfig(t *testing.T) {
 	wantPerPackage := map[string]float64{
 		"github.com/rshade/ax-go":                         80.0,
 		"github.com/rshade/ax-go/examples/integration":    85.0,
-		"github.com/rshade/ax-go/internal/cli":            100.0,
+		"github.com/rshade/ax-go/internal/cli":            98.0,
 		"github.com/rshade/ax-go/internal/cmd/benchcheck": 80.0,
 		"github.com/rshade/ax-go/internal/cmd/doccover":   45.0,
 		"github.com/rshade/ax-go/internal/config":         65.0,
-		"github.com/rshade/ax-go/internal/mcp":            90.0,
-		"github.com/rshade/ax-go/internal/schema":         95.0,
+		"github.com/rshade/ax-go/internal/mcp":            96.9,
+		"github.com/rshade/ax-go/internal/schema":         93.0,
 		"github.com/rshade/ax-go/internal/telemetry":      60.0,
 		"github.com/rshade/ax-go/internal/testutil":       25.0,
 	}
@@ -360,6 +360,9 @@ func TestDefaultFloorConfig(t *testing.T) {
 	if len(cfg.perPackage) != len(wantPerPackage) {
 		t.Fatalf("perPackage has %d entries, want %d", len(cfg.perPackage), len(wantPerPackage))
 	}
+	// The exclusion set is intentionally empty: internal/cli, internal/mcp,
+	// and internal/schema were enrolled in per-package enforcement once tests
+	// landed, so every package faces the gate.
 	if len(cfg.excluded) != 0 {
 		t.Fatalf("excluded has %d entries, want 0", len(cfg.excluded))
 	}

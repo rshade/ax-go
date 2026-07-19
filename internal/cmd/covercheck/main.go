@@ -34,9 +34,11 @@ import (
 
 const (
 	// repoWideFloor is the minimum acceptable aggregate coverage percentage
-	// across all packages. Set to 70.0 against the 2026-06-16 measured baseline
-	// of 70.8% (a 0.8pp safety buffer); aspirational target 85%.
-	repoWideFloor = 70.0
+	// across all packages. Raised to 78.0 on 2026-07-17 against a measured
+	// 78.8% (a 0.8pp safety buffer) after internal/cli, internal/mcp, and
+	// internal/schema enrolled in per-package enforcement; aspirational target
+	// 85%. (The initial 70.0 floor tracked the 2026-06-16 baseline of 70.8%.)
+	repoWideFloor = 78.0
 	// defaultPackageFloor applies to any package not listed in the per-package
 	// floor map, so a newly added package faces a non-trivial gate by default.
 	defaultPackageFloor = 25.0
@@ -126,8 +128,10 @@ func (c floorConfig) floorFor(importPath string) float64 {
 
 // defaultFloorConfig returns the production coverage policy, calibrated to the
 // 2026-06-16 baseline. See AGENTS.md "Coverage Policy" for the authoritative
-// table and the escalation plan. The excluded packages have 0% baseline
-// coverage and are pending tests; they still count toward the repo-wide floor.
+// table and the escalation plan. internal/cli, internal/mcp, and
+// internal/schema were enrolled in per-package enforcement on 2026-07-17 once
+// tests landed (floors set ~2pp below their measured coverage), so the
+// exclusion set is intentionally empty: every package faces the gate.
 //
 //nolint:mnd // per-package floor percentages are policy data documented in AGENTS.md, not magic numbers
 func defaultFloorConfig() floorConfig {
@@ -137,12 +141,12 @@ func defaultFloorConfig() floorConfig {
 		perPackage: map[string]float64{
 			"github.com/rshade/ax-go":                         80.0,
 			"github.com/rshade/ax-go/examples/integration":    85.0,
-			"github.com/rshade/ax-go/internal/cli":            100.0,
+			"github.com/rshade/ax-go/internal/cli":            98.0,
 			"github.com/rshade/ax-go/internal/cmd/benchcheck": 80.0,
 			"github.com/rshade/ax-go/internal/cmd/doccover":   45.0,
 			"github.com/rshade/ax-go/internal/config":         65.0,
-			"github.com/rshade/ax-go/internal/mcp":            90.0,
-			"github.com/rshade/ax-go/internal/schema":         95.0,
+			"github.com/rshade/ax-go/internal/mcp":            96.9,
+			"github.com/rshade/ax-go/internal/schema":         93.0,
 			"github.com/rshade/ax-go/internal/telemetry":      60.0,
 			"github.com/rshade/ax-go/internal/testutil":       25.0,
 		},

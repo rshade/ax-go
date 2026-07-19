@@ -12,14 +12,16 @@
 📖 **Documentation:** <https://rshade.github.io/ax-go/>
 
 > **Status: Released (pre-v1.0, `0.x`).** The current pinnable release is
-> **v0.2.0**: `go get github.com/rshade/ax-go@v0.2.0`. Output contracts are
+> **v0.3.0**: `go get github.com/rshade/ax-go@v0.3.0`. Output contracts are
 > frozen in code — core primitives such as `ax.Error`, `ax.Execute`,
 > `ax.NewLogger`, `ax.ParseConfig`, and `ax.NewEntityID` are covered by
 > contract tests, and all public output shapes are pinned by golden fixtures.
-> v0.2.0 adds the import-isolated contract packages (`contract`, `config`,
-> `schema`, `id`) for thin consumers. Releases are tagged by release-please
-> from the Conventional Commit history; see
-> [CHANGELOG.md](CHANGELOG.md) for release history.
+> v0.2.0 added the import-isolated contract packages (`contract`, `config`,
+> `schema`, `id`) for thin consumers; v0.3.0 adds the public `mcp` package
+> (`mcp.Serve`, `mcp.NewCommand`), the `ax.Guard` / `ax.Perform` dry-run
+> side-effect guards, and the `retryable` / `retry_after_seconds` error
+> recovery fields. Releases are tagged by release-please from the Conventional
+> Commit history; see [CHANGELOG.md](CHANGELOG.md) for release history.
 >
 > **Stability guarantee while in `0.x`:** a **patch** upgrade (`0.x.PATCH`) is
 > always safe — patch releases are bug-fixes-only and stay backward-compatible.
@@ -407,16 +409,9 @@ The same resolved value feeds `__schema.version`, the `ax.Error` envelope
 
 ## Roadmap
 
-Sequenced from the accepted ADRs and the current scaffold:
-
-1. **Harden `__schema`** — enforce example coverage, expand output-mode
-   declarations, and mature the MCP adapter owned by the `schema` package.
-2. **Implement Loki direct push** — keep stderr shipping as the default and add
-   opt-in `AX_LOKI_URL` direct push from
-   [ADR-0006](docs/adr/0006-loki-integration.md).
-3. **Expand examples and benchmarks** — keep
-   [`examples/integration/`](examples/integration/) current with public API
-   changes and benchmark hot paths with `testing.B` / `-benchmem`.
+The live roadmap — immediate focus, sequenced near-term and long-term items,
+and completed milestones — is tracked in [`ROADMAP.md`](ROADMAP.md), with
+every open item filed as a labeled GitHub issue.
 
 ## Compatibility
 

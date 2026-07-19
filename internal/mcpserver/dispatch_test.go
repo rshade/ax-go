@@ -151,7 +151,7 @@ func decodeErrorEnvelope(t *testing.T, payload string) contract.Error {
 
 func mustMultiCall(t *testing.T, d *dispatcher, args map[string]any) contract.Envelope[multiFlagPayload] {
 	t.Helper()
-	res := mustCall(t, d, "demo multi", args)
+	res := mustCall(t, d, "demo-multi", args)
 	if res.IsError {
 		t.Fatalf("unexpected IsError result: %s", resultText(t, res))
 	}
@@ -164,7 +164,7 @@ func mustMultiCall(t *testing.T, d *dispatcher, args map[string]any) contract.En
 func TestDispatchSuccess(t *testing.T) {
 	d := newTestDispatcher(dispatchTestRoot())
 
-	res := mustCall(t, d, "demo echo", map[string]any{"name": "Ada"})
+	res := mustCall(t, d, "demo-echo", map[string]any{"name": "Ada"})
 	if res.IsError {
 		t.Fatalf("unexpected IsError result: %s", resultText(t, res))
 	}
@@ -182,7 +182,7 @@ func TestDispatchSuccess(t *testing.T) {
 func TestDispatchForcesMachineModeOverHumanArg(t *testing.T) {
 	d := newTestDispatcher(dispatchTestRoot())
 
-	res := mustCall(t, d, "demo echo", map[string]any{"name": "x", "format": "human"})
+	res := mustCall(t, d, "demo-echo", map[string]any{"name": "x", "format": "human"})
 	env := decodeEnvelope(t, resultText(t, res))
 	if env.Data.Mode != string(contract.ModeJSON) {
 		t.Errorf("data.mode = %q, want %q", env.Data.Mode, contract.ModeJSON)
@@ -282,10 +282,10 @@ func TestDispatchValidationErrors(t *testing.T) {
 		tool string
 		args map[string]any
 	}{
-		{name: "unknown tool", tool: "demo nope", args: nil},
-		{name: "unknown argument", tool: "demo echo", args: map[string]any{"bogus": "x"}},
-		{name: "dry-run not a bool", tool: "demo echo", args: map[string]any{"dry-run": "yes"}},
-		{name: "idempotency-key not a string", tool: "demo echo", args: map[string]any{"idempotency-key": 7.0}},
+		{name: "unknown tool", tool: "demo-nope", args: nil},
+		{name: "unknown argument", tool: "demo-echo", args: map[string]any{"bogus": "x"}},
+		{name: "dry-run not a bool", tool: "demo-echo", args: map[string]any{"dry-run": "yes"}},
+		{name: "idempotency-key not a string", tool: "demo-echo", args: map[string]any{"idempotency-key": 7.0}},
 	}
 
 	for _, tc := range cases {
@@ -309,7 +309,7 @@ func TestDispatchValidationErrors(t *testing.T) {
 func TestDispatchValidationErrorsContinueTraceContext(t *testing.T) {
 	d := newTestDispatcher(dispatchTestRoot())
 	const traceID = "0af7651916cd43dd8448eb211c80319c"
-	req := callRequest("demo nope", nil)
+	req := callRequest("demo-nope", nil)
 	req.Params.Meta = sdk.Meta{
 		traceParentKey: "00-" + traceID + "-b7ad6b7169203331-01",
 	}
@@ -333,7 +333,7 @@ func TestDispatchValidationErrorsContinueTraceContext(t *testing.T) {
 func TestDispatchFailureKeepsServing(t *testing.T) {
 	d := newTestDispatcher(dispatchTestRoot())
 
-	failRes := mustCall(t, d, "demo fail", nil)
+	failRes := mustCall(t, d, "demo-fail", nil)
 	if !failRes.IsError {
 		t.Fatalf("expected IsError for failing command")
 	}
@@ -341,7 +341,7 @@ func TestDispatchFailureKeepsServing(t *testing.T) {
 		t.Errorf("error_code = %q, want %q", envelope.ErrorCode, "demo_failure")
 	}
 
-	okRes := mustCall(t, d, "demo echo", map[string]any{"name": "after-failure"})
+	okRes := mustCall(t, d, "demo-echo", map[string]any{"name": "after-failure"})
 	if okRes.IsError {
 		t.Fatalf("server stopped serving after a failure: %s", resultText(t, okRes))
 	}
@@ -355,14 +355,14 @@ func TestDispatchFailureKeepsServing(t *testing.T) {
 func TestDispatchRecoversPanic(t *testing.T) {
 	d := newTestDispatcher(dispatchTestRoot())
 
-	res := mustCall(t, d, "demo boom", nil)
+	res := mustCall(t, d, "demo-boom", nil)
 	if !res.IsError {
 		t.Fatalf("expected IsError for panicking command")
 	}
 	if envelope := decodeErrorEnvelope(t, resultText(t, res)); envelope.ErrorCode != "internal_error" {
 		t.Errorf("error_code = %q, want %q", envelope.ErrorCode, "internal_error")
 	}
-	if okRes := mustCall(t, d, "demo echo", map[string]any{"name": "alive"}); okRes.IsError {
+	if okRes := mustCall(t, d, "demo-echo", map[string]any{"name": "alive"}); okRes.IsError {
 		t.Fatalf("server did not survive a panic: %s", resultText(t, okRes))
 	}
 }
@@ -373,17 +373,17 @@ func TestDispatchRecoversPanic(t *testing.T) {
 func TestDispatchAgentSafetyPassthrough(t *testing.T) {
 	d := newTestDispatcher(dispatchTestRoot())
 
-	dryRes := mustCall(t, d, "demo echo", map[string]any{"name": "x", "dry-run": true})
+	dryRes := mustCall(t, d, "demo-echo", map[string]any{"name": "x", "dry-run": true})
 	if env := decodeEnvelope(t, resultText(t, dryRes)); !env.Meta.DryRun {
 		t.Errorf("meta.dry_run = false, want true")
 	}
 
-	keyed := mustCall(t, d, "demo echo", map[string]any{"name": "x", "idempotency-key": "my-key"})
+	keyed := mustCall(t, d, "demo-echo", map[string]any{"name": "x", "idempotency-key": "my-key"})
 	if env := decodeEnvelope(t, resultText(t, keyed)); env.Meta.IdempotencyKey != "my-key" {
 		t.Errorf("meta.idempotency_key = %q, want %q", env.Meta.IdempotencyKey, "my-key")
 	}
 
-	auto := mustCall(t, d, "demo echo", map[string]any{"name": "x"})
+	auto := mustCall(t, d, "demo-echo", map[string]any{"name": "x"})
 	if env := decodeEnvelope(t, resultText(t, auto)); env.Meta.IdempotencyKey == "" {
 		t.Errorf("meta.idempotency_key should be auto-generated when absent")
 	}
@@ -449,7 +449,7 @@ func poisonAssignmentRoot() *cobra.Command {
 func TestDispatchInvalidScalarFlagValueIsValidationError(t *testing.T) {
 	d := newTestDispatcher(multiFlagRoot())
 
-	res := mustCall(t, d, "demo multi", map[string]any{"large-id": "not-an-int"})
+	res := mustCall(t, d, "demo-multi", map[string]any{"large-id": "not-an-int"})
 	if !res.IsError {
 		t.Fatalf("expected IsError for an invalid scalar flag value, got: %s", resultText(t, res))
 	}
@@ -465,7 +465,7 @@ func TestDispatchInvalidScalarFlagValueIsValidationError(t *testing.T) {
 func TestDispatchMissingRequiredFlagIsValidationError(t *testing.T) {
 	d := newTestDispatcher(requiredFlagRoot())
 
-	res := mustCall(t, d, "demo deploy", nil)
+	res := mustCall(t, d, "demo-deploy", nil)
 	if !res.IsError {
 		t.Fatalf("expected IsError for a missing required flag, got: %s", resultText(t, res))
 	}
@@ -479,7 +479,7 @@ func TestDispatchMissingRequiredFlagIsValidationError(t *testing.T) {
 func TestDispatchRequiredFlagSatisfied(t *testing.T) {
 	d := newTestDispatcher(requiredFlagRoot())
 
-	res := mustCall(t, d, "demo deploy", map[string]any{"target": "prod"})
+	res := mustCall(t, d, "demo-deploy", map[string]any{"target": "prod"})
 	if res.IsError {
 		t.Fatalf("unexpected IsError result: %s", resultText(t, res))
 	}
@@ -496,14 +496,14 @@ func TestDispatchRequiredFlagSatisfied(t *testing.T) {
 func TestDispatchRecoversPanicInFlagAssignment(t *testing.T) {
 	d := newTestDispatcher(poisonAssignmentRoot())
 
-	res := mustCall(t, d, "demo poison", map[string]any{"vals": []any{"boom"}})
+	res := mustCall(t, d, "demo-poison", map[string]any{"vals": []any{"boom"}})
 	if !res.IsError {
 		t.Fatalf("expected IsError for a panicking flag assignment, got: %s", resultText(t, res))
 	}
 	if env := decodeErrorEnvelope(t, resultText(t, res)); env.ErrorCode != "internal_error" {
 		t.Errorf("error_code = %q, want %q", env.ErrorCode, "internal_error")
 	}
-	if okRes := mustCall(t, d, "demo ok", nil); okRes.IsError {
+	if okRes := mustCall(t, d, "demo-ok", nil); okRes.IsError {
 		t.Fatalf("server did not survive a flag-assignment panic: %s", resultText(t, okRes))
 	}
 }
@@ -520,7 +520,7 @@ func TestDispatchStreamSeparation(t *testing.T) {
 		Stderr:     &stderr,
 	})
 
-	text := resultText(t, mustCall(t, d, "demo echo", map[string]any{"name": "x"}))
+	text := resultText(t, mustCall(t, d, "demo-echo", map[string]any{"name": "x"}))
 	if strings.Contains(text, echoStderrMarker) {
 		t.Errorf("command stderr leaked into the tool result content:\n%s", text)
 	}

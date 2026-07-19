@@ -1,136 +1,165 @@
-package cli_test
+package cli
 
 import (
 	"testing"
 
 	"github.com/spf13/cobra"
-
-	"github.com/rshade/ax-go/internal/cli"
 )
 
-func newRootCmd() *cobra.Command {
-	return &cobra.Command{Use: "root"}
+// TestFlagConstants pins the exact spellings of the persistent agent-safety
+// flag names. Both ax.Execute's flag installer and the MCP dispatcher resolve
+// these constants as a single source of truth, so a typo here silently forks
+// the two paths — this test makes such a typo fail loudly.
+func TestFlagConstants(t *testing.T) {
+	cases := []struct {
+		name string
+		got  string
+		want string
+	}{
+		{name: "FlagFormat", got: FlagFormat, want: "format"},
+		{name: "FlagDryRun", got: FlagDryRun, want: "dry-run"},
+		{name: "FlagIdempotencyKey", got: FlagIdempotencyKey, want: "idempotency-key"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.got != tc.want {
+				t.Errorf("%s = %q, want %q", tc.name, tc.got, tc.want)
+			}
+		})
+	}
 }
 
+// TestEnsurePersistentStringFlag asserts the install contract: the flag lands
+// on PersistentFlags (so children inherit it) with the given default and
+// usage, and a second install is a no-op that never overwrites an existing
+// flag of the same name.
 func TestEnsurePersistentStringFlag(t *testing.T) {
-	t.Run("adds the flag when absent", func(t *testing.T) {
-		root := newRootCmd()
-		cli.EnsurePersistentStringFlag(root, cli.FlagFormat, "default", "usage text")
+	root := &cobra.Command{Use: "demo"}
+	EnsurePersistentStringFlag(root, FlagFormat, "json", "output mode")
 
-		flag := root.PersistentFlags().Lookup(cli.FlagFormat)
-		if flag == nil {
-			t.Fatal("expected flag to be added, got nil")
-		}
-		if flag.DefValue != "default" {
-			t.Errorf("DefValue = %q, want %q", flag.DefValue, "default")
-		}
-		if flag.Usage != "usage text" {
-			t.Errorf("Usage = %q, want %q", flag.Usage, "usage text")
-		}
-	})
+	flag := root.PersistentFlags().Lookup(FlagFormat)
+	if flag == nil {
+		t.Fatalf("persistent flag %q was not installed", FlagFormat)
+	}
+	if flag.DefValue != "json" || flag.Usage != "output mode" {
+		t.Errorf("installed flag = (DefValue %q, Usage %q), want (%q, %q)",
+			flag.DefValue, flag.Usage, "json", "output mode")
+	}
 
-	t.Run("is a no-op when the flag already exists", func(t *testing.T) {
-		root := newRootCmd()
-		root.PersistentFlags().String(cli.FlagFormat, "original", "original usage")
-
-		cli.EnsurePersistentStringFlag(root, cli.FlagFormat, "override", "override usage")
-
-		flag := root.PersistentFlags().Lookup(cli.FlagFormat)
-		if flag.DefValue != "original" {
-			t.Errorf("DefValue = %q, want unchanged %q", flag.DefValue, "original")
-		}
-		if flag.Usage != "original usage" {
-			t.Errorf("Usage = %q, want unchanged %q", flag.Usage, "original usage")
-		}
-	})
+	EnsurePersistentStringFlag(root, FlagFormat, "human", "overwritten usage")
+	flag = root.PersistentFlags().Lookup(FlagFormat)
+	if flag.DefValue != "json" || flag.Usage != "output mode" {
+		t.Errorf("second install overwrote the flag: (DefValue %q, Usage %q), want the original (%q, %q)",
+			flag.DefValue, flag.Usage, "json", "output mode")
+	}
 }
 
+// TestEnsurePersistentBoolFlag mirrors TestEnsurePersistentStringFlag for the
+// bool variant: installs on PersistentFlags with the given default, and a
+// repeat install is a no-op.
 func TestEnsurePersistentBoolFlag(t *testing.T) {
-	t.Run("adds the flag when absent", func(t *testing.T) {
-		root := newRootCmd()
-		cli.EnsurePersistentBoolFlag(root, cli.FlagDryRun, true, "usage text")
+	root := &cobra.Command{Use: "demo"}
+	EnsurePersistentBoolFlag(root, FlagDryRun, false, "emit without side effects")
 
-		flag := root.PersistentFlags().Lookup(cli.FlagDryRun)
-		if flag == nil {
-			t.Fatal("expected flag to be added, got nil")
-		}
-		if flag.DefValue != "true" {
-			t.Errorf("DefValue = %q, want %q", flag.DefValue, "true")
-		}
-	})
+	flag := root.PersistentFlags().Lookup(FlagDryRun)
+	if flag == nil {
+		t.Fatalf("persistent flag %q was not installed", FlagDryRun)
+	}
+	if flag.DefValue != "false" || flag.Value.Type() != "bool" {
+		t.Errorf("installed flag = (DefValue %q, Type %q), want (%q, %q)",
+			flag.DefValue, flag.Value.Type(), "false", "bool")
+	}
 
-	t.Run("is a no-op when the flag already exists", func(t *testing.T) {
-		root := newRootCmd()
-		root.PersistentFlags().Bool(cli.FlagDryRun, false, "original usage")
-
-		cli.EnsurePersistentBoolFlag(root, cli.FlagDryRun, true, "override usage")
-
-		flag := root.PersistentFlags().Lookup(cli.FlagDryRun)
-		if flag.DefValue != "false" {
-			t.Errorf("DefValue = %q, want unchanged %q", flag.DefValue, "false")
-		}
-	})
+	EnsurePersistentBoolFlag(root, FlagDryRun, true, "overwritten usage")
+	flag = root.PersistentFlags().Lookup(FlagDryRun)
+	if flag.DefValue != "false" {
+		t.Errorf("second install overwrote the default: DefValue %q, want %q", flag.DefValue, "false")
+	}
 }
 
+// TestLookupFlagString asserts resolution order and the miss contract: a local
+// flag wins, an inherited (parent persistent) flag resolves next, and an
+// unknown name returns "" rather than panicking.
 func TestLookupFlagString(t *testing.T) {
-	t.Run("resolves a local flag", func(t *testing.T) {
-		cmd := &cobra.Command{Use: "child"}
-		cmd.Flags().String("name", "local-value", "usage")
+	cases := []struct {
+		name     string
+		flagName string
+		build    func() *cobra.Command
+		want     string
+	}{
+		{
+			name:     "local flag resolves",
+			flagName: FlagFormat,
+			build: func() *cobra.Command {
+				cmd := &cobra.Command{Use: "demo"}
+				cmd.Flags().String(FlagFormat, "json", "output mode")
+				return cmd
+			},
+			want: "json",
+		},
+		{
+			name:     "inherited persistent flag resolves on the child",
+			flagName: FlagIdempotencyKey,
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo"}
+				root.PersistentFlags().String(FlagIdempotencyKey, "key-1", "idempotency key")
+				child := &cobra.Command{Use: "child"}
+				root.AddCommand(child)
+				return child
+			},
+			want: "key-1",
+		},
+		{
+			name:     "missing flag resolves to empty string",
+			flagName: FlagFormat,
+			build:    func() *cobra.Command { return &cobra.Command{Use: "demo"} },
+			want:     "",
+		},
+	}
 
-		if got := cli.LookupFlagString(cmd, "name"); got != "local-value" {
-			t.Errorf("LookupFlagString() = %q, want %q", got, "local-value")
-		}
-	})
-
-	t.Run("resolves an inherited persistent flag", func(t *testing.T) {
-		root := newRootCmd()
-		root.PersistentFlags().String(cli.FlagFormat, "inherited-value", "usage")
-		child := &cobra.Command{Use: "child"}
-		root.AddCommand(child)
-
-		if got := cli.LookupFlagString(child, cli.FlagFormat); got != "inherited-value" {
-			t.Errorf("LookupFlagString() = %q, want %q", got, "inherited-value")
-		}
-	})
-
-	t.Run("returns empty string for an unknown flag", func(t *testing.T) {
-		cmd := &cobra.Command{Use: "child"}
-
-		if got := cli.LookupFlagString(cmd, "missing"); got != "" {
-			t.Errorf("LookupFlagString() = %q, want empty string", got)
-		}
-	})
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := LookupFlagString(tc.build(), tc.flagName); got != tc.want {
+				t.Errorf("LookupFlagString(%q) = %q, want %q", tc.flagName, got, tc.want)
+			}
+		})
+	}
 }
 
+// TestLookupFlagBool asserts the parse-based bool resolution: bool flags
+// resolve their value (locally or inherited), a missing or unparseable flag
+// resolves false, and a string flag holding a parseable bool resolves through
+// strconv.ParseBool.
 func TestLookupFlagBool(t *testing.T) {
-	tests := []struct {
+	cases := []struct {
 		name  string
-		setup func() *cobra.Command
+		build func() *cobra.Command
 		want  bool
 	}{
 		{
-			name: "true local flag",
-			setup: func() *cobra.Command {
-				cmd := &cobra.Command{Use: "child"}
-				cmd.Flags().Bool(cli.FlagDryRun, true, "usage")
+			name: "local true bool resolves true",
+			build: func() *cobra.Command {
+				cmd := &cobra.Command{Use: "demo"}
+				cmd.Flags().Bool(FlagDryRun, true, "dry run")
 				return cmd
 			},
 			want: true,
 		},
 		{
-			name: "false local flag",
-			setup: func() *cobra.Command {
-				cmd := &cobra.Command{Use: "child"}
-				cmd.Flags().Bool(cli.FlagDryRun, false, "usage")
+			name: "local false bool resolves false",
+			build: func() *cobra.Command {
+				cmd := &cobra.Command{Use: "demo"}
+				cmd.Flags().Bool(FlagDryRun, false, "dry run")
 				return cmd
 			},
 			want: false,
 		},
 		{
-			name: "inherited persistent flag",
-			setup: func() *cobra.Command {
-				root := newRootCmd()
-				root.PersistentFlags().Bool(cli.FlagDryRun, true, "usage")
+			name: "inherited true bool resolves true on the child",
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo"}
+				root.PersistentFlags().Bool(FlagDryRun, true, "dry run")
 				child := &cobra.Command{Use: "child"}
 				root.AddCommand(child)
 				return child
@@ -138,28 +167,34 @@ func TestLookupFlagBool(t *testing.T) {
 			want: true,
 		},
 		{
-			name: "missing flag defaults to false",
-			setup: func() *cobra.Command {
-				return &cobra.Command{Use: "child"}
-			},
-			want: false,
+			name:  "missing flag resolves false",
+			build: func() *cobra.Command { return &cobra.Command{Use: "demo"} },
+			want:  false,
 		},
 		{
-			name: "non-boolean flag value defaults to false",
-			setup: func() *cobra.Command {
-				cmd := &cobra.Command{Use: "child"}
-				cmd.Flags().String(cli.FlagDryRun, "not-a-bool", "usage")
+			name: "unparseable string flag resolves false",
+			build: func() *cobra.Command {
+				cmd := &cobra.Command{Use: "demo"}
+				cmd.Flags().String(FlagDryRun, "notabool", "misdeclared")
 				return cmd
 			},
 			want: false,
 		},
+		{
+			name: "string flag holding a parseable bool resolves through ParseBool",
+			build: func() *cobra.Command {
+				cmd := &cobra.Command{Use: "demo"}
+				cmd.Flags().String(FlagDryRun, "true", "misdeclared")
+				return cmd
+			},
+			want: true,
+		},
 	}
 
-	for _, tc := range tests {
+	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			cmd := tc.setup()
-			if got := cli.LookupFlagBool(cmd, cli.FlagDryRun); got != tc.want {
-				t.Errorf("LookupFlagBool() = %v, want %v", got, tc.want)
+			if got := LookupFlagBool(tc.build(), FlagDryRun); got != tc.want {
+				t.Errorf("LookupFlagBool(%q) = %v, want %v", FlagDryRun, got, tc.want)
 			}
 		})
 	}

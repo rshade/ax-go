@@ -63,7 +63,7 @@ func CollectFlags(cmd *cobra.Command) []Flag {
 			Type:      flag.Value.Type(),
 			Default:   flag.DefValue,
 			Usage:     flag.Usage,
-			Required:  isRequiredFlag(flag),
+			Required:  IsRequiredFlag(flag),
 		})
 	}
 
@@ -81,6 +81,8 @@ func WalkCommands(cmd *cobra.Command, visit func(*cobra.Command)) {
 	}
 }
 
-func isRequiredFlag(flag *pflag.Flag) bool {
+// IsRequiredFlag reports whether flag carries Cobra's required-flag annotation
+// (set via MarkFlagRequired or MarkPersistentFlagRequired).
+func IsRequiredFlag(flag *pflag.Flag) bool {
 	return slices.Contains(flag.Annotations[cobra.BashCompOneRequiredFlag], "true")
 }

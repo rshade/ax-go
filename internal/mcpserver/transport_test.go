@@ -122,12 +122,12 @@ func TestHTTPTransportParity(t *testing.T) {
 	for _, tool := range list.Tools {
 		names[tool.Name] = true
 	}
-	if !names["demo echo"] {
-		t.Errorf("tools/list missing %q over HTTP", "demo echo")
+	if !names["demo-echo"] {
+		t.Errorf("tools/list missing %q over HTTP", "demo-echo")
 	}
 
 	call, err := session.CallTool(ctx, &sdk.CallToolParams{
-		Name:      "demo echo",
+		Name:      "demo-echo",
 		Arguments: map[string]any{"name": "over-http"},
 	})
 	if err != nil {

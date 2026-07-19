@@ -50,6 +50,7 @@ type dispatcher struct {
 	version       string
 	tools         []schema.MCPTool
 	toolNames     map[string]struct{}
+	targets       map[string]*cobra.Command
 	sliceDefaults map[*pflag.Flag][]string
 
 	mu sync.Mutex
@@ -81,7 +82,7 @@ func newDispatcher(ctx context.Context, root *cobra.Command, cfg Config) *dispat
 	root.SilenceUsage = true
 	root.SilenceErrors = true
 
-	tools := discoverTools(root)
+	tools, targets := discoverTools(root)
 	names := make(map[string]struct{}, len(tools))
 	for _, tool := range tools {
 		names[tool.Name] = struct{}{}
@@ -93,6 +94,7 @@ func newDispatcher(ctx context.Context, root *cobra.Command, cfg Config) *dispat
 		version:       cfg.Version,
 		tools:         tools,
 		toolNames:     names,
+		targets:       targets,
 		sliceDefaults: snapshotSliceDefaults(root),
 		stderr:        cfg.Stderr,
 	}
@@ -190,11 +192,14 @@ func (d *dispatcher) newCallContext(reqCtx context.Context) (context.Context, co
 	return callCtx, cancel
 }
 
-// resolveTarget returns the Cobra command for a discovered tool name.
+// resolveTarget returns the Cobra command a discovered tool name maps to. The
+// mapping is snapshotted at discovery because tool names join path segments
+// with "-", which is not safely invertible (command names may themselves
+// contain hyphens, e.g. mcp-server).
 func (d *dispatcher) resolveTarget(name string) (*cobra.Command, error) {
-	target, _, err := d.root.Find(toolPathArgs(d.root, name))
-	if err != nil {
-		return nil, fmt.Errorf("resolve tool %q: %w", name, err)
+	target, ok := d.targets[name]
+	if !ok {
+		return nil, fmt.Errorf("resolve tool %q: not in the discovered tool set", name)
 	}
 	return target, nil
 }
@@ -271,7 +276,7 @@ func (d *dispatcher) buildArgs(
 	flagArgs = append(flagArgs, "--"+idempotencyKeyFlagName+"="+cc.idempotencyKey)
 	sort.Strings(flagArgs)
 
-	return append(toolPathArgs(d.root, name), flagArgs...), assignments, cc, nil
+	return append(commandPathArgs(d.root, target), flagArgs...), assignments, cc, nil
 }
 
 func (d *dispatcher) applyCallConfigArg(
@@ -344,7 +349,7 @@ func missingRequiredFlag(allowed map[string]*pflag.Flag, setFlags map[string]str
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		if !isRequiredFlag(allowed[name]) {
+		if !internalschema.IsRequiredFlag(allowed[name]) {
 			continue
 		}
 		if _, ok := setFlags[name]; !ok {
@@ -352,11 +357,6 @@ func missingRequiredFlag(allowed map[string]*pflag.Flag, setFlags map[string]str
 		}
 	}
 	return ""
-}
-
-// isRequiredFlag reports whether flag carries Cobra's required-flag annotation.
-func isRequiredFlag(flag *pflag.Flag) bool {
-	return slices.Contains(flag.Annotations[cobra.BashCompOneRequiredFlag], "true")
 }
 
 // execute runs the prepared argument vector against the shared command tree in
@@ -507,14 +507,17 @@ func decodeArguments(raw json.RawMessage) (map[string]any, error) {
 	return args, nil
 }
 
-// toolPathArgs converts a tool name (a full command path including the root
-// name) into the Cobra argument path beneath the root.
-func toolPathArgs(root *cobra.Command, toolName string) []string {
-	fields := strings.Fields(toolName)
-	if len(fields) > 0 && fields[0] == root.Name() {
-		fields = fields[1:]
+// commandPathArgs returns the subcommand-name path from root to target
+// (excluding root): the Cobra argument vector that selects target. It is built
+// from parent pointers because the MCP tool name cannot be split back into
+// segments (command names may contain the "-" separator themselves).
+func commandPathArgs(root, target *cobra.Command) []string {
+	var reversed []string
+	for cmd := target; cmd != nil && cmd != root; cmd = cmd.Parent() {
+		reversed = append(reversed, cmd.Name())
 	}
-	return fields
+	slices.Reverse(reversed)
+	return reversed
 }
 
 // acceptedFlags returns the flags accepted by cmd (local and inherited).

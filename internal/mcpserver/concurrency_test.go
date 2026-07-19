@@ -31,7 +31,7 @@ func TestConcurrentToolCallsIsolated(t *testing.T) {
 			session := connectHTTP(t, addr)
 			name := fmt.Sprintf("caller-%d", i)
 			res, err := session.CallTool(context.Background(), &sdk.CallToolParams{
-				Name:      "demo echo",
+				Name:      "demo-echo",
 				Arguments: map[string]any{"name": name},
 			})
 			if err != nil {
@@ -92,7 +92,7 @@ func TestShutdownDrainsInFlightCalls(t *testing.T) {
 
 	callResult := make(chan *sdk.CallToolResult, 1)
 	go func() {
-		res, _ := session.CallTool(context.Background(), &sdk.CallToolParams{Name: "demo block"})
+		res, _ := session.CallTool(context.Background(), &sdk.CallToolParams{Name: "demo-block"})
 		callResult <- res
 	}()
 

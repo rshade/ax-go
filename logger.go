@@ -107,6 +107,15 @@ func NewLogger(ctx context.Context, opts ...LoggerOption) Logger {
 		opt(&cfg)
 	}
 
+	// Sanction the configured labels on every Loki sink after all options have
+	// run, so stream-label promotion follows the final label set regardless of
+	// LoggerOption order (WithLokiFromEnv before or after WithLoggerLabels).
+	for _, s := range cfg.additionalSinks {
+		if lw, ok := s.(*lokiWriter); ok {
+			lw.sanctionLabels(cfg.labels)
+		}
+	}
+
 	w := cfg.writer
 	if len(cfg.additionalSinks) > 0 {
 		writers := make([]io.Writer, 0, 1+len(cfg.additionalSinks))
@@ -144,8 +153,15 @@ func (l zerologLogger) WithLabels(labels Labels) Logger {
 	ctx := l.logger.With()
 	ctx = applyLabels(ctx, labels)
 	// Carry sinks forward so ax.Flush still drains buffered entries (e.g. the
-	// Loki sink) on the derived logger. Loki stream labels are extracted from
-	// each emitted log line, so labels added here remain queryable in Loki.
+	// Loki sink) on the derived logger. Sanction the new label pairs on every
+	// Loki sink so they — and only they — are promoted from each emitted log
+	// line into stream labels; payload fields that reuse a label key name stay
+	// payload-only (FR-009).
+	for _, s := range l.sinks {
+		if lw, ok := s.(*lokiWriter); ok {
+			lw.sanctionLabels(labels)
+		}
+	}
 	return zerologLogger{logger: ctx.Logger(), sinks: l.sinks}
 }
 

@@ -590,15 +590,15 @@ func TestMCPServerSmoke(t *testing.T) {
 	for _, tool := range list.Tools {
 		tools[tool.Name] = true
 	}
-	if !tools[appName+" "+streamCommandName] {
-		t.Errorf("tools/list missing %q; got %v", appName+" "+streamCommandName, tools)
+	if !tools[appName+"-"+streamCommandName] {
+		t.Errorf("tools/list missing %q; got %v", appName+"-"+streamCommandName, tools)
 	}
-	if tools[appName+" mcp-server"] {
+	if tools[appName+"-mcp-server"] {
 		t.Error("mcp-server must be excluded from its own tool list")
 	}
 
 	res, err := session.CallTool(ctx, &sdk.CallToolParams{
-		Name:      appName + " " + streamCommandName,
+		Name:      appName + "-" + streamCommandName,
 		Arguments: map[string]any{"count": 2.0, "name": "smoke"},
 	})
 	if err != nil {
@@ -699,7 +699,8 @@ func TestQuickstartAgainstBuiltBinary(t *testing.T) {
 
 // assertQuickstartSession runs the quickstart's initialize -> tools/list ->
 // tools/call sequence and asserts a real version, the expected tool set
-// (mcp-server excluded), and a successful call returning the command payload.
+// (reserved mcp-server, __schema, and completion excluded), and a successful
+// call returning the command payload.
 func assertQuickstartSession(ctx context.Context, t *testing.T, session *sdk.ClientSession) {
 	t.Helper()
 
@@ -716,18 +717,21 @@ func assertQuickstartSession(ctx context.Context, t *testing.T, session *sdk.Cli
 	for _, tool := range list.Tools {
 		tools[tool.Name] = true
 	}
-	if !tools[appName+" "+streamCommandName] {
-		t.Errorf("tools/list missing %q; got %v", appName+" "+streamCommandName, tools)
+	if !tools[appName+"-"+streamCommandName] {
+		t.Errorf("tools/list missing %q; got %v", appName+"-"+streamCommandName, tools)
 	}
-	if tools[appName+" mcp-server"] {
+	if tools[appName+"-mcp-server"] {
 		t.Error("mcp-server must be excluded from its own tool list")
 	}
-	if tools[appName+" __schema"] {
+	if tools[appName+"-__schema"] {
 		t.Error("__schema must be excluded from the tool list")
+	}
+	if tools[appName+"-completion"] {
+		t.Error("completion must be excluded from the tool list")
 	}
 
 	res, err := session.CallTool(ctx, &sdk.CallToolParams{
-		Name:      appName + " " + streamCommandName,
+		Name:      appName + "-" + streamCommandName,
 		Arguments: map[string]any{"count": 2.0, "name": "quickstart"},
 	})
 	if err != nil {

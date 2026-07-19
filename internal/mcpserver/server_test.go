@@ -4,8 +4,10 @@ import (
 	"bytes"
 	"context"
 	"io"
+	"maps"
 	"os"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -22,8 +24,9 @@ func noopRunE(*cobra.Command, []string) error { return nil }
 
 // fixedRoot builds a deterministic command tree exercising every discovery
 // rule: a root with a flag, a leaf command, a parent group with a child, a
-// hidden command, and the two reserved commands (__schema, mcp-server). Only
-// hidden and reserved commands must be excluded from the tool set.
+// hidden leaf, a hidden group with a visible child (subtree pruning), and the
+// reserved commands (__schema, mcp-server, and completion with a child). Only
+// hidden subtrees and reserved commands must be excluded from the tool set.
 func fixedRoot() *cobra.Command {
 	root := &cobra.Command{Use: "demo", Short: "demo root", RunE: noopRunE}
 	root.Flags().String("name", "world", "name to greet")
@@ -38,8 +41,15 @@ func fixedRoot() *cobra.Command {
 	root.AddCommand(group)
 
 	root.AddCommand(&cobra.Command{Use: "secret", Short: "hidden", Hidden: true, RunE: noopRunE})
+	admin := &cobra.Command{Use: "admin", Short: "hidden group", Hidden: true, RunE: noopRunE}
+	admin.AddCommand(&cobra.Command{Use: "reset", Short: "visible child of a hidden group", RunE: noopRunE})
+	root.AddCommand(admin)
+
 	root.AddCommand(&cobra.Command{Use: "__schema", Short: "schema", RunE: noopRunE})
 	root.AddCommand(&cobra.Command{Use: "mcp-server", Short: "server", RunE: noopRunE})
+	completion := &cobra.Command{Use: "completion", Short: "completion scripts", RunE: noopRunE}
+	completion.AddCommand(&cobra.Command{Use: "bash", Short: "bash script", RunE: noopRunE})
+	root.AddCommand(completion)
 
 	return root
 }
@@ -99,20 +109,40 @@ func toolNameSet(tools []schema.MCPTool) map[string]bool {
 
 // TestDiscoverToolsExcludesHiddenAndReserved asserts the callable tool set is
 // exactly the non-hidden, non-reserved commands — parent/group commands and the
-// root included, hidden and __schema/mcp-server excluded (FR-004/005/006, C-2,
-// INV-3).
+// root included; hidden subtrees (a hidden group's visible children included)
+// and the reserved __schema, mcp-server, and completion commands excluded
+// (FR-004/005/006, C-2, INV-3).
 func TestDiscoverToolsExcludesHiddenAndReserved(t *testing.T) {
 	got := toolNameSet(newTestDispatcher(fixedRoot()).tools)
 
-	for _, want := range []string{"demo", "demo greet", "demo group", "demo group child"} {
+	for _, want := range []string{"demo", "demo-greet", "demo-group", "demo-group-child"} {
 		if !got[want] {
 			t.Errorf("expected tool %q to be present", want)
 		}
 	}
-	for _, excluded := range []string{"demo secret", "demo __schema", "demo mcp-server"} {
+	for _, excluded := range []string{
+		"demo-secret", "demo-admin", "demo-admin-reset",
+		"demo-__schema", "demo-mcp-server", "demo-completion", "demo-completion-bash",
+	} {
 		if got[excluded] {
 			t.Errorf("expected tool %q to be excluded", excluded)
 		}
+	}
+}
+
+// TestDiscoverToolsMatchesStaticAdapter asserts the live server's tool set is
+// exactly the static __schema --as=mcp set (fixedRoot has no positional-arg
+// commands, which are the only live-only exclusion): both paths share
+// internal/mcp's walk and reserved-command exclusions, so they cannot diverge
+// (D8, FR-004/005/006, INV-3).
+func TestDiscoverToolsMatchesStaticAdapter(t *testing.T) {
+	static := schema.BuildMCPSchema(fixedRoot())
+	staticNames := toolNameSet(static.Tools)
+
+	liveNames := toolNameSet(newTestDispatcher(fixedRoot()).tools)
+
+	if !maps.Equal(liveNames, staticNames) {
+		t.Errorf("live and static tool sets diverged\nlive:   %v\nstatic: %v", liveNames, staticNames)
 	}
 }
 
@@ -127,11 +157,11 @@ func TestDiscoverToolsExcludesPositionalArgCommands(t *testing.T) {
 	root.AddCommand(&cobra.Command{Use: "list", Short: "list", RunE: noopRunE})
 
 	got := toolNameSet(newTestDispatcher(root).tools)
-	if got["demo get"] {
-		t.Errorf("expected positional-arg command %q to be excluded", "demo get")
+	if got["demo-get"] {
+		t.Errorf("expected positional-arg command %q to be excluded", "demo-get")
 	}
-	if !got["demo list"] {
-		t.Errorf("expected flag-only command %q to be present", "demo list")
+	if !got["demo-list"] {
+		t.Errorf("expected flag-only command %q to be present", "demo-list")
 	}
 }
 
@@ -164,8 +194,9 @@ func TestToolsListGolden(t *testing.T) {
 
 // TestInitializeAndToolsListOverInMemory drives a live client↔server session
 // through initialize and tools/list, asserting the handshake reports the server
-// name and injected version and the live tool set matches discovery (FR-003,
-// C-1/C-2).
+// name and injected version, the live tool set matches discovery, and every
+// advertised tool name satisfies the MCP tool-name rule ^[a-zA-Z0-9_.-]+$
+// (FR-003, C-1/C-2).
 func TestInitializeAndToolsListOverInMemory(t *testing.T) {
 	root := fixedRoot()
 	server := newTestServer(t, root)
@@ -186,16 +217,23 @@ func TestInitializeAndToolsListOverInMemory(t *testing.T) {
 	if err != nil {
 		t.Fatalf("tools/list: %v", err)
 	}
+	namePattern := regexp.MustCompile(`^[a-zA-Z0-9_.-]+$`)
 	live := map[string]bool{}
 	for _, tool := range res.Tools {
+		if !namePattern.MatchString(tool.Name) {
+			t.Errorf("live tool name %q violates the MCP name rule %s", tool.Name, namePattern)
+		}
 		live[tool.Name] = true
 	}
-	for _, want := range []string{"demo", "demo greet", "demo group", "demo group child"} {
+	for _, want := range []string{"demo", "demo-greet", "demo-group", "demo-group-child"} {
 		if !live[want] {
 			t.Errorf("live tools/list missing %q", want)
 		}
 	}
-	for _, excluded := range []string{"demo secret", "demo __schema", "demo mcp-server"} {
+	for _, excluded := range []string{
+		"demo-secret", "demo-admin", "demo-admin-reset",
+		"demo-__schema", "demo-mcp-server", "demo-completion", "demo-completion-bash",
+	} {
 		if live[excluded] {
 			t.Errorf("live tools/list should exclude %q", excluded)
 		}

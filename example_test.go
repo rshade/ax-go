@@ -10,6 +10,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/spf13/cobra"
+
 	ax "github.com/rshade/ax-go"
 )
 
@@ -371,4 +373,145 @@ func ExamplePerform() {
 	// Output:
 	// committing
 	// validating only
+}
+
+// ExampleExecute wraps a Cobra root command with the full AX lifecycle —
+// telemetry, mode resolution, and idempotency-key injection — and maps the
+// result to a deterministic exit code instead of exiting the process. The
+// command reads the resolved values back out of its context. With an explicit
+// --idempotency-key and a buffered, non-TTY stdout the run is fully
+// deterministic: the payload is the only stdout output and stderr stays empty.
+func ExampleExecute() {
+	var stdout, stderr bytes.Buffer
+
+	root := &cobra.Command{
+		Use: "app",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			mode, _ := ax.ModeFromContext(cmd.Context())
+			key, _ := ax.IdempotencyKeyFromContext(cmd.Context())
+			return ax.WriteJSON(cmd.OutOrStdout(), struct {
+				Mode   ax.Mode `json:"mode"`
+				DryRun bool    `json:"dry_run"`
+				Key    string  `json:"key"`
+			}{
+				Mode:   mode,
+				DryRun: ax.DryRunFromContext(cmd.Context()),
+				Key:    key,
+			})
+		},
+	}
+	root.SetArgs([]string{"--dry-run", "--idempotency-key=abc"})
+
+	code := ax.Execute(
+		context.Background(),
+		root,
+		ax.WithStdout(&stdout),
+		ax.WithStderr(&stderr),
+		ax.WithEnv(func(string) string { return "" }),
+		ax.WithStdoutIsTTY(false),
+	)
+
+	fmt.Println("exit:", code)
+	fmt.Print(stdout.String())
+	fmt.Println("stderr bytes:", stderr.Len())
+	// Output:
+	// exit: 0
+	// {"mode":"json","dry_run":true,"key":"abc"}
+	// stderr bytes: 0
+}
+
+// ExampleBuildSchema reflects a Cobra command tree into the versioned,
+// ax-native schema document the reserved __schema command emits on stdout.
+// The output is strict minified JSON with no timestamps or generated IDs, so
+// it is byte-identical across runs.
+func ExampleBuildSchema() {
+	root := &cobra.Command{
+		Use:     "app",
+		Short:   "test app",
+		Example: "app run",
+	}
+	root.Flags().String("config", "", "config file")
+
+	s := ax.BuildSchema(root, ax.WithSchemaVersion("v0.1.0"))
+	if err := ax.WriteJSON(os.Stdout, s); err != nil {
+		fmt.Println("error:", err)
+	}
+	// Output: {"schema_version":"1.0.0","tool":"app","version":"v0.1.0","mode_detection":"--format flag \u003e AGENT_MODE env \u003e TTY detection","command":{"use":"app","short":"test app","example":"app run","flags":[{"name":"config","type":"string","usage":"config file"}]},"error_envelope":{"schema_version":"1.0.0","required":["error_code","message","trace_id","tool","version","schema_version"],"optional":["actionable_fix","context","suggestions"]}}
+}
+
+// ExampleBuildMCPSchema adapts the command tree to the MCP tools-list shape
+// emitted by __schema --as=mcp: each callable command becomes a tool whose
+// inputSchema describes its flags as a JSON Schema object.
+func ExampleBuildMCPSchema() {
+	root := &cobra.Command{
+		Use:   "app",
+		Short: "test app",
+	}
+	root.Flags().String("config", "", "config file")
+
+	mcpSchema := ax.BuildMCPSchema(root)
+	fmt.Println(mcpSchema.Tools[0].Name)
+	fmt.Println(mcpSchema.Tools[0].Description)
+	fmt.Println(mcpSchema.Tools[0].InputSchema["type"])
+	// Output:
+	// app
+	// test app
+	// object
+}
+
+// ExampleSchema shows the ax-native reflective schema tree: tool identity, the
+// build-injected version, the mode-detection rule, the command tree, and the
+// error-envelope contract. The schema carries its own schema_version, so it
+// can evolve independently of the tool version.
+func ExampleSchema() {
+	root := &cobra.Command{
+		Use:   "app",
+		Short: "test app",
+	}
+
+	s := ax.BuildSchema(root, ax.WithSchemaVersion("v0.1.0"))
+	fmt.Println(s.SchemaVersion)
+	fmt.Println(s.Tool)
+	fmt.Println(s.Version)
+	fmt.Println(s.ModeDetection)
+	// Output:
+	// 1.0.0
+	// app
+	// v0.1.0
+	// --format flag > AGENT_MODE env > TTY detection
+}
+
+// ExampleNewLogger builds the canonical structured logger: zerolog-backed,
+// writing to the configured writer (stderr by default), with trace_id and
+// span_id stamped on every line for trace correlation. With no active span
+// the IDs are the zero W3C values, so the output is deterministic.
+func ExampleNewLogger() {
+	var buf bytes.Buffer
+	logger := ax.NewLogger(context.Background(), ax.WithLoggerWriter(&buf))
+	logger.Info(context.Background()).Msg("hello")
+	fmt.Print(buf.String())
+	// Output: {"level":"info","trace_id":"00000000000000000000000000000000","span_id":"0000000000000000","message":"hello"}
+}
+
+// ExampleLogger shows the Logger surface beyond construction: WithLabels
+// derives a logger that stamps low-cardinality labels on every line while
+// keeping trace correlation. Keep labels low-cardinality (environment,
+// application, host, version) — they are indexed in Loki.
+func ExampleLogger() {
+	var buf bytes.Buffer
+	logger := ax.NewLogger(context.Background(), ax.WithLoggerWriter(&buf))
+	labeled := logger.WithLabels(ax.Labels{Application: "app", Version: "v1.2.3"})
+	labeled.Info(context.Background()).Msg("started")
+	fmt.Print(buf.String())
+	// Output: {"level":"info","application":"app","version":"v1.2.3","trace_id":"00000000000000000000000000000000","span_id":"0000000000000000","message":"started"}
+}
+
+// ExampleTelemetry shows the lifecycle guard on Telemetry.Shutdown: it is
+// nil-safe, so a CLI can defer Shutdown unconditionally on the handle —
+// including a zero handle when setup was skipped — without a nil-pointer
+// panic.
+func ExampleTelemetry() {
+	var telemetry *ax.Telemetry
+	fmt.Println(telemetry.Shutdown(context.Background()))
+	// Output: <nil>
 }

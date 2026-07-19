@@ -4,8 +4,9 @@
 // thin and the SDK never leaks past internal/.
 //
 // The engine reflects an adopting CLI's Cobra command tree into MCP tool
-// registrations (reusing schema.BuildMCPSchema, minus hidden and reserved
-// commands), answers the initialize handshake and tools/list, and dispatches
+// registrations (sharing internal/mcp's tool projection with the static
+// "__schema --as=mcp" adapter, so the live and static tool sets cannot
+// diverge), answers the initialize handshake and tools/list, and dispatches
 // each tools/call into an isolated, machine-mode invocation of the command
 // tree. Command stdout is captured verbatim into the tool result; a non-zero
 // exit is mapped to the ax.Error envelope with IsError set, never crashing the

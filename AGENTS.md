@@ -31,10 +31,16 @@ conflicts with the constitution, the constitution wins.
   packages for thin consumers. They must remain import-isolated from the root
   runtime facade, telemetry exporters/SDK setup, logger/Loki, HTTP
   instrumentation, and gRPC runtime adapters.
+- `mcp/` is an approved public package: the thin MCP server runtime surface
+  (`mcp.Serve`, `mcp.NewCommand`) over `internal/mcpserver`, which confines
+  the MCP Go SDK and all protocol mechanics. It belongs to the apidiff-gated
+  public surface but is not an import-isolated contract package; the contract
+  packages must never import it (enforced by `mcp/import_isolation_test.go`).
 - `testdata/` contains golden fixtures for stable public JSON contracts.
-- `cmd/` is reserved for runnable support binaries such as the future
-  `ax-go mcp-server`; do not create placeholder commands before behavior
-  exists.
+- `cmd/` is reserved for runnable support binaries and does not exist yet.
+  The MCP server runtime is not a `cmd/` launcher: spec 011 shipped
+  `mcp.NewCommand`, the reserved `mcp-server` subcommand an adopting CLI
+  mounts itself. Do not create placeholder commands before behavior exists.
 - Do not add `pkg/` or `src/`; public package `ax` lives at the module root
   to preserve the `github.com/rshade/ax-go` import path.
 - `examples/integration/` contains the runnable integration command for
@@ -57,8 +63,9 @@ conflicts with the constitution, the constitution wins.
   - `4`: authentication/permission
 - Every CLI built on ax-go must expose `__schema`, emitting a structured JSON
   description of command tree, flags, types, and examples. A companion
-  `__schema --as=mcp` adapter emits MCP-tool-compatible output so an ax-go CLI
-  can be wrapped as an MCP server via `ax-go mcp-server` with no per-tool work.
+  `__schema --as=mcp` adapter emits MCP-tool-compatible output, and the `mcp`
+  package's reserved `mcp-server` subcommand (`mcp.NewCommand`) runs the same
+  command tree as a live MCP server with no per-tool work.
 - Input accepts Hujson for human convenience on **reads only** — writes emit
   strict JSON (Hujson cannot Marshal comments). To mutate an existing Hujson
   file while preserving user formatting, use the AST `Patch` path
@@ -219,23 +226,25 @@ reviewable commit auditable via `git blame`.
 
 ### Floors
 
-| Scope | Initial Floor | Aspirational Target |
-|-------|---------------|---------------------|
-| Repo-wide (aggregate) | 70% | 85% |
+| Scope | Floor | Aspirational Target |
+|-------|-------|---------------------|
+| Repo-wide (aggregate) | 78% | 85% |
 | Per-package default | 25% | 80% |
 
-Per-package overrides (calibrated to the 2026-06-16 baseline):
+Per-package overrides (the original six calibrated to the 2026-06-16 baseline;
+`internal/cli`, `internal/mcp`, and `internal/schema` calibrated on 2026-07-17
+when they enrolled, ~2pp below their measured coverage):
 
-| Package | Initial Floor |
-|---------|---------------|
+| Package | Floor |
+|---------|-------|
 | `github.com/rshade/ax-go` | 80% |
 | `github.com/rshade/ax-go/examples/integration` | 85% |
-| `github.com/rshade/ax-go/internal/cli` | 100% |
+| `github.com/rshade/ax-go/internal/cli` | 98% |
 | `github.com/rshade/ax-go/internal/cmd/benchcheck` | 80% |
 | `github.com/rshade/ax-go/internal/cmd/doccover` | 45% |
 | `github.com/rshade/ax-go/internal/config` | 65% |
-| `github.com/rshade/ax-go/internal/mcp` | 90% |
-| `github.com/rshade/ax-go/internal/schema` | 95% |
+| `github.com/rshade/ax-go/internal/mcp` | 96.9% |
+| `github.com/rshade/ax-go/internal/schema` | 93% |
 | `github.com/rshade/ax-go/internal/telemetry` | 60% |
 | `github.com/rshade/ax-go/internal/testutil` | 25% |
 
@@ -244,8 +253,11 @@ Any package without an explicit override (including newly added packages and
 
 ### Excluded from Per-Package Floor Enforcement
 
-No packages are currently excluded from the per-package floor gate; every
-package has an explicit override or falls back to the 25% default.
+The exclusion set is empty: every package in the module faces the per-package
+floor gate. The three originally excluded packages (`internal/cli`,
+`internal/mcp`, and `internal/schema`) were enrolled with tests and explicit
+floors on 2026-07-17; retiring their 0% contribution to the aggregate is what
+allowed the repo-wide floor to rise from 70% to 78%.
 
 ### Local Verification
 
@@ -276,9 +288,10 @@ each offending package with its actual%, floor%, and shortfall on stderr), and
 
 ### Escalation Path
 
-Floors escalate in 5pp increments as tests are added. The goal is to reach 80%
-per-package and 85% repo-wide by moving the excluded packages into per-package
-enforcement first, which is the most direct path to raising the repo-wide floor.
+Floors escalate in 5pp increments as tests are added. All packages are now
+under per-package enforcement, so the remaining path to the 80% per-package
+and 85% repo-wide aspirational targets is raising individual package floors —
+and the repo-wide floor with them — as coverage improves.
 
 ## Performance Regression Budget
 
@@ -440,8 +453,8 @@ follows them.
   agents.
 - **Public API diffing in CI.** The `API Diff` workflow
   (`.github/workflows/apidiff.yml`) runs `go-apidiff` on every PR and scopes
-  the result to the public surface — the root package `ax` plus the contract
-  packages `contract`, `config`, `schema`, and `id`. `internal/` is exempt
+  the result to the public surface — the root package `ax` plus the public
+  packages `config`, `contract`, `id`, `mcp`, and `schema`. `internal/` is exempt
   (Constitution Principle XI; the toolchain blocks external import). An
   incompatible change to that surface **fails CI** unless the PR carries the
   `breaking-change-approved` label. Applying the label acknowledges the break
@@ -484,5 +497,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/010-import-isolated-contracts/plan.md
+at specs/013-error-recovery-fields/plan.md
 <!-- SPECKIT END -->

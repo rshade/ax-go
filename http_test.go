@@ -10,6 +10,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"go.opentelemetry.io/otel"
 	"google.golang.org/grpc"
@@ -17,6 +18,44 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
+
+// TestHTTPClientTimeout verifies the timeout contract: NewHTTPClient never
+// returns a client with an unbounded timeout. The default is DefaultHTTPTimeout,
+// WithHTTPTimeout overrides it, and non-positive overrides fall back to the
+// default rather than disabling the timeout.
+func TestHTTPClientTimeout(t *testing.T) {
+	tests := []struct {
+		name string
+		opts []HTTPClientOption
+		want time.Duration
+	}{
+		{name: "default", opts: nil, want: DefaultHTTPTimeout},
+		{name: "override", opts: []HTTPClientOption{WithHTTPTimeout(5 * time.Second)}, want: 5 * time.Second},
+		{name: "zero falls back to default", opts: []HTTPClientOption{WithHTTPTimeout(0)}, want: DefaultHTTPTimeout},
+		{
+			name: "negative falls back to default",
+			opts: []HTTPClientOption{WithHTTPTimeout(-time.Second)},
+			want: DefaultHTTPTimeout,
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			client := NewHTTPClient(tc.opts...)
+			if client.Timeout != tc.want {
+				t.Fatalf("NewHTTPClient().Timeout = %s, want %s", client.Timeout, tc.want)
+			}
+		})
+	}
+}
+
+// TestHTTPClientDefaultTimeout verifies the zero-argument HTTPClient constructor
+// delegates to the default-timeout path, so callers using the original API still
+// get a bounded client.
+func TestHTTPClientDefaultTimeout(t *testing.T) {
+	if got := HTTPClient().Timeout; got != DefaultHTTPTimeout {
+		t.Fatalf("HTTPClient().Timeout = %s, want %s", got, DefaultHTTPTimeout)
+	}
+}
 
 func TestHTTPClientPropagatesActiveSpanTraceparent(t *testing.T) {
 	ctx, telemetry, err := StartTelemetry(
