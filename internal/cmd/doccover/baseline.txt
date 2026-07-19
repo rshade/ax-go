@@ -4,11 +4,3 @@
 # yet have an ExampleXxx. doccover fails only when a required symbol is missing
 # an example AND is not listed here. Remove a line once you add its example.
 # Goal: burn this file down to empty.
-
-BuildMCPSchema
-BuildSchema
-Execute
-Logger
-NewLogger
-Schema
-Telemetry

@@ -6,8 +6,8 @@
 // internal/ packages. The constitution (Principle XI) exempts internal/ from
 // the stability contract: the toolchain blocks external import, so there is no
 // external consumer to break. This tool therefore filters the report down to
-// the public allowlist — the root package ax plus the import-isolated contract
-// packages (contract, config, schema, id) — using exact package-path equality,
+// the public allowlist — the root package ax plus the public packages
+// config, contract, id, mcp, and schema — using exact package-path equality,
 // never a prefix match (the root import path is a literal prefix of every
 // internal/ path).
 //
@@ -59,10 +59,11 @@ const (
 )
 
 // allowedPackages is the single source of truth for ax-go's public API surface:
-// the root package ax plus the import-isolated contract packages. go-apidiff
-// findings for any other package (notably internal/ and examples/) are ignored
-// by the gate. check-packages enforces that this list stays in sync with the
-// module's actual public packages. Keep it sorted.
+// the root package ax plus the public packages config, contract, id, mcp, and
+// schema (the import-isolated contract packages and the thin mcp runtime
+// surface). go-apidiff findings for any other package (notably internal/ and
+// examples/) are ignored by the gate. check-packages enforces that this list
+// stays in sync with the module's actual public packages. Keep it sorted.
 func allowedPackages() []string {
 	return []string{
 		"github.com/rshade/ax-go",

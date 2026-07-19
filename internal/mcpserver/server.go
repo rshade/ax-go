@@ -11,7 +11,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rshade/ax-go/contract"
-	internalschema "github.com/rshade/ax-go/internal/schema"
+	internalmcp "github.com/rshade/ax-go/internal/mcp"
 	"github.com/rshade/ax-go/schema"
 )
 
@@ -26,13 +26,10 @@ const (
 )
 
 const (
-	// schemaCommandName and ServerCommandName are the reserved commands excluded
-	// from the callable tool set (D8, FR-005). ServerCommandName is exported so
-	// the public mcp.NewCommand mounts the same name this engine excludes,
-	// keeping the server from ever listing itself as a callable tool.
-	schemaCommandName = "__schema"
 	// ServerCommandName is the reserved subcommand name an adopting CLI mounts
-	// to expose itself as an MCP server.
+	// to expose itself as an MCP server. It is exported so the public
+	// mcp.NewCommand mounts the same name the discovery walk (internal/mcp)
+	// excludes, keeping the server from ever listing itself as a callable tool.
 	ServerCommandName = "mcp-server"
 
 	// versionDev and versionUnknown are placeholder versions rejected
@@ -135,49 +132,37 @@ func newMCPServer(dispatch *dispatcher, cfg Config) *sdk.Server {
 	return server
 }
 
-// discoverTools projects root's command tree into the callable MCP tool set:
-// schema.BuildMCPSchema(root) (already hidden-filtered) minus the reserved
-// __schema and mcp-server commands (D8, FR-004/005/006, INV-3) and minus any
-// command that requires positional arguments (see commandsRequiringPositionalArgs).
-func discoverTools(root *cobra.Command) []schema.MCPTool {
-	built := schema.BuildMCPSchema(root)
-	uncallable := commandsRequiringPositionalArgs(root)
-	tools := make([]schema.MCPTool, 0, len(built.Tools))
-	for _, tool := range built.Tools {
-		if isReservedTool(tool.Name) {
-			continue
+// discoverTools projects root's command tree into the callable MCP tool set and
+// the name→command target map dispatch uses to resolve calls. The walk shares
+// internal/mcp's traversal with the static __schema --as=mcp adapter — hidden
+// subtrees pruned wholesale, the reserved __schema, mcp-server, and completion
+// commands excluded (D8, FR-004/005/006, INV-3) — so the live and static tool
+// sets cannot diverge. Commands that require positional arguments are excluded
+// on top (see requiresPositionalArgs).
+func discoverTools(root *cobra.Command) ([]schema.MCPTool, map[string]*cobra.Command) {
+	var tools []schema.MCPTool
+	targets := map[string]*cobra.Command{}
+	internalmcp.WalkCallableCommands(root, func(cmd *cobra.Command) {
+		if requiresPositionalArgs(cmd) {
+			return
 		}
-		if _, skip := uncallable[tool.Name]; skip {
-			continue
-		}
-		tools = append(tools, tool)
-	}
-	return tools
-}
-
-// commandsRequiringPositionalArgs returns the set of command paths whose Cobra
-// Args validator rejects a zero-length argument vector. The flat MCP argument
-// object maps only onto flags (positional-argument mapping is a deferred open
-// item), so such a command could never be satisfied by a tools/call. Excluding
-// it keeps the tool list to commands an agent can actually invoke rather than
-// advertising a tool that always fails.
-func commandsRequiringPositionalArgs(root *cobra.Command) map[string]struct{} {
-	uncallable := map[string]struct{}{}
-	internalschema.WalkCommands(root, func(cmd *cobra.Command) {
-		if cmd.Args != nil && cmd.Args(cmd, []string{}) != nil {
-			uncallable[cmd.CommandPath()] = struct{}{}
-		}
+		tool := internalmcp.BuildTool(cmd)
+		tools = append(tools, schema.MCPTool{
+			Name:        tool.Name,
+			Description: tool.Description,
+			InputSchema: tool.InputSchema,
+		})
+		targets[tool.Name] = cmd
 	})
-	return uncallable
+	return tools, targets
 }
 
-// isReservedTool reports whether a tool name's leaf command is reserved
-// (__schema or mcp-server) and must never be exposed as a callable tool.
-func isReservedTool(name string) bool {
-	fields := strings.Fields(name)
-	if len(fields) == 0 {
-		return false
-	}
-	leaf := fields[len(fields)-1]
-	return leaf == schemaCommandName || leaf == ServerCommandName
+// requiresPositionalArgs reports whether cmd's Cobra Args validator rejects a
+// zero-length argument vector. The flat MCP argument object maps only onto
+// flags (positional-argument mapping is a deferred open item), so such a
+// command could never be satisfied by a tools/call. Excluding it keeps the
+// tool list to commands an agent can actually invoke rather than advertising a
+// tool that always fails.
+func requiresPositionalArgs(cmd *cobra.Command) bool {
+	return cmd.Args != nil && cmd.Args(cmd, []string{}) != nil
 }

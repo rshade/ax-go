@@ -104,8 +104,8 @@ func NewSchemaCommand(root *cobra.Command, opts ...Option) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   schemaCommandName,
 		Short: "Emit the AX machine-discoverability schema",
-		Example: `  app __schema
-  app __schema --as=mcp`,
+		Example: fmt.Sprintf("  %s __schema\n  %s __schema --as=mcp",
+			root.Name(), root.Name()),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			switch as {
 			case "", "ax":

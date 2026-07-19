@@ -66,6 +66,8 @@ func WithStdoutIsTTY(isTTY bool) ExecuteOption {
 }
 
 // WithVersion sets the tool version reported in schema and error envelopes.
+// When omitted or empty, Execute falls back to ResolveVersion(""), which
+// resolves build metadata and is never empty.
 func WithVersion(version string) ExecuteOption {
 	return func(cfg *executeConfig) {
 		cfg.version = version
@@ -82,6 +84,15 @@ func WithTelemetryShutdownTimeout(timeout time.Duration) ExecuteOption {
 // Execute wraps Cobra execution with AX mode resolution, idempotency, schema,
 // error-envelope, and telemetry lifecycle behavior. It returns a deterministic
 // exit code and leaves process termination to the caller.
+//
+// The version reported in __schema output and error envelopes comes from
+// WithVersion. When WithVersion is not supplied, Execute falls back to
+// ResolveVersion("") — link-time injection, then Go build metadata, then the
+// "0.0.0-unknown" sentinel — so the version surfaced to agents is never empty.
+//
+// When the command returns an *Error, Execute normalizes a copy of it (filling
+// in trace ID, tool, and version) before writing the envelope to stderr; the
+// caller's *Error value is never mutated.
 func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) int {
 	cfg := executeConfig{
 		stdin:           os.Stdin,
@@ -98,6 +109,9 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	}
 	if cfg.stderr == nil {
 		cfg.stderr = os.Stderr
+	}
+	if cfg.version == "" {
+		cfg.version = ResolveVersion("")
 	}
 	// Serialize all writes to stderr. OTel exporters, zerolog hooks, and the
 	// shutdown diagnostic may write concurrently; a mutex writer prevents
@@ -130,7 +144,7 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	root.SetErr(cfg.stderr)
 
 	if executeErr := root.ExecuteContext(ctx); executeErr != nil {
-		span.SetStatus(codes.Error, "")
+		span.SetStatus(codes.Error, executeErr.Error())
 		axErr := normalizeExecuteError(root.Context(), root.Name(), cfg.version, executeErr)
 		_ = WriteError(cfg.stderr, axErr)
 		return axErr.ExitCode()
@@ -205,22 +219,27 @@ func wrapPersistentPreRun(root *cobra.Command, cfg executeConfig) {
 	}
 }
 
+// normalizeExecuteError fills empty envelope fields (trace ID, tool, version,
+// schema version) on the error the command returned. A caller-supplied *Error
+// is copied first: the caller owns that value and Execute must not mutate it,
+// so normalization lands on the copy while the caller's fields stay untouched.
 func normalizeExecuteError(ctx context.Context, tool, version string, err error) *Error {
 	var axErr *Error
 	if errors.As(err, &axErr) {
-		if axErr.TraceID == "" {
-			axErr.TraceID = TraceIDFromContext(ctx)
+		normalized := *axErr
+		if normalized.TraceID == "" {
+			normalized.TraceID = TraceIDFromContext(ctx)
 		}
-		if axErr.Tool == "" {
-			axErr.Tool = tool
+		if normalized.Tool == "" {
+			normalized.Tool = tool
 		}
-		if axErr.Version == "" {
-			axErr.Version = version
+		if normalized.Version == "" {
+			normalized.Version = version
 		}
-		if axErr.SchemaVersion == "" {
-			axErr.SchemaVersion = ErrorSchemaVersion
+		if normalized.SchemaVersion == "" {
+			normalized.SchemaVersion = ErrorSchemaVersion
 		}
-		return axErr
+		return &normalized
 	}
 
 	return NewError(

@@ -5,11 +5,12 @@
 // (internal/mcpserver): Serve runs the server until its context is canceled,
 // and NewCommand returns the reserved "mcp-server" Cobra subcommand an adopting
 // CLI mounts to expose itself (for example, "mycli mcp-server"). Tools are
-// discovered from the same schema.BuildMCPSchema projection that backs
-// "__schema --as=mcp", so the live tool set stays in lock-step with the static
-// schema. A tools/call dispatches back into the command tree, returning the
-// command's verbatim stdout payload on success and the ax.Error envelope on
-// failure, while the server keeps serving.
+// discovered through the same internal/mcp projection (WalkCallableCommands
+// and BuildTool) that backs the static "__schema --as=mcp" adapter, so the
+// live tool set stays in lock-step with the static schema. A tools/call
+// dispatches back into the command tree, returning the command's verbatim
+// stdout payload on success and the ax.Error envelope on failure, while the
+// server keeps serving.
 //
 // The server runs over stdio (the default) or a streamable HTTP transport that
 // binds loopback by default and fails closed against accidental public exposure

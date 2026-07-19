@@ -787,11 +787,21 @@ func TestLokiURL_RejectsNonHTTPScheme(t *testing.T) {
 
 // TestLokiWriter_ContextCancelStopsGoroutine validates that cancelling the
 // context passed to NewLogger stops the background run goroutine (it closes its
-// done channel). Regression guard for the goroutine ignoring the logger context
-// and only exiting via Flush.
+// done channel) AND that the final flush on ctx.Done() actually delivers the
+// queued batch: no ax.Flush call and no 1-second ticker wait are involved, so
+// the cancel path (flushRemaining) is the only mechanism that can have pushed
+// the line. Regression guard for the goroutine ignoring the logger context and
+// for a dead final-flush backstop.
 func TestLokiWriter_ContextCancelStopsGoroutine(t *testing.T) {
+	var mu sync.Mutex
+	var bodies [][]byte
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, _ = io.ReadAll(r.Body)
+		if r.URL.Path == "/loki/api/v1/push" {
+			body, _ := io.ReadAll(r.Body)
+			mu.Lock()
+			bodies = append(bodies, body)
+			mu.Unlock()
+		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
 	defer srv.Close()
@@ -811,6 +821,8 @@ func TestLokiWriter_ContextCancelStopsGoroutine(t *testing.T) {
 		t.Fatalf("sink is %T, want *lokiWriter", zl.sinks[0])
 	}
 
+	// Write is synchronous, so the line is queued in the channel before
+	// cancel() runs and must be collected by the ctx.Done() final flush.
 	l.Info(context.Background()).Msg("ctx cancel test")
 	cancel()
 
@@ -819,5 +831,201 @@ func TestLokiWriter_ContextCancelStopsGoroutine(t *testing.T) {
 		// goroutine exited in response to context cancellation — pass.
 	case <-time.After(3 * time.Second):
 		t.Fatal("run goroutine did not exit after context cancellation")
+	}
+
+	// lw.done closes only after flushRemaining returns, so any delivered push
+	// has already been recorded by the handler at this point.
+	mu.Lock()
+	captured := bodies
+	mu.Unlock()
+	if len(captured) == 0 {
+		t.Fatal("context cancellation lost the queued batch: expected the final flush to deliver it, got 0 pushes")
+	}
+	found := false
+	for _, body := range captured {
+		if strings.Contains(string(body), "ctx cancel test") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatalf("final flush pushed %d batch(es) but none contain the queued log line", len(captured))
+	}
+}
+
+// TestLokiStreamLabels_PayloadFieldsStayPayload is the FR-009 / Constitution
+// VIII regression guard for key-collision promotion: a log line carrying
+// high-cardinality payload fields — user_id, durations, resource IDs, and a
+// request-scoped field that reuses a label key name (.Str("host", req.Host)) —
+// must NOT have those fields promoted into the Loki stream label set. Only
+// label (key, value) pairs declared through WithLoggerLabels or
+// Logger.WithLabels may be promoted; everything else stays payload-only.
+func TestLokiStreamLabels_PayloadFieldsStayPayload(t *testing.T) {
+	var mu sync.Mutex
+	var bodies [][]byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/loki/api/v1/push" {
+			body, _ := io.ReadAll(r.Body)
+			mu.Lock()
+			bodies = append(bodies, body)
+			mu.Unlock()
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	t.Setenv("AX_LOKI_URL", srv.URL)
+	l := NewLogger(context.Background(),
+		WithLoggerWriter(io.Discard),
+		WithLokiFromEnv(),
+	)
+	l.Info(context.Background()).
+		Str("user_id", "u-8f3c0a1b").
+		Str("host", "api.example.com:8443").
+		Int64("duration_ms", 187).
+		Str("resource_id", "01890d3e-2b7a-7c9e-9a1e-9f3c0a1b2c3d").
+		Msg("request payload fields")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = Flush(ctx, l)
+
+	mu.Lock()
+	captured := bodies
+	mu.Unlock()
+	if len(captured) == 0 {
+		t.Fatal("expected at least one push request, got 0")
+	}
+
+	// No label pairs were declared on this logger, so only the always-present
+	// level label is permitted on any stream.
+	for _, stream := range collectPushStreamLabels(t, captured) {
+		for key, value := range stream {
+			if key != lokiLabelLevel {
+				t.Errorf("payload field promoted to stream label %q=%q; only %q is permitted",
+					key, value, lokiLabelLevel)
+			}
+		}
+	}
+
+	// The fields must still be present in the pushed log-line body: payload,
+	// not labels.
+	found := false
+	for _, body := range captured {
+		if strings.Contains(string(body), "api.example.com:8443") {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Error("payload field values must remain in the pushed log line body")
+	}
+}
+
+// TestLokiStreamLabels_DeclaredLabelsPromotedByValue pins the value-sanction
+// half of the FR-009 contract: a label declared via WithLoggerLabels IS
+// promoted (host="pod-1"), but a per-line field that reuses the label key with
+// a different, undeclared value (a request host override) is NOT promoted.
+func TestLokiStreamLabels_DeclaredLabelsPromotedByValue(t *testing.T) {
+	var mu sync.Mutex
+	var bodies [][]byte
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/loki/api/v1/push" {
+			body, _ := io.ReadAll(r.Body)
+			mu.Lock()
+			bodies = append(bodies, body)
+			mu.Unlock()
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	t.Setenv("AX_LOKI_URL", srv.URL)
+	want := Labels{Environment: "prod", Host: "pod-1"}
+	l := NewLogger(context.Background(),
+		WithLoggerWriter(io.Discard),
+		WithLoggerLabels(want),
+		WithLokiFromEnv(),
+	)
+	l.Info(context.Background()).Msg("declared labels")
+	l.Info(context.Background()).Str("host", "tenant-42.example.com").Msg("per-line host override")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	_ = Flush(ctx, l)
+
+	mu.Lock()
+	captured := bodies
+	mu.Unlock()
+	streams := collectPushStreamLabels(t, captured)
+	if !hasStreamLabels(streams, want) {
+		t.Fatalf("declared labels were not promoted; got %#v", streams)
+	}
+	for _, stream := range streams {
+		if stream[lokiLabelHost] == "tenant-42.example.com" {
+			t.Errorf("per-line host override promoted to a stream label: %#v", stream)
+		}
+	}
+}
+
+// TestLokiWriter_ConnectionFailureWarning validates the FR-005 diagnostic
+// contract: when the Loki endpoint is unreachable (connection failure, not a
+// non-2xx response), a bounded warning is written to the logger's configured
+// writer, Flush still returns nil (fail-open), and the diagnostic never leaks
+// the auth token.
+func TestLokiWriter_ConnectionFailureWarning(t *testing.T) {
+	// Start and immediately close a server to get an address that refuses
+	// connections without depending on a well-known unused port.
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	srv.Close()
+
+	t.Setenv("AX_LOKI_URL", srv.URL)
+	t.Setenv("AX_LOKI_AUTH_TOKEN", "super-secret-token")
+	var buf bytes.Buffer
+	l := NewLogger(context.Background(),
+		WithLoggerWriter(&buf),
+		WithLokiFromEnv(),
+	)
+	l.Info(context.Background()).Msg("connection failure test")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := Flush(ctx, l); err != nil {
+		t.Fatalf("Flush must return nil on connection failure, got: %v", err)
+	}
+	got := buf.String()
+	if !strings.Contains(got, "ax: loki push failed") {
+		t.Fatalf("expected connection-failure warning in configured writer, got: %q", got)
+	}
+	if strings.Contains(got, "super-secret-token") {
+		t.Fatalf("diagnostic must not leak the auth token, got: %q", got)
+	}
+}
+
+// TestLokiWriter_DiagnosticsFollowWriterOptionOrder validates that Loki push
+// diagnostics resolve the logger's writer lazily: constructing the sink with
+// WithLokiFromEnv BEFORE WithLoggerWriter must still route diagnostics to the
+// configured writer, not the default stderr in effect when the option ran.
+func TestLokiWriter_DiagnosticsFollowWriterOptionOrder(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	t.Setenv("AX_LOKI_URL", srv.URL)
+	var buf bytes.Buffer
+	l := NewLogger(context.Background(),
+		WithLokiFromEnv(), // before WithLoggerWriter on purpose
+		WithLoggerWriter(&buf),
+	)
+	l.Info(context.Background()).Msg("option order diagnostic test")
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	if err := Flush(ctx, l); err != nil {
+		t.Fatalf("Flush returned error: %v", err)
+	}
+	if !strings.Contains(buf.String(), "ax: loki push returned 503") {
+		t.Fatalf("expected Loki diagnostic in configured writer, got: %q", buf.String())
 	}
 }

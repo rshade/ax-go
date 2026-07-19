@@ -96,9 +96,16 @@ func WithTelemetryShutdownBudget(d time.Duration) TelemetryOption {
 // while still allowing Execute to create a recording root span for log
 // correlation.
 //
-// StartTelemetry is fail-open: telemetry setup failures are reported to stderr
-// and the returned error is reserved for signature compatibility and currently
-// always nil.
+// StartTelemetry unconditionally replaces the process-wide OTel globals: any
+// TextMapPropagator or TracerProvider an embedding application installed via
+// otel.SetTextMapPropagator or otel.SetTracerProvider before this call is
+// discarded. That clobbering is deliberate for now — ax-go targets short-lived
+// CLI processes that own their telemetry lifecycle; cooperating with a
+// pre-installed provider in long-running embedding apps is a known, deferred
+// design decision.
+//
+// StartTelemetry is fail-open: telemetry setup failures are reported to stderr.
+// The error return is reserved for future use and is always nil today.
 func StartTelemetry(ctx context.Context, opts ...TelemetryOption) (context.Context, *Telemetry, error) {
 	if ctx == nil {
 		ctx = context.Background()

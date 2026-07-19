@@ -38,9 +38,10 @@ func NewCommand(root *cobra.Command, opts ...Option) *cobra.Command {
 		Use:   mcpserver.ServerCommandName,
 		Short: "Run this CLI as a live MCP server",
 		Long: "Expose this CLI's command tree as a live Model Context Protocol " +
-			"(MCP) server. Every non-hidden command (minus __schema and mcp-server) " +
-			"becomes a tool; tools/call runs the command in machine mode and returns " +
-			"its payload. Serves over stdio by default, or streamable HTTP (loopback " +
+			"(MCP) server. Every non-hidden command (minus the reserved __schema, " +
+			"mcp-server, and completion commands) becomes a tool; tools/call runs " +
+			"the command in machine mode and returns its payload. Serves over stdio " +
+			"by default, or streamable HTTP (loopback " +
 			"unless --allow-non-loopback is set).",
 		Example: "  mycli mcp-server\n" +
 			"  mycli mcp-server --transport=http --addr=127.0.0.1:8080\n" +
@@ -85,7 +86,7 @@ func parseTransport(ctx context.Context, value string) (mcpserver.Transport, err
 	case transportHTTPValue:
 		return mcpserver.TransportHTTP, nil
 	default:
-		return mcpserver.TransportStdio, contract.NewError(ctx, "validation_error",
+		return 0, contract.NewError(ctx, "validation_error",
 			fmt.Sprintf("mcp: unknown transport %q (want stdio or http)", value),
 			contract.WithErrorExitCode(contract.ExitValidation))
 	}

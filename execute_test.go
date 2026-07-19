@@ -356,6 +356,170 @@ func TestExecuteWritesErrorsToStderr(t *testing.T) {
 	}
 }
 
+// TestExecuteResolvesVersionWhenWithVersionOmitted verifies that Execute never
+// ships an empty version to agent-visible surfaces: when the caller does not
+// pass WithVersion, the error envelope and __schema must carry the
+// ResolveVersion build-info/vcs fallback, which is non-empty by contract.
+func TestExecuteResolvesVersionWhenWithVersionOmitted(t *testing.T) {
+	t.Run("error envelope", func(t *testing.T) {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+
+		root := &cobra.Command{
+			Use: "app",
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				return NewError(cmd.Context(), "validation_error", "bad input", WithErrorExitCode(ExitValidation))
+			},
+		}
+
+		code := Execute(
+			context.Background(),
+			root,
+			WithStdout(&stdout),
+			WithStderr(&stderr),
+			WithEnv(func(string) string { return "" }),
+			WithStdoutIsTTY(false),
+		)
+
+		if code != ExitValidation {
+			t.Fatalf("Execute exit code = %d, want %d", code, ExitValidation)
+		}
+		var got map[string]any
+		if err := json.Unmarshal(stderr.Bytes(), &got); err != nil {
+			t.Fatalf("stderr was not JSON: %v", err)
+		}
+		if got["version"] == "" || got["version"] == nil {
+			t.Fatalf("error envelope version = %v, want non-empty ResolveVersion fallback", got["version"])
+		}
+	})
+
+	t.Run("schema", func(t *testing.T) {
+		var stdout bytes.Buffer
+		var stderr bytes.Buffer
+
+		root := &cobra.Command{
+			Use:   "app",
+			Short: "test app",
+		}
+		root.SetArgs([]string{"__schema"})
+
+		code := Execute(
+			context.Background(),
+			root,
+			WithStdout(&stdout),
+			WithStderr(&stderr),
+			WithEnv(func(string) string { return "" }),
+			WithStdoutIsTTY(false),
+		)
+
+		if code != ExitSuccess {
+			t.Fatalf("Execute exit code = %d, want %d; stderr=%s", code, ExitSuccess, stderr.String())
+		}
+		var got Schema
+		if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+			t.Fatalf("stdout was not schema JSON: %v", err)
+		}
+		if got.Version == "" {
+			t.Fatal("__schema version is empty, want non-empty ResolveVersion fallback")
+		}
+	})
+}
+
+// TestExecuteDoesNotMutateCallerError verifies the non-mutation guarantee:
+// normalizing a caller-returned *Error (filling trace_id, tool, version) must
+// not modify the caller's value, while the emitted envelope still carries the
+// normalized fields and the exit code still maps from the original error.
+func TestExecuteDoesNotMutateCallerError(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	callerErr := NewError(context.Background(), "validation_error", "bad input", WithErrorExitCode(ExitValidation))
+	// NewError stamps ZeroTraceID for a span-less context at construction;
+	// normalization must leave that value — and the empty Tool/Version — as-is.
+	wantTraceID := callerErr.TraceID
+
+	root := &cobra.Command{
+		Use: "app",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return callerErr
+		},
+	}
+
+	code := Execute(
+		context.Background(),
+		root,
+		WithStdout(&stdout),
+		WithStderr(&stderr),
+		WithVersion("v0.1.0"),
+		WithEnv(func(string) string { return "" }),
+		WithStdoutIsTTY(false),
+	)
+
+	if code != ExitValidation {
+		t.Fatalf("Execute exit code = %d, want %d", code, ExitValidation)
+	}
+	if callerErr.TraceID != wantTraceID {
+		t.Fatalf("caller error TraceID mutated to %q, want unchanged %q", callerErr.TraceID, wantTraceID)
+	}
+	if callerErr.Tool != "" {
+		t.Fatalf("caller error Tool mutated to %q, want unchanged (empty)", callerErr.Tool)
+	}
+	if callerErr.Version != "" {
+		t.Fatalf("caller error Version mutated to %q, want unchanged (empty)", callerErr.Version)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(stderr.Bytes(), &got); err != nil {
+		t.Fatalf("stderr was not JSON: %v", err)
+	}
+	if got["tool"] != "app" {
+		t.Fatalf("envelope tool = %v, want normalized value app", got["tool"])
+	}
+	if got["version"] != "v0.1.0" {
+		t.Fatalf("envelope version = %v, want normalized value v0.1.0", got["version"])
+	}
+	if got["trace_id"] == "" || got["trace_id"] == nil {
+		t.Fatalf("envelope trace_id = %v, want normalized non-empty value", got["trace_id"])
+	}
+}
+
+// TestExecuteErrorSpanStatusDescriptionCarriesMessage verifies that a failed
+// command sets the root span's error status description to the error message,
+// not an empty string. The AX_OTEL_DEBUG exporter serializes the span status
+// to stderr, where the description must appear.
+func TestExecuteErrorSpanStatusDescriptionCarriesMessage(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+
+	root := &cobra.Command{
+		Use: "app",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return NewError(cmd.Context(), "validation_error", "bad input", WithErrorExitCode(ExitValidation))
+		},
+	}
+
+	code := Execute(
+		context.Background(),
+		root,
+		WithStdout(&stdout),
+		WithStderr(&stderr),
+		WithEnv(func(key string) string {
+			if key == "AX_OTEL_DEBUG" {
+				return "1"
+			}
+			return ""
+		}),
+		WithStdoutIsTTY(false),
+	)
+
+	if code != ExitValidation {
+		t.Fatalf("Execute exit code = %d, want %d", code, ExitValidation)
+	}
+	if !strings.Contains(stderr.String(), `"Description": "bad input"`) {
+		t.Fatalf("stderr = %q, want span status description carrying the error message", stderr.String())
+	}
+}
+
 func TestExecuteSchemaCommandWritesStdout(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer

@@ -143,7 +143,7 @@ func TestServeInitializeAndToolsList(t *testing.T) {
 	for _, tool := range res.Tools {
 		got[tool.Name] = true
 	}
-	for _, want := range []string{"demo", "demo echo", "demo fail"} {
+	for _, want := range []string{"demo", "demo-echo", "demo-fail"} {
 		if !got[want] {
 			t.Errorf("tools/list missing %q", want)
 		}
@@ -159,7 +159,7 @@ func TestServeToolsCall(t *testing.T) {
 	ctx := context.Background()
 
 	ok, err := session.CallTool(ctx, &sdk.CallToolParams{
-		Name:      "demo echo",
+		Name:      "demo-echo",
 		Arguments: map[string]any{"name": "Ada"},
 	})
 	if err != nil {
@@ -179,7 +179,7 @@ func TestServeToolsCall(t *testing.T) {
 		t.Errorf("data.mode = %q, want json (machine mode forced)", env.Data.Mode)
 	}
 
-	failed, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "demo fail"})
+	failed, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "demo-fail"})
 	if err != nil {
 		t.Fatalf("tools/call fail: %v", err)
 	}
@@ -196,7 +196,7 @@ func TestServeToolsCall(t *testing.T) {
 
 	// The server keeps serving after a tool failure.
 	again, err := session.CallTool(ctx, &sdk.CallToolParams{
-		Name:      "demo echo",
+		Name:      "demo-echo",
 		Arguments: map[string]any{"name": "still-alive"},
 	})
 	if err != nil {

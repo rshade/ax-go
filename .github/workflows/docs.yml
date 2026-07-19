@@ -27,7 +27,7 @@ jobs:
         with:
           submodules: recursive
           # If rshade-theme becomes PRIVATE, the default GITHUB_TOKEN cannot read
-          # it; add a cross-repo PAT here (see specs/009-starlight-docs-site D8):
+          # it; add a cross-repo PAT here (see specs/014-starlight-docs-site D8):
           # token: ${{ secrets.THEME_REPO_TOKEN }}
 
       - name: Set up Node

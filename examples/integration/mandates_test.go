@@ -217,9 +217,10 @@ func TestRunGeneratesIdempotencyKeyWhenAbsent(t *testing.T) {
 }
 
 // TestRunSchemaMCPAdapter covers Core AX Mandate #4: __schema --as=mcp emits the
-// MCP-compatible tools list. The static adapter reflects the entire command tree
-// (including the reserved __schema command) — distinct from the live mcp-server,
-// which filters reserved commands out of tools/list (asserted by
+// MCP-compatible tools list. Tool names join command-path segments with "-" (the
+// MCP tool-name rule ^[a-zA-Z0-9_.-]+$ forbids spaces), and the static adapter
+// shares the live mcp-server's exclusion set: the reserved __schema, mcp-server,
+// and completion commands never surface as tools (the live path is asserted by
 // TestQuickstartAgainstBuiltBinary).
 func TestRunSchemaMCPAdapter(t *testing.T) {
 	code, stdout, stderr := runCapture(t, []string{"__schema", "--as=mcp"}, emptyEnv)
@@ -236,14 +237,22 @@ func TestRunSchemaMCPAdapter(t *testing.T) {
 		names[tool.Name] = true
 	}
 	for _, want := range []string{
-		appName + " " + streamCommandName,
-		appName + " " + fetchCommandName,
-		appName + " " + authzCommandName,
-		appName + " " + crashCommandName,
-		appName + " " + schemaCommandName,
+		appName + "-" + streamCommandName,
+		appName + "-" + fetchCommandName,
+		appName + "-" + authzCommandName,
+		appName + "-" + crashCommandName,
 	} {
 		if !names[want] {
 			t.Fatalf("mcp tools missing %q; got %v", want, names)
+		}
+	}
+	for _, excluded := range []string{
+		appName + "-" + schemaCommandName,
+		appName + "-mcp-server",
+		appName + "-completion",
+	} {
+		if names[excluded] {
+			t.Fatalf("reserved command %q leaked into mcp tools; got %v", excluded, names)
 		}
 	}
 }

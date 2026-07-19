@@ -1,8 +1,11 @@
 GOLANGCI_LINT?=$(HOME)/go/bin/golangci-lint
 GOLANGCI_LINT_VERSION?=2.12.2
 MARKDOWNLINT?=markdownlint
-MARKDOWNLINT_FILES?=AGENTS.md README.md .github/copilot-instructions.md docs/**/*.md
+MARKDOWNLINT_VERSION?=0.49.0
+MARKDOWNLINT_FILES?=AGENTS.md README.md CONTRIBUTING.md .github/copilot-instructions.md docs/**/*.md
 ACTIONLINT?=$(HOME)/go/bin/actionlint
+ACTIONLINT_VERSION?=1.7.12
+GOVULNCHECK_VERSION?=1.6.0
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.0-unknown)
 BENCH_CPU?=1
 BENCH_COUNT?=10
@@ -99,7 +102,7 @@ lint:
 	@echo "Running markdownlint..."
 	@command -v $(MARKDOWNLINT) >/dev/null 2>&1 || \
 		(echo "markdownlint CLI not found. Install with"; \
-		echo "  npm install -g markdownlint-cli@0.45.0"; exit 1)
+		echo "  npm install -g markdownlint-cli@$(MARKDOWNLINT_VERSION)"; exit 1)
 	$(MARKDOWNLINT) $(MARKDOWNLINT_FILES)
 	@$(MAKE) lint-actions
 
@@ -108,7 +111,7 @@ lint-actions:
 	@echo "Running actionlint..."
 	@command -v $(ACTIONLINT) >/dev/null 2>&1 || \
 		(echo "actionlint not found. Install with"; \
-		echo "  go install github.com/rhysd/actionlint/cmd/actionlint@latest"; exit 1)
+		echo "  go install github.com/rhysd/actionlint/cmd/actionlint@v$(ACTIONLINT_VERSION)"; exit 1)
 	find .github/workflows -name '*.yml' -not -name '*.lock.yml' -print0 | xargs -0 $(ACTIONLINT)
 
 .PHONY: validate
@@ -124,7 +127,7 @@ validate:
 .PHONY: security
 security:
 	@echo "Running govulncheck..."
-	@command -v govulncheck >/dev/null 2>&1 || go install golang.org/x/vuln/cmd/govulncheck@latest
+	@command -v govulncheck >/dev/null 2>&1 || go install golang.org/x/vuln/cmd/govulncheck@v$(GOVULNCHECK_VERSION)
 	govulncheck ./...
 
 .PHONY: ensure
@@ -143,8 +146,8 @@ ensure-golangci-lint:
 ensure-markdownlint:
 	@echo "==> markdownlint-cli"
 	@command -v $(MARKDOWNLINT) >/dev/null 2>&1 || \
-		(echo "    Installing markdownlint-cli@0.45.0..." && \
-		npm install -g markdownlint-cli@0.45.0)
+		(echo "    Installing markdownlint-cli@$(MARKDOWNLINT_VERSION)..." && \
+		npm install -g markdownlint-cli@$(MARKDOWNLINT_VERSION))
 	@echo "    OK"
 
 .PHONY: ensure-actionlint
@@ -152,7 +155,7 @@ ensure-actionlint:
 	@echo "==> actionlint"
 	@command -v $(ACTIONLINT) >/dev/null 2>&1 || \
 		(echo "    Installing actionlint..." && \
-		go install github.com/rhysd/actionlint/cmd/actionlint@latest)
+		go install github.com/rhysd/actionlint/cmd/actionlint@v$(ACTIONLINT_VERSION))
 	@echo "    OK"
 
 .PHONY: clean
