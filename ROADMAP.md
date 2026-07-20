@@ -25,9 +25,11 @@ recovery/remediation fields (#27) — alongside dedicated unit tests for
 `examples/integration` Common DNA audit (#15), `SECURITY.md` (#19), the
 coverage-floor escalation trio for `internal/cli`/`internal/mcp`/`internal/schema`
 (#63–#65), and the CI performance regression budget (#22, `benchstat` via
-`internal/cmd/benchcheck`). **The single-WIP slot in Immediate Focus is now
-open**; #18 (`internal/` migration audit) is the leading epic-promotion
-candidate for the next `/roadmap sync`.
+`internal/cmd/benchcheck`). **#18 (`internal/` migration audit) is now the
+active WIP in Immediate Focus** — promoted 2026-07-19 through its closed
+epic-parent #20 (directory-layout decision). A wave of 20 new AX-surface issues
+(#119–#138) was filed 2026-07-19 (verified against live code before filing) and
+is now tracked across Near-Term and Future Vision below.
 
 ## Vision
 
@@ -40,21 +42,38 @@ primitives, and short-lived-process-correct observability.
 
 Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
 
-*No active WIP — #22 (performance regression budget) shipped 2026-07-08.
-Awaiting the next `/roadmap sync` to promote #18 (see Near-Term Vision).*
-
-## Near-Term Vision (v0.3.0 — governance queue)
-
-**On deck — next promotion:** #18 is now epic-promotion-eligible — its
-blocking directory-layout decision (#17/#20) closed 2026-06-29 — and is the
-leading candidate for Immediate Focus now that #22 has closed.
-
 - [ ] #18 Move remaining non-public helpers under `internal/` before v1.0 [L]
   — keep drawing the public-API boundary while it's still cheap. Unblocked by
   #17/#20 (directory-layout decision, closed 2026-06-29).
+  *Promoted by /roadmap sync on 2026-07-19 — epic-promotion-eligible slot
+  (epic-parent #20 closed); leading candidate now that #22 has shipped.*
+
+## Near-Term Vision (v0.3.0 — governance queue)
+
+**On deck — next promotion:** with #18 now the active WIP, the agent-safety
+envelope trio (#121/#122/#123) filed 2026-07-19 is the leading theme for the
+following slot; #121 (`--yes` no-prompt invariant) is the smallest entry point.
+
+### Agent-safety envelope (new — 2026-07-19)
+
+- [ ] #121 `--yes` no-prompt invariant (`confirmation_required` envelope) [M] —
+  guarantee non-interactive runs never block on a prompt; surface a structured
+  `confirmation_required` signal instead of hanging.
+- [ ] #122 Dry-run-by-default with `--apply` and declared side-effect class [L]
+  — invert the default so mutating commands are safe unless explicitly applied.
+  Extends the shipped #13 `--dry-run` guards.
+- [ ] #123 Structured warnings on the success envelope + `--strict` escalation
+  [M] — non-fatal warnings an agent can read, with opt-in promotion to failure.
+
+### Governance & library queue
+
 - [ ] #69 `covercheck` type-design hardening — derived fields as methods +
   integer floor comparison [S] — two deferred refactors from spec/009; no
   public-API impact.
+- [ ] #119 `WithFlushFunc` ExecuteOption to drain `ax.Flush` on Execute
+  shutdown [S] — deterministic telemetry flush on the Execute lifecycle.
+- [ ] #120 Reconcile SPECKIT plan pointers + dedupe spec dir numbering
+  (011/014) [S] — docs/spec housekeeping; no runtime impact.
 
 ## Future Vision (Long-Term)
 
@@ -98,6 +117,47 @@ in-scope gaps that deepen the machine-contract half of AX.*
   agent-facing descriptions (synopsis, vuln summary, version status). Builds on
   the now-shipped #10 wrapper; *blocked on pkg.go.dev `v1` stable API.*
 
+### Agent-contract deepening (new — 2026-07-19)
+
+*Filed 2026-07-19 from the `kimi-features` audit; each verified as
+not-yet-implemented against live code before filing. All widen the
+machine-contract half of AX (discoverability, error detail, agent-safety) and
+route through a Spec Kit feature — plus a Constitution amendment where they add
+a runtime contract.*
+
+- [ ] #124 Field-level validation detail (`violations`) on the exit-2 error
+  envelope [M] — per-field failure structure so an agent can self-correct input.
+- [ ] #125 Structured "did you mean" suggestions in the agent-mode error
+  envelope [S] — typo/near-miss command + flag hints as data.
+- [ ] #126 Scope `__schema` output to a command subtree via positional path
+  [M] — emit only the relevant slice of the command tree.
+- [ ] #127 Surface Cobra deprecation markers in `__schema` and MCP metadata
+  [S] — carry `//Deprecated:` status into the machine contract.
+- [ ] #128 Sensitive-flag marking with guaranteed redaction in schema, logs,
+  and envelopes [M] — one declaration, redacted everywhere (ties to the no-PII
+  guardrail).
+- [ ] #129 Agent-facing `--timeout` flag + expected-duration schema hints [M]
+  — bounded execution with a declared budget agents can plan around.
+- [ ] #130 Structured error envelope + deterministic exit on SIGTERM/SIGINT
+  [M] — signal handling that still emits a clean `ax.Error` and a stable code.
+- [ ] #131 Output budget: `--fields` projection, `--limit`/`--cursor`
+  pagination, `truncated`/`next_cursor` envelope [L] — bound unbounded result
+  sets without breaking determinism.
+- [ ] #132 Cross-environment determinism principle + audit + `testutil` helper
+  [S] — pin byte-identical output across hosts, not just across runs.
+- [ ] #133 Structured NDJSON progress events on `stderr` with MCP
+  `progressToken` mapping [M] — machine-readable progress that bridges to MCP.
+- [ ] #134 `__selftest` read-only probe (version, config validity, dependency
+  reachability) [M] — a safe pre-flight an agent can call before real work.
+- [ ] #135 `resume_token` envelope convention for checkpointable multi-step
+  commands [S] — resumability signal without persisting state in `ax-go`.
+- [ ] #136 Static auth-preflight metadata in `__schema` (contract-declared
+  CLAIM) [M] — declare required auth up front; mechanics still delegated.
+- [ ] #137 Declare per-command MCP elicitation points (contract-first) [M] —
+  schema-declared prompts the MCP layer can drive.
+- [ ] #138 Declare MCP prompts and static resources in the schema contract
+  (contract-first) [M] — contract-first MCP prompt/resource surface.
+
 ### v1.0 readiness & governance
 
 - [ ] #16 `__schema` non-deterministic-field enumeration [M] — declare a
@@ -105,8 +165,6 @@ in-scope gaps that deepen the machine-contract half of AX.*
   with #5.
 - [ ] #24 Supply chain: SBOM + signed releases [M] — CycloneDX SBOM and cosign
   keyless signing on release artifacts.
-- [ ] #25 CI cross-compile matrix [S] — `GOOS`/`GOARCH` build+vet across
-  linux/darwin/windows × amd64/arm64.
 
 ## Completed Milestones
 
@@ -121,6 +179,9 @@ in-scope gaps that deepen the machine-contract half of AX.*
   Shipped via
   [`specs/014-bench-regression-budget`](specs/014-bench-regression-budget/).
   Closed 2026-07-08.
+- [x] #25 CI cross-compile matrix [S] — `GOOS`/`GOARCH` build+vet across
+  linux/darwin/windows × amd64/arm64; wired into CI via PR #105. Closed
+  2026-07-08.
 - [x] #65 `internal/schema` unit tests + coverage floor enrollment [S] —
   removed from `excludedPackages`; calibrated a 95% per-package floor. Closed
   2026-07-06.
