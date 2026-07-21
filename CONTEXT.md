@@ -48,6 +48,17 @@ constitution wins.
 - **Implement domain commands.** It wraps and instruments the adopting CLI's
   commands; it never ships business verbs of its own (beyond the reserved
   `__schema`).
+- **Expose a "code-mode" / batch / `exec` MCP tool.** The MCP bridge maps
+  **one command → one tool**, and `tools/call` runs exactly that command and
+  returns its verbatim payload. `ax-go` never adds a tool that accepts a
+  script, a code string, or a list of sub-commands to run server-side.
+  Composition — loops, chaining, filtering, fan-out — belongs to the calling
+  agent's own runtime (its "code mode"); re-implementing it here would only
+  insert a redundant layer between the agent and the raw command. When callers
+  need to move less data, the answer is a richer *contract* on the raw endpoint
+  (field projection, pagination, progress events — see the `#131`/`#133`
+  roadmap items), not a server-side compute layer. Each granular command *is*
+  the raw endpoint an external code-mode agent should compose against.
 - **Write anything but the machine payload to `stdout`.** Logs, progress,
   diagnostics, and error envelopes go to `stderr` — no exceptions for human
   convenience.

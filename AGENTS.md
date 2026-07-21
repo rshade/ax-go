@@ -392,6 +392,67 @@ keep the code within the existing budget or change the budget constants in
 After the trade-off lands on the base branch, future PRs compare against
 that branch state on their own runner.
 
+## Public Surface Gate
+
+The root `ax` public API surface is gated in CI by
+`internal/cmd/surfacecheck`, which inventories the complete compiler-visible
+root surface (declarations, direct and promoted fields, complete interface
+method sets, value and pointer method sets, alias-attributed members, and
+reachable hidden concrete types) across all six supported GOOS/GOARCH
+profiles and compares it against two committed artifacts:
+
+- `internal/cmd/surfacecheck/baseline.json`: the current approved canonical
+  feature IDs and signatures (schema in
+  `specs/015-internalize-helpers/contracts/baseline-schema.md`).
+- `specs/015-internalize-helpers/public-surface-audit.json`: the permanent,
+  never-delete decision record classifying every feature as `supported` or
+  `implementation-leak` with a lifecycle state (schema in
+  `specs/015-internalize-helpers/contracts/audit-schema.md`).
+
+Run it from the module root:
+
+```bash
+make surface-check
+go run ./internal/cmd/surfacecheck
+```
+
+From a nested directory:
+
+```bash
+make -C "$(git rev-parse --show-toplevel)" surface-check
+```
+
+### Stream and Exit Contract
+
+A pass writes one minified JSON object to stdout and nothing to stderr and
+exits `0`. Every failure writes nothing to stdout and exactly one minified
+`ax.Error` envelope to stderr:
+
+| Error code | Exit | Meaning |
+|------------|------|---------|
+| `surface_drift` | `2` | Source, profiles, baseline, audit state, or a required `Deprecated:` paragraph disagree. |
+| `invalid_surface_artifact` | `2` | Missing, malformed, oversized, unsorted, duplicate, or schema-invalid baseline/audit; invalid flags. |
+| `surface_permission` | `4` | Permission denial reading artifacts or executing tooling. |
+| `surface_internal` | `1` | Unexpected internal failure. |
+
+### Change Protocol
+
+- An intentional live-surface change updates `baseline.json` in the same
+  reviewed PR; an intentional addition also appends a retained audit record
+  (see `specs/015-internalize-helpers/quickstart.md`). Bootstrap candidates
+  come from `go run ./internal/cmd/surfacecheck -list` and `-audit-seed`;
+  both modes are read-only and the seed is invalid until manually classified.
+- Deprecations retain the baseline entry and transition the audit row
+  `live → deprecated`; removal is a follow-up breaking feature that
+  transitions `deprecated → removable → removed` only after a published
+  `0.MINOR.0` carried the notice (Constitution Principle XII).
+- Never hand-tune the gate into silence: an `added` drift means the surface
+  change is unreviewed, not that the baseline should be regenerated blindly.
+
+`internal/cmd/surfacecheck` is an internal command package and faces the 25%
+default per-package coverage floor; it has no explicit override in
+`internal/cmd/covercheck/main.go`.
+
 ## Documentation Discipline (Contracts, Not Narration)
 
 Coding agents read doc comments as much as humans do, and an agent
@@ -500,5 +561,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/013-error-recovery-fields/plan.md
+at specs/015-internalize-helpers/plan.md
 <!-- SPECKIT END -->
