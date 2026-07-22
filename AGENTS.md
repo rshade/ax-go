@@ -66,6 +66,9 @@ conflicts with the constitution, the constitution wins.
   `__schema --as=mcp` adapter emits MCP-tool-compatible output, and the `mcp`
   package's reserved `mcp-server` subcommand (`mcp.NewCommand`) runs the same
   command tree as a live MCP server with no per-tool work.
+- The `non_deterministic_fields` enumeration in `__schema` output is the
+  authoritative source of truth for fields an agent may safely ignore when
+  diffing two runs. Agents must not infer or maintain a separate mask list.
 - Input accepts Hujson for human convenience on **reads only** — writes emit
   strict JSON (Hujson cannot Marshal comments). To mutate an existing Hujson
   file while preserving user formatting, use the AST `Patch` path

@@ -15,9 +15,9 @@ const (
 
 // Metadata carries common machine-readable envelope fields.
 type Metadata struct {
-	TraceID        string `json:"trace_id"`
-	SpanID         string `json:"span_id,omitempty"`
-	IdempotencyKey string `json:"idempotency_key,omitempty"`
+	TraceID        string `json:"trace_id"                  ax:"nondeterministic"`
+	SpanID         string `json:"span_id,omitempty"         ax:"nondeterministic"`
+	IdempotencyKey string `json:"idempotency_key,omitempty" ax:"nondeterministic"`
 	DryRun         bool   `json:"dry_run,omitempty"`
 }
 
