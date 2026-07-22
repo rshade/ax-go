@@ -2,6 +2,7 @@ package schema
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/spf13/cobra"
 
@@ -13,7 +14,10 @@ import (
 // SchemaVersion is the current SemVer version for ax-native schemas.
 const SchemaVersion = contract.ErrorSchemaVersion
 
-const schemaCommandName = "__schema"
+const (
+	schemaCommandName = "__schema"
+	traceIDField      = "trace_id"
+)
 
 // Schema is the ax-native reflective JSON tree emitted by __schema.
 type Schema struct {
@@ -27,19 +31,21 @@ type Schema struct {
 
 // ErrorSchemaInfo describes the shared stderr error envelope.
 type ErrorSchemaInfo struct {
-	SchemaVersion string   `json:"schema_version"`
-	Required      []string `json:"required"`
-	Optional      []string `json:"optional"`
+	SchemaVersion          string   `json:"schema_version"`
+	Required               []string `json:"required"`
+	Optional               []string `json:"optional"`
+	NonDeterministicFields []string `json:"non_deterministic_fields"`
 }
 
 // CommandSchema describes a Cobra command and its direct children.
 type CommandSchema struct {
-	Use      string          `json:"use"`
-	Short    string          `json:"short,omitempty"`
-	Long     string          `json:"long,omitempty"`
-	Example  string          `json:"example,omitempty"`
-	Flags    []FlagSchema    `json:"flags,omitempty"`
-	Commands []CommandSchema `json:"commands,omitempty"`
+	Use                    string          `json:"use"`
+	Short                  string          `json:"short,omitempty"`
+	Long                   string          `json:"long,omitempty"`
+	Example                string          `json:"example,omitempty"`
+	Flags                  []FlagSchema    `json:"flags,omitempty"`
+	Commands               []CommandSchema `json:"commands,omitempty"`
+	NonDeterministicFields []string        `json:"non_deterministic_fields"`
 }
 
 // FlagSchema describes a command flag.
@@ -66,6 +72,17 @@ func WithSchemaVersion(version string) Option {
 	}
 }
 
+// WithNonDeterministicFields registers cmd as emitting the standard success
+// envelope for T. It adds the built-in meta.* locators and records exported
+// fields of T marked ax:"nondeterministic" as data.* locators. Reflection runs
+// once at registration time; a nil command is ignored.
+func WithNonDeterministicFields[T any](cmd *cobra.Command) {
+	if cmd == nil {
+		return
+	}
+	internalschema.RegisterEnvelope(cmd, internalschema.DataLocators(reflect.TypeFor[T]()))
+}
+
 // BuildSchema reflects a Cobra command tree into the ax-native schema.
 func BuildSchema(root *cobra.Command, opts ...Option) Schema {
 	cfg := options{}
@@ -84,7 +101,7 @@ func BuildSchema(root *cobra.Command, opts ...Option) Schema {
 			Required: []string{
 				"error_code",
 				"message",
-				"trace_id",
+				traceIDField,
 				"tool",
 				"version",
 				"schema_version",
@@ -94,6 +111,7 @@ func BuildSchema(root *cobra.Command, opts ...Option) Schema {
 				"context",
 				"suggestions",
 			},
+			NonDeterministicFields: []string{traceIDField},
 		},
 	}
 }
@@ -133,9 +151,10 @@ type MCPSchema struct {
 
 // MCPTool describes one command as an MCP-compatible tool.
 type MCPTool struct {
-	Name        string         `json:"name"`
-	Description string         `json:"description,omitempty"`
-	InputSchema map[string]any `json:"inputSchema"`
+	Name                   string         `json:"name"`
+	Description            string         `json:"description,omitempty"`
+	InputSchema            map[string]any `json:"inputSchema"`
+	NonDeterministicFields []string       `json:"nonDeterministicFields"`
 }
 
 // BuildMCPSchema adapts the command tree to a simple MCP tools list.
@@ -144,9 +163,10 @@ func BuildMCPSchema(root *cobra.Command) MCPSchema {
 	tools := make([]MCPTool, 0, len(mcpSchema.Tools))
 	for _, tool := range mcpSchema.Tools {
 		tools = append(tools, MCPTool{
-			Name:        tool.Name,
-			Description: tool.Description,
-			InputSchema: tool.InputSchema,
+			Name:                   tool.Name,
+			Description:            tool.Description,
+			InputSchema:            tool.InputSchema,
+			NonDeterministicFields: tool.NonDeterministicFields,
 		})
 	}
 	return MCPSchema{Tools: tools}
@@ -154,12 +174,13 @@ func BuildMCPSchema(root *cobra.Command) MCPSchema {
 
 func convertCommandSchema(command internalschema.Command) CommandSchema {
 	schema := CommandSchema{
-		Use:      command.Use,
-		Short:    command.Short,
-		Long:     command.Long,
-		Example:  command.Example,
-		Flags:    convertFlagSchemas(command.Flags),
-		Commands: make([]CommandSchema, 0, len(command.Commands)),
+		Use:                    command.Use,
+		Short:                  command.Short,
+		Long:                   command.Long,
+		Example:                command.Example,
+		Flags:                  convertFlagSchemas(command.Flags),
+		Commands:               make([]CommandSchema, 0, len(command.Commands)),
+		NonDeterministicFields: internalschema.NonDeterministicFields(command.Annotations),
 	}
 
 	for _, child := range command.Commands {

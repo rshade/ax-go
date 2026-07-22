@@ -42,7 +42,7 @@ type helloPayload struct {
 	Greeting string             `json:"greeting"`
 	Name     string             `json:"name"`
 	Mode     string             `json:"mode"`
-	EntityID string             `json:"entity_id"`
+	EntityID string             `json:"entity_id"        ax:"nondeterministic"`
 	Config   *integrationConfig `json:"config,omitempty"`
 }
 
@@ -152,6 +152,7 @@ func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string
 
 	root.Flags().StringVar(&name, "name", "agent", "name to include in the JSON payload")
 	root.Flags().StringVar(&configPath, "config", "", "optional Hujson config file path, or - for stdin")
+	ax.WithNonDeterministicFields[helloPayload](root)
 	root.AddCommand(newStreamCommand())
 	root.AddCommand(newPatchConfigCommand())
 	root.AddCommand(newFailCommand())
@@ -201,6 +202,7 @@ func newStreamCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(&name, "name", "agent", "name to include in each streamed item")
 	cmd.Flags().IntVar(&count, "count", defaultStreamCount, "number of NDJSON items to emit")
+	ax.WithNonDeterministicFields[streamPayload](cmd)
 
 	return cmd
 }
@@ -244,6 +246,7 @@ func newPatchConfigCommand() *cobra.Command {
 
 	cmd.Flags().StringVar(&configPath, "config", "", "Hujson config file path to patch in place")
 	cmd.Flags().StringVar(&patchDoc, "patch", "", "RFC 6902 JSON patch array to apply")
+	ax.WithNonDeterministicFields[patchConfigPayload](cmd)
 
 	return cmd
 }

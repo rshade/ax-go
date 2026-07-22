@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"flag"
 	"os"
 	"path/filepath"
@@ -87,6 +88,174 @@ func TestGoldenSchemaMCP(t *testing.T) {
 		t.Fatalf("exit code = %d, want %d", code, ax.ExitSuccess)
 	}
 	assertGolden(t, "schema_mcp.golden.json", testutil.MaskNonDeterministic([]byte(stdout)))
+}
+
+func TestByteIdenticalModuloNonDeterministicFields(t *testing.T) {
+	schemaOutput, _, schemaCode := runGolden(t, []string{schemaCommandName})
+	if schemaCode != ax.ExitSuccess {
+		t.Fatalf("schema exit code = %d, want %d", schemaCode, ax.ExitSuccess)
+	}
+	var discovered ax.Schema
+	if err := json.Unmarshal([]byte(schemaOutput), &discovered); err != nil {
+		t.Fatalf("decode schema: %v", err)
+	}
+
+	runRoot := func(entityID string) []byte {
+		t.Helper()
+		var stdout, stderr bytes.Buffer
+		code := runWithEntityID(
+			context.Background(),
+			[]string{"--format=json", "--name=Ada"},
+			strings.NewReader(""),
+			&stdout,
+			&stderr,
+			emptyEnv,
+			goldenVersion,
+			func() (string, error) { return entityID, nil },
+		)
+		if code != ax.ExitSuccess {
+			t.Fatalf("root exit code = %d, want %d; stderr=%s", code, ax.ExitSuccess, stderr.String())
+		}
+		return stdout.Bytes()
+	}
+
+	first := runRoot("019744d2-1a5f-7000-8000-000000000001")
+	second := runRoot("019744d2-1a5f-7000-8000-000000000002")
+	if bytes.Equal(first, second) {
+		t.Fatal("unmasked runs are byte-identical, want non-deterministic fields to differ")
+	}
+
+	firstMasked := deleteJSONLocators(t, first, discovered.Command.NonDeterministicFields)
+	secondMasked := deleteJSONLocators(t, second, discovered.Command.NonDeterministicFields)
+	if !bytes.Equal(firstMasked, secondMasked) {
+		t.Fatalf("masked outputs differ\nfirst:  %s\nsecond: %s", firstMasked, secondMasked)
+	}
+}
+
+func deleteJSONLocators(t *testing.T, payload []byte, locators []string) []byte {
+	t.Helper()
+	var document map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &document); err != nil {
+		t.Fatalf("decode command output: %v", err)
+	}
+	for _, locator := range locators {
+		deleteJSONPath(t, document, strings.Split(locator, "."))
+	}
+	masked, err := json.Marshal(document)
+	if err != nil {
+		t.Fatalf("encode masked command output: %v", err)
+	}
+	return masked
+}
+
+func deleteJSONPath(t *testing.T, document map[string]json.RawMessage, path []string) {
+	t.Helper()
+	if len(path) == 0 {
+		t.Fatal("empty non-deterministic field locator")
+	}
+
+	if child, ok := document[path[0]]; ok {
+		if len(path) == 1 {
+			delete(document, path[0])
+			return
+		}
+		document[path[0]] = deleteJSONValue(t, child, path[1:])
+		return
+	}
+
+	// path[0] is not a literal key at this level. Raw JSON bytes cannot
+	// distinguish a marshaled Go struct from a marshaled Go map, and
+	// research.md D3 omits map keys from locators the same way it omits
+	// array indices, so a missing literal key means this object is a map
+	// value type: apply the full remaining path uniformly to every value.
+	if len(document) == 0 {
+		t.Fatalf("locator path %q is missing from command output", strings.Join(path, "."))
+	}
+	for key, value := range document {
+		document[key] = deleteJSONValue(t, value, path)
+	}
+}
+
+// deleteJSONValue applies the remaining locator path segments to raw. A JSON
+// array (produced by a Go slice/array field) is not indexed by a locator
+// segment — research.md D3 omits array indices because list positions are
+// not stable across runs — so path is applied to every element uniformly. A
+// JSON object is treated as a struct with literal field keys first; when a
+// path segment isn't a literal key, deleteJSONPath falls back to treating
+// the object as a map value type and applies the path to every value, since
+// map keys are equally omitted from locators for the same reason.
+func deleteJSONValue(t *testing.T, raw json.RawMessage, path []string) json.RawMessage {
+	t.Helper()
+
+	var elements []json.RawMessage
+	if err := json.Unmarshal(raw, &elements); err == nil {
+		for i, element := range elements {
+			elements[i] = deleteJSONValue(t, element, path)
+		}
+		encoded, err := json.Marshal(elements)
+		if err != nil {
+			t.Fatalf("encode locator path %q: %v", strings.Join(path, "."), err)
+		}
+		return encoded
+	}
+
+	var nested map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &nested); err != nil {
+		t.Fatalf("decode locator path %q: %v", strings.Join(path, "."), err)
+	}
+	deleteJSONPath(t, nested, path)
+	encoded, err := json.Marshal(nested)
+	if err != nil {
+		t.Fatalf("encode locator path %q: %v", strings.Join(path, "."), err)
+	}
+	return encoded
+}
+
+// TestDeleteJSONLocatorsArrayElement guards against a regression where a
+// locator descending through a slice/array field (e.g. "data.items.id",
+// research.md D3's no-index-segment format) crashed deleteJSONPath instead
+// of masking the field in every array element.
+func TestDeleteJSONLocatorsArrayElement(t *testing.T) {
+	first := []byte(`{"data":{"items":[{"id":"one","name":"a"},{"id":"two","name":"b"}]}}`)
+	second := []byte(`{"data":{"items":[{"id":"three","name":"a"},{"id":"four","name":"b"}]}}`)
+
+	firstMasked := deleteJSONLocators(t, first, []string{"data.items.id"})
+	secondMasked := deleteJSONLocators(t, second, []string{"data.items.id"})
+	if !bytes.Equal(firstMasked, secondMasked) {
+		t.Fatalf("masked outputs differ\nfirst:  %s\nsecond: %s", firstMasked, secondMasked)
+	}
+
+	var masked map[string]json.RawMessage
+	if err := json.Unmarshal(firstMasked, &masked); err != nil {
+		t.Fatalf("decode masked output: %v", err)
+	}
+	if !strings.Contains(string(masked["data"]), `"name":"a"`) {
+		t.Errorf("masked output = %s, want deterministic sibling field preserved", masked["data"])
+	}
+}
+
+// TestDeleteJSONLocatorsMapValue guards against a regression where a locator
+// descending through a map value field (e.g. "data.items.id", the same
+// no-index-segment format research.md D3 uses for map keys) hard-failed or
+// silently no-op'd in deleteJSONPath instead of masking the field in every
+// map value.
+func TestDeleteJSONLocatorsMapValue(t *testing.T) {
+	first := []byte(`{"data":{"items":{"k1":{"id":"one","name":"a"},"k2":{"id":"two","name":"b"}}}}`)
+	second := []byte(`{"data":{"items":{"k1":{"id":"three","name":"a"},"k2":{"id":"four","name":"b"}}}}`)
+
+	firstMasked := deleteJSONLocators(t, first, []string{"data.items.id"})
+	secondMasked := deleteJSONLocators(t, second, []string{"data.items.id"})
+	if !bytes.Equal(firstMasked, secondMasked) {
+		t.Fatalf("masked outputs differ\nfirst:  %s\nsecond: %s", firstMasked, secondMasked)
+	}
+
+	var masked map[string]json.RawMessage
+	if err := json.Unmarshal(firstMasked, &masked); err != nil {
+		t.Fatalf("decode masked output: %v", err)
+	}
+	if !strings.Contains(string(masked["data"]), `"name":"a"`) {
+		t.Errorf("masked output = %s, want deterministic sibling field preserved", masked["data"])
+	}
 }
 
 // TestGoldenRootSuccess pins the root command's bounded JSON success envelope.

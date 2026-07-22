@@ -42,9 +42,10 @@ type Schema struct {
 
 // Tool describes one command as an MCP-compatible tool.
 type Tool struct {
-	Name        string
-	Description string
-	InputSchema map[string]any
+	Name                   string
+	Description            string
+	InputSchema            map[string]any
+	NonDeterministicFields []string
 }
 
 // Build adapts a Cobra command tree to MCP-compatible tool metadata. Hidden
@@ -64,9 +65,10 @@ func Build(root *cobra.Command) Schema {
 // input schema.
 func BuildTool(cmd *cobra.Command) Tool {
 	return Tool{
-		Name:        ToolName(cmd),
-		Description: cmd.Short,
-		InputSchema: inputSchema(cmd),
+		Name:                   ToolName(cmd),
+		Description:            cmd.Short,
+		InputSchema:            inputSchema(cmd),
+		NonDeterministicFields: internalschema.NonDeterministicFields(cmd.Annotations),
 	}
 }
 

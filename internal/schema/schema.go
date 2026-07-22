@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"maps"
 	"slices"
 
 	"github.com/spf13/cobra"
@@ -9,12 +10,13 @@ import (
 
 // Command is the internal Cobra command reflection shape.
 type Command struct {
-	Use      string
-	Short    string
-	Long     string
-	Example  string
-	Flags    []Flag
-	Commands []Command
+	Use         string
+	Short       string
+	Long        string
+	Example     string
+	Flags       []Flag
+	Commands    []Command
+	Annotations map[string]string
 }
 
 // Flag is the internal Cobra flag reflection shape.
@@ -30,11 +32,12 @@ type Flag struct {
 // BuildCommand reflects a Cobra command tree into the internal schema.
 func BuildCommand(cmd *cobra.Command) Command {
 	schema := Command{
-		Use:     cmd.Use,
-		Short:   cmd.Short,
-		Long:    cmd.Long,
-		Example: cmd.Example,
-		Flags:   CollectFlags(cmd),
+		Use:         cmd.Use,
+		Short:       cmd.Short,
+		Long:        cmd.Long,
+		Example:     cmd.Example,
+		Flags:       CollectFlags(cmd),
+		Annotations: maps.Clone(cmd.Annotations),
 	}
 
 	for _, child := range cmd.Commands() {

@@ -136,6 +136,24 @@ without guessing. The primary format is ax-native JSON, with
 contract is now owned by the `schema` package and the absorbed decisions in
 [`specs/010-import-isolated-contracts/research.md`](specs/010-import-isolated-contracts/research.md).
 
+Each command declares an explicit `non_deterministic_fields` list. Commands
+that emit `ax.Envelope[T]` register their payload type once; varying payload
+fields carry the marking at their definition:
+
+```go
+type result struct {
+    EntityID string `json:"entity_id" ax:"nondeterministic"`
+}
+
+ax.WithNonDeterministicFields[result](cmd)
+```
+
+Registration adds the standard `meta.trace_id`, `meta.span_id`, and
+`meta.idempotency_key` locators. Tagged payload fields appear as `data.*`
+locators, and unregistered commands emit an explicit empty list. The same list
+is available as `nonDeterministicFields` in `__schema --as=mcp`; it is the
+authoritative mask for deterministic output comparisons.
+
 ### Running as an MCP server
 
 The same command tree that powers `__schema --as=mcp` can run as a **live MCP

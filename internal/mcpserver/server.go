@@ -148,9 +148,10 @@ func discoverTools(root *cobra.Command) ([]schema.MCPTool, map[string]*cobra.Com
 		}
 		tool := internalmcp.BuildTool(cmd)
 		tools = append(tools, schema.MCPTool{
-			Name:        tool.Name,
-			Description: tool.Description,
-			InputSchema: tool.InputSchema,
+			Name:                   tool.Name,
+			Description:            tool.Description,
+			InputSchema:            tool.InputSchema,
+			NonDeterministicFields: tool.NonDeterministicFields,
 		})
 		targets[tool.Name] = cmd
 	})

@@ -33,6 +33,13 @@ func WithSchemaVersion(version string) SchemaOption {
 	return isolatedschema.WithSchemaVersion(version)
 }
 
+// WithNonDeterministicFields registers cmd as emitting the standard success
+// envelope for T. It reflects T once and records its ax:"nondeterministic"
+// fields for __schema output; a nil command is ignored.
+func WithNonDeterministicFields[T any](cmd *cobra.Command) {
+	isolatedschema.WithNonDeterministicFields[T](cmd)
+}
+
 // BuildSchema reflects a Cobra command tree into the ax-native schema.
 func BuildSchema(root *cobra.Command, opts ...SchemaOption) Schema {
 	return isolatedschema.BuildSchema(root, opts...)
