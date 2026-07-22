@@ -98,10 +98,15 @@ which the next step reads.
 ### Step 3 — Read what actually changed (machine sources)
 
 Run the bundled scanner, which reads the cached `CHANGELOG.md` section for the
-hop and lists the module's `// Deprecated:` symbols:
+hop and lists the module's `// Deprecated:` symbols. Run it from the consumer's
+module root (so its SA1019 pass sees the consumer's code), and invoke it by its
+full path inside this skill directory — not a bare `scripts/scan.sh`, which
+would resolve against whatever `scripts/` happens to sit in the current
+directory:
 
 ```bash
-scripts/scan.sh vX.Y.Z [vCURRENT]
+# SKILL_DIR is this skill's own directory (the one holding SKILL.md).
+"$SKILL_DIR/scripts/scan.sh" vX.Y.Z [vCURRENT]
 ```
 
 Then read, in priority order:
@@ -187,7 +192,8 @@ Re-run until all three are clean:
 ```bash
 go build ./...
 go test ./...            # add -race if the consumer's suite uses it
-staticcheck ./...        # zero SA1019 remaining
+# zero SA1019 remaining — same version-matched tool as Step 4:
+golangci-lint run --default=none --enable=staticcheck ./...
 ```
 
 Green build + green tests + zero SA1019 means this hop is done. If the jump was
@@ -245,9 +251,9 @@ Use this template:
 - (or: "None.")
 
 ## Verification
-- go build ./...:   PASS
-- go test ./...:    PASS
-- staticcheck:      0 SA1019 remaining
+- go build ./...:              PASS
+- go test ./...:               PASS
+- golangci-lint (SA1019):      0 remaining
 
 ## New capabilities in this upgrade
 - Adopted (opt-in): <feature> (file:line) — or "None selected."

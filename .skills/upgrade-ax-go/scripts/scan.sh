@@ -73,16 +73,35 @@ echo
 echo "== SA1019 (deprecated-symbol use) in the current module =="
 if command -v golangci-lint >/dev/null 2>&1; then
   # golangci-lint's bundled staticcheck is version-matched to the toolchain.
-  golangci-lint run --default=none --enable=staticcheck ./... 2>&1 \
-    | grep 'SA1019' || echo "(no SA1019 findings)"
+  # A clean run exits 0; any finding (SA1019 or otherwise) or a run failure
+  # exits non-zero. Only treat exit 0 as "no findings" — otherwise surface
+  # SA1019 hits, or fail loudly on a genuine linter/build error so a real
+  # failure is never collapsed into a false "clean" report.
+  if out="$(golangci-lint run --default=none --enable=staticcheck ./... 2>&1)"; then
+    echo "(no SA1019 findings)"
+  elif printf '%s\n' "$out" | grep 'SA1019'; then
+    :
+  else
+    echo "golangci-lint failed without SA1019 findings; full output:" >&2
+    printf '%s\n' "$out" >&2
+    exit 1
+  fi
 elif command -v staticcheck >/dev/null 2>&1; then
-  out="$(staticcheck ./... 2>&1 || true)"
-  if printf '%s' "$out" | grep -q 'was built with go'; then
+  # Preserve staticcheck's exit status: exit 0 means no findings; otherwise
+  # distinguish the go-directive refusal, real SA1019 hits, and any other
+  # failure, so a build/import error is never hidden behind "(no findings)".
+  if out="$(staticcheck ./... 2>&1)"; then
+    echo "(no SA1019 findings)"
+  elif printf '%s' "$out" | grep -q 'was built with go'; then
     printf '%s\n' "$out" | grep 'was built with go' >&2
     echo "(standalone staticcheck is older than this module's Go directive; use" \
          "golangci-lint run --default=none --enable=staticcheck ./... instead)"
+  elif printf '%s\n' "$out" | grep 'SA1019'; then
+    :
   else
-    printf '%s\n' "$out" | grep 'SA1019' || echo "(no SA1019 findings)"
+    echo "staticcheck failed without SA1019 findings; full output:" >&2
+    printf '%s\n' "$out" >&2
+    exit 1
   fi
 else
   echo "(no linter found; install golangci-lint, or grep the deprecated symbols" \
