@@ -84,6 +84,22 @@ Import-isolation tests keep those public contract packages free of the root
 facade, telemetry exporters/SDK setup, logger/Loki, HTTP instrumentation, and
 gRPC runtime adapters.
 
+**These packages provide no live tracing.** That same import isolation keeps the
+OpenTelemetry SDK out of them, so none of them starts a span, extracts
+`TRACEPARENT` / `TRACESTATE`, or resolves an active span context.
+`contract.TraceIDFromContext` and `contract.SpanIDFromContext` **read back
+metadata a caller already stored** with `contract.WithMetadata` — they resolve
+nothing themselves, and return `contract.ZeroTraceID` / `contract.ZeroSpanID`
+when no metadata is present. Because those zero values are well-formed W3C IDs
+rather than empty strings, a context that was never populated produces
+valid-looking output carrying no trace at all.
+
+Live tracing is provided **only by the root `ax` package**: `ax.StartTelemetry`
+(W3C propagation and `TRACEPARENT` extraction), the recording root span
+`ax.Execute` opens around the command, and `ax.NewLogger`'s `trace_id` /
+`span_id` log correlation. Thin consumers that need real trace IDs must import
+root `ax` and accept the runtime weight the isolated packages exist to avoid.
+
 Use the `mcp` package to run a CLI as a live MCP server (see
 [Running as an MCP server](#running-as-an-mcp-server)):
 
@@ -294,10 +310,12 @@ byte-identical to one emitted before these fields existed.
   hex trace/span IDs — a bounded, documented exception, not a regression. Run
   `go test -run '^$' -bench '^BenchmarkLogger' -benchmem ./...` to reproduce.
 - **Trace propagation:** contexts carry and propagate W3C Trace Context IDs by
-  default, via the OpenTelemetry SDK
+  default, via the OpenTelemetry SDK in the root `ax` package
   ([ADR-0004](docs/adr/0004-trace-id-format.md);
   real export lifecycle delivered by
-  [spec 004](specs/004-real-otel-export/)).
+  [spec 004](specs/004-real-otel-export/)). The import-isolated packages
+  (`contract`, `config`, `schema`, `id`) carry no live tracing — see
+  [Public Import Surfaces](#public-import-surfaces).
 - **Observability backends:** Grafana Loki for log aggregation via
   opt-in direct push (`AX_LOKI_URL`; see
   [`specs/007-loki-direct-push/research.md`](specs/007-loki-direct-push/research.md));
