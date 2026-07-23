@@ -42,7 +42,9 @@ const (
 	driftAdded              = "added"
 	driftMissing            = "missing"
 	driftSignatureChanged   = "signature-changed"
-	driftProfileDivergent   = "profile-divergent"
+	driftSignatureDivergent = "signature-divergent"
+	driftPresenceChanged    = "presence-changed"
+	driftPresenceUnfactored = "presence-unfactored"
 	driftAuditMissing       = "audit-missing"
 	driftAuditStateInvalid  = "audit-state-invalid"
 	driftDeprecationMissing = "deprecation-missing"
@@ -69,10 +71,71 @@ const (
 const (
 	detailActiveAuditRecord = "active audit record"
 	detailAbsent            = "absent"
+	detailPresent           = "present"
 	detailDeprecationNotice = "Deprecated: paragraph on the source declaration"
 )
 
-// Profile is one supported compiler selection used to verify that the root
+// Build-tag names. Both ax-go constraints are negative, so the default
+// configuration passes no tags at all.
+const (
+	tagNoGRPC = "ax_no_grpc"
+	tagNoOTLP = "ax_no_otlp"
+)
+
+// Configuration names recorded in the baseline.
+const (
+	configDefault = "default"
+	configNoGRPC  = "no-grpc"
+	configNoOTLP  = "no-otlp"
+	configMinimal = "minimal"
+)
+
+// rootImportPath is the module root, and the package that owns the one
+// tag-dependent public identifier.
+const rootImportPath = "github.com/rshade/ax-go"
+
+// PublicPackages is the API surface subject to the stability contract: the
+// root package ax plus the public packages config, contract, id, mcp, and
+// schema. internal/ is exempt (Constitution Principle XI — the toolchain
+// blocks external import), and examples/ is not a consumer surface.
+//
+// This list MUST agree exactly with allowedPackages() in
+// internal/cmd/apidiff-verdict/main.go. That function is the declared single
+// source of truth but lives in another main package and cannot be imported,
+// so the duplication is guarded by a test that parses it and compares. Keep
+// sorted.
+func PublicPackages() []string {
+	return []string{
+		rootImportPath,
+		rootImportPath + "/config",
+		rootImportPath + "/contract",
+		rootImportPath + "/id",
+		rootImportPath + "/mcp",
+		rootImportPath + "/schema",
+	}
+}
+
+// Configuration is one supported build-tag combination. Both ax-go tags are
+// negative, so the default configuration passes no tags at all.
+type Configuration struct {
+	Name string
+	Tags []string
+}
+
+// DefaultConfigurations returns the exhaustive set of supported build
+// configurations. The two constraints are independent, so this is their full
+// cross product; no third tag exists. A fresh slice is returned on every call
+// so callers cannot mutate shared state.
+func DefaultConfigurations() []Configuration {
+	return []Configuration{
+		{Name: configDefault, Tags: nil},
+		{Name: configMinimal, Tags: []string{tagNoGRPC, tagNoOTLP}},
+		{Name: configNoGRPC, Tags: []string{tagNoGRPC}},
+		{Name: configNoOTLP, Tags: []string{tagNoOTLP}},
+	}
+}
+
+// Profile is one supported compiler selection used to verify that the public
 // API is platform-invariant. The host process stays host-built; profile
 // values are passed only to child go list commands.
 type Profile struct {
@@ -97,11 +160,36 @@ func DefaultProfiles() []Profile {
 	}
 }
 
+// Combination is one configuration/profile pair — the unit of work, and the
+// unit a presence record and a drift message name.
+type Combination struct {
+	Configuration string
+	Profile       string
+}
+
+// String renders the combination for drift messages.
+func (c Combination) String() string {
+	return "configuration " + c.Configuration + " on " + c.Profile
+}
+
+// DefaultCombinations returns the full configuration × profile matrix in
+// canonical order.
+func DefaultCombinations(configs []Configuration, profiles []Profile) []Combination {
+	combos := make([]Combination, 0, len(configs)*len(profiles))
+	for _, cfg := range configs {
+		for _, p := range profiles {
+			combos = append(combos, Combination{Configuration: cfg.Name, Profile: p.String()})
+		}
+	}
+	return combos
+}
+
 // Feature is one compiler-visible package declaration or selector exposed by
-// the scanned root package. ID is the canonical public-selector identity;
+// a scanned public package. ID is the canonical public-selector identity;
 // Access is review metadata (direct, promoted, or alias) and never part of
 // the identity.
 type Feature struct {
+	Package   string
 	ID        string
 	Kind      string
 	Owner     string
@@ -161,23 +249,28 @@ func (l *limitedWriter) Write(p []byte) (int, error) {
 	return l.w.Write(p)
 }
 
-// profileScan is the inventory observed for one target profile.
-type profileScan struct {
-	profile  Profile
-	features []Feature
-	files    []string
+// combinationScan is the inventory observed for one configuration/profile
+// pair, across every scanned public package.
+type combinationScan struct {
+	combination Combination
+	features    []Feature
+	files       []string
 }
 
-// scanAll scans dir once per profile, sequentially, and returns each
-// profile's canonical inventory.
-func scanAll(ctx context.Context, dir string, profiles []Profile) ([]profileScan, error) {
-	scans := make([]profileScan, 0, len(profiles))
-	for _, p := range profiles {
-		scan, err := scanProfile(ctx, dir, p)
-		if err != nil {
-			return nil, fmt.Errorf("scanning profile %s: %w", p, err)
+// scanAll scans dir once per configuration/profile combination, sequentially,
+// and returns each combination's canonical inventory.
+func scanAll(ctx context.Context, dir string, configs []Configuration,
+	profiles []Profile, packages []string) ([]combinationScan, error) {
+	scans := make([]combinationScan, 0, len(configs)*len(profiles))
+	for _, cfg := range configs {
+		for _, p := range profiles {
+			scan, err := scanCombination(ctx, dir, cfg, p, packages)
+			if err != nil {
+				combo := Combination{Configuration: cfg.Name, Profile: p.String()}
+				return nil, fmt.Errorf("scanning %s: %w", combo, err)
+			}
+			scans = append(scans, scan)
 		}
-		scans = append(scans, scan)
 	}
 	return scans, nil
 }
@@ -192,208 +285,308 @@ type listedPackage struct {
 	CgoFiles   []string `json:"CgoFiles"`
 }
 
-// scanProfile runs go list -deps -export -json for one target profile, loads
-// the root package from compiler export data, and inventories its complete
-// compiler-visible surface.
-func scanProfile(ctx context.Context, dir string, p Profile) (profileScan, error) {
-	cmd := exec.CommandContext(ctx, "go", "list", "-deps", "-export", "-json", ".")
+// scanCombination runs go list -deps -export -json for one configuration and
+// target profile, loads every requested public package from compiler export
+// data, and inventories their complete compiler-visible surface.
+//
+// It is deliberately fail-closed. A requested package that does not come back
+// with usable export data would silently shrink the observed surface and let
+// the gate pass vacuously on a misconfigured matrix, so every requested import
+// path must be present in the go list output.
+func scanCombination(ctx context.Context, dir string, cfg Configuration,
+	p Profile, requested []string) (combinationScan, error) {
+	listing, err := goList(ctx, dir, cfg, p, requested)
+	if err != nil {
+		return combinationScan{}, err
+	}
+
+	lookup := func(path string) (io.ReadCloser, error) {
+		export, ok := listing.exports[path]
+		if !ok {
+			return nil, fmt.Errorf("no export data for %s", path)
+		}
+		return os.Open(export)
+	}
+	imp := importer.ForCompiler(token.NewFileSet(), "gc", lookup)
+
+	// The audit and its Deprecated: notices are scoped to the run's root
+	// package, which is the first entry in canonical order.
+	root := requested[0]
+
+	var features []Feature
+	var files []string
+	for _, path := range requested {
+		if _, ok := listing.files[path]; !ok {
+			return combinationScan{}, fmt.Errorf("package %s did not load", path)
+		}
+		pkg, importErr := imp.Import(path)
+		if importErr != nil {
+			return combinationScan{}, fmt.Errorf("importing %s: %w", path, importErr)
+		}
+		features = append(features, collectFeatures(path, pkg)...)
+		if path == root {
+			files = append(files, listing.files[path]...)
+		}
+	}
+	sort.Strings(files)
+	sort.Slice(features, func(i, j int) bool {
+		if features[i].Package != features[j].Package {
+			return features[i].Package < features[j].Package
+		}
+		return features[i].ID < features[j].ID
+	})
+	return combinationScan{
+		combination: Combination{Configuration: cfg.Name, Profile: p.String()},
+		features:    features,
+		files:       files,
+	}, nil
+}
+
+// listing is the decoded go list output for one combination: export data by
+// import path, and the source files of each requested (non-dependency)
+// package.
+type listing struct {
+	exports map[string]string
+	files   map[string][]string
+}
+
+// goList runs go list for one configuration and profile and decodes the
+// stream under a hard byte ceiling.
+func goList(ctx context.Context, dir string, cfg Configuration,
+	p Profile, requested []string) (listing, error) {
+	args := []string{"list", "-deps", "-export", "-json"}
+	if len(cfg.Tags) > 0 {
+		args = append(args, "-tags="+strings.Join(cfg.Tags, ","))
+	}
+	args = append(args, requested...)
+
+	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = dir
-	cmd.Env = profileEnv(p)
+	cmd.Env = combinationEnv(p)
 	var stdout, stderr bytes.Buffer
 	limited := &limitedWriter{w: &stdout, max: maxGoListBytes}
 	cmd.Stdout = limited
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		if limited.err != nil {
-			return profileScan{}, limited.err
+			return listing{}, limited.err
 		}
-		return profileScan{}, fmt.Errorf("go list: %w", err)
+		return listing{}, fmt.Errorf("go list: %w", err)
 	}
 	if limited.err != nil {
-		return profileScan{}, limited.err
+		return listing{}, limited.err
 	}
 
-	exports := map[string]string{}
-	var rootPath string
-	var rootFiles []string
+	result := listing{exports: map[string]string{}, files: map[string][]string{}}
 	dec := json.NewDecoder(&stdout)
 	for {
 		var lp listedPackage
 		err := dec.Decode(&lp)
 		if errors.Is(err, io.EOF) {
-			break
+			return result, nil
 		}
 		if err != nil {
-			return profileScan{}, fmt.Errorf("decoding go list output: %w", err)
+			return listing{}, fmt.Errorf("decoding go list output: %w", err)
 		}
 		if lp.Export != "" {
-			exports[lp.ImportPath] = lp.Export
+			result.exports[lp.ImportPath] = lp.Export
 		}
 		if !lp.DepOnly {
-			rootPath = lp.ImportPath
-			rootFiles = append(rootFiles, lp.GoFiles...)
-			rootFiles = append(rootFiles, lp.CgoFiles...)
+			files := append([]string(nil), lp.GoFiles...)
+			result.files[lp.ImportPath] = append(files, lp.CgoFiles...)
 		}
 	}
-	if rootPath == "" {
-		return profileScan{}, errors.New("root package not found in go list output")
-	}
-	sort.Strings(rootFiles)
-
-	lookup := func(path string) (io.ReadCloser, error) {
-		export, ok := exports[path]
-		if !ok {
-			return nil, fmt.Errorf("no export data for %s", path)
-		}
-		return os.Open(export)
-	}
-	fset := token.NewFileSet()
-	pkg, err := importer.ForCompiler(fset, "gc", lookup).Import(rootPath)
-	if err != nil {
-		return profileScan{}, fmt.Errorf("importing root package: %w", err)
-	}
-	return profileScan{profile: p, features: collectFeatures(pkg), files: rootFiles}, nil
 }
 
-// profileEnv returns the process environment with GOOS/GOARCH pinned to the
-// target profile so the child go list compiles for that selection.
-func profileEnv(p Profile) []string {
+// combinationEnv returns the process environment with GOOS/GOARCH pinned to
+// the target profile and cgo disabled, so the child go list compiles for that
+// selection from any host.
+func combinationEnv(p Profile) []string {
 	env := make([]string, 0, len(os.Environ()))
 	for _, e := range os.Environ() {
-		if strings.HasPrefix(e, "GOOS=") || strings.HasPrefix(e, "GOARCH=") {
+		if strings.HasPrefix(e, "GOOS=") || strings.HasPrefix(e, "GOARCH=") ||
+			strings.HasPrefix(e, "CGO_ENABLED=") {
 			continue
 		}
 		env = append(env, e)
 	}
-	return append(env, "GOOS="+p.GOOS, "GOARCH="+p.GOARCH)
+	return append(env, "GOOS="+p.GOOS, "GOARCH="+p.GOARCH, "CGO_ENABLED=0")
 }
 
-// reconcile verifies profile invariance: every profile must yield the same
-// canonical ID/signature set. On divergence it fails closed with a nil
-// inventory and one drift item per divergent feature.
-func reconcile(scans []profileScan, profiles []Profile) ([]Feature, []DriftItem) {
+// featureKey identifies one feature within one public package.
+type featureKey struct {
+	Package string
+	ID      string
+}
+
+// Observation is one feature's canonical identity together with the exact set
+// of combinations it was observed in.
+type Observation struct {
+	Feature Feature
+	Present map[Combination]bool
+}
+
+// reconcile folds the per-combination scans into one canonical inventory plus
+// a presence record, and reports signature divergence.
+//
+// Presence is deliberately NOT an invariant here: a build constraint removing
+// an identifier is the whole point of the configuration axis, and a
+// platform-specific declaration is legitimate too. Presence is instead
+// recorded and diffed against the reviewed baseline, so an unreviewed change
+// in *where* a feature exists still fails the gate.
+//
+// Signature, by contrast, stays a hard invariant: one feature has exactly one
+// signature. A feature whose rendering differs between two combinations is
+// reported as signature-divergent and fails closed with a nil inventory,
+// because there is no single canonical signature to record for it.
+func reconcile(scans []combinationScan, root string) ([]Observation, []DriftItem) {
 	if len(scans) == 0 {
 		return nil, nil
 	}
-	if drift := profileDrift(scans, profiles); len(drift) > 0 {
+	type record struct {
+		feature Feature
+		present map[Combination]bool
+		first   Combination
+	}
+	byKey := map[featureKey]*record{}
+	var order []featureKey
+	var drift []DriftItem
+
+	for _, scan := range scans {
+		for _, f := range scan.features {
+			key := featureKey{Package: f.Package, ID: f.ID}
+			rec, ok := byKey[key]
+			if !ok {
+				byKey[key] = &record{
+					feature: f,
+					present: map[Combination]bool{scan.combination: true},
+					first:   scan.combination,
+				}
+				order = append(order, key)
+				continue
+			}
+			if f.Signature != rec.feature.Signature {
+				drift = append(drift, DriftItem{
+					ID:       qualifiedID(key, root),
+					Drift:    driftSignatureDivergent,
+					Expected: rec.feature.Signature + " in " + rec.first.String(),
+					Actual:   f.Signature + " in " + scan.combination.String(),
+				})
+				continue
+			}
+			rec.present[scan.combination] = true
+		}
+	}
+	if len(drift) > 0 {
+		sortDrift(drift)
 		return nil, drift
 	}
-	return scans[0].features, nil
+
+	sort.Slice(order, func(i, j int) bool {
+		if order[i].Package != order[j].Package {
+			return order[i].Package < order[j].Package
+		}
+		return order[i].ID < order[j].ID
+	})
+	observations := make([]Observation, 0, len(order))
+	for _, key := range order {
+		rec := byKey[key]
+		observations = append(observations, Observation{Feature: rec.feature, Present: rec.present})
+	}
+	return observations, nil
 }
 
-// profileDrift returns one drift item per feature whose presence or signature
-// differs across the scanned profiles.
-func profileDrift(scans []profileScan, profiles []Profile) []DriftItem {
-	byProfile := signatureMaps(scans)
+// qualifiedID renders a feature key for drift messages, leaving root-package
+// features in their bare canonical spelling so they match the audit's IDs.
+func qualifiedID(key featureKey, root string) string {
+	if key.Package == root {
+		return key.ID
+	}
+	return key.Package + "." + key.ID
+}
+
+// diffBaseline compares the live inventory against the approved baseline:
+// source-only features are added, baseline-only features are missing, equal
+// features with different signatures are signature-changed, and equal
+// features observed in a different set of combinations than the baseline
+// records are presence-changed.
+func diffBaseline(live []Observation, base *baselineDoc, universe []Combination, root string) []DriftItem {
+	liveMap := map[featureKey]Observation{}
+	for _, o := range live {
+		liveMap[featureKey{Package: o.Feature.Package, ID: o.Feature.ID}] = o
+	}
+	baseMap := map[featureKey]baselineFeature{}
+	for _, pkg := range base.Packages {
+		for _, f := range pkg.Features {
+			baseMap[featureKey{Package: pkg.Path, ID: f.ID}] = f
+		}
+	}
+
 	var drift []DriftItem
-	for _, id := range unionIDs(scans) {
-		if item, divergent := divergenceItem(id, byProfile, profiles); divergent {
-			drift = append(drift, item)
+	for _, o := range live {
+		key := featureKey{Package: o.Feature.Package, ID: o.Feature.ID}
+		recorded, ok := baseMap[key]
+		if !ok {
+			drift = append(drift, DriftItem{
+				ID: qualifiedID(key, root), Drift: driftAdded, Expected: "", Actual: o.Feature.Signature,
+			})
+			continue
+		}
+		if recorded.Signature != o.Feature.Signature {
+			drift = append(drift, DriftItem{
+				ID: qualifiedID(key, root), Drift: driftSignatureChanged,
+				Expected: recorded.Signature, Actual: o.Feature.Signature,
+			})
+		}
+		drift = append(drift, presenceDrift(key, o, recorded, universe, root)...)
+	}
+	for key, f := range baseMap {
+		if _, ok := liveMap[key]; !ok {
+			drift = append(drift, DriftItem{
+				ID: qualifiedID(key, root), Drift: driftMissing, Expected: f.Signature, Actual: "",
+			})
 		}
 	}
 	sortDrift(drift)
 	return drift
 }
 
-// unionIDs returns the sorted union of feature IDs across all scans.
-func unionIDs(scans []profileScan) []string {
-	union := map[string]bool{}
-	for _, s := range scans {
-		for _, f := range s.features {
-			union[f.ID] = true
-		}
-	}
-	ids := make([]string, 0, len(union))
-	for id := range union {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
-	return ids
-}
-
-// signatureMaps projects each scan into an ID-to-signature map.
-func signatureMaps(scans []profileScan) []map[string]string {
-	byProfile := make([]map[string]string, len(scans))
-	for i, s := range scans {
-		byProfile[i] = map[string]string{}
-		for _, f := range s.features {
-			byProfile[i][f.ID] = f.Signature
-		}
-	}
-	return byProfile
-}
-
-// divergenceItem reports whether one feature is invariant across profiles and,
-// when it is not, the profile-divergent drift item for it.
-func divergenceItem(id string, byProfile []map[string]string, profiles []Profile) (DriftItem, bool) {
-	first, present := byProfile[0][id]
-	allSame := present
-	for i := 1; i < len(byProfile) && allSame; i++ {
-		sig, ok := byProfile[i][id]
-		allSame = ok && sig == first
-	}
-	if allSame {
-		return DriftItem{}, false
-	}
-	return DriftItem{
-		ID:       id,
-		Drift:    driftProfileDivergent,
-		Expected: "present in all profiles",
-		Actual:   divergenceActual(id, byProfile, profiles, first),
-	}, true
-}
-
-// divergenceActual describes the first profile, in declaration order, whose
-// observation of id breaks invariance.
-func divergenceActual(id string, byProfile []map[string]string, profiles []Profile, first string) string {
-	for i, p := range profiles {
-		sig, present := byProfile[i][id]
-		if !present {
-			return "absent in " + p.String()
-		}
-		if i > 0 && sig != first {
-			return "signature differs in " + p.String()
-		}
-	}
-	return ""
-}
-
-// diffBaseline compares the live inventory against the approved baseline:
-// source-only IDs are added, baseline-only IDs are missing, and equal IDs
-// with different signatures are signature-changed.
-func diffBaseline(live []Feature, base *baselineDoc) []DriftItem {
-	liveMap := map[string]string{}
-	for _, f := range live {
-		liveMap[f.ID] = f.Signature
-	}
-	baseMap := map[string]string{}
-	for _, f := range base.Features {
-		baseMap[f.ID] = f.Signature
-	}
+// presenceDrift compares one feature's observed combinations against the
+// presence the baseline records for it, naming the first combination that
+// disagrees in canonical order so the message is deterministic.
+func presenceDrift(key featureKey, live Observation,
+	recorded baselineFeature, universe []Combination, root string) []DriftItem {
+	expected := recorded.combinations(universe)
 	var drift []DriftItem
-	for _, f := range live {
-		sig, ok := baseMap[f.ID]
-		if !ok {
-			drift = append(drift, DriftItem{ID: f.ID, Drift: driftAdded, Expected: "", Actual: f.Signature})
+	for _, combo := range universe {
+		want, got := expected[combo], live.Present[combo]
+		if want == got {
 			continue
 		}
-		if sig != f.Signature {
-			drift = append(drift, DriftItem{ID: f.ID, Drift: driftSignatureChanged, Expected: sig, Actual: f.Signature})
+		expectation, actual := detailAbsent, detailPresent
+		if want {
+			expectation, actual = detailPresent, detailAbsent
 		}
+		drift = append(drift, DriftItem{
+			ID:       qualifiedID(key, root),
+			Drift:    driftPresenceChanged,
+			Expected: expectation + " in " + combo.String(),
+			Actual:   actual + " in " + combo.String(),
+		})
+		break
 	}
-	for _, f := range base.Features {
-		if _, ok := liveMap[f.ID]; !ok {
-			drift = append(drift, DriftItem{ID: f.ID, Drift: driftMissing, Expected: f.Signature, Actual: ""})
-		}
-	}
-	sortDrift(drift)
 	return drift
 }
 
 // crossValidateAudit enforces the audit/baseline completeness invariants:
 // every baseline ID needs an active audit record, active records must appear
 // in the live baseline, and removed records must not.
-func crossValidateAudit(base *baselineDoc, audit *auditDoc) []DriftItem {
+//
+// The audit is the root package's permanent decision record and its IDs are
+// the bare root spellings, so cross-validation is scoped to the root
+// package's baseline entries. The other public packages are gated by the
+// baseline alone.
+func crossValidateAudit(base *baselineDoc, audit *auditDoc, root string) []DriftItem {
 	active := map[string]bool{}
 	removed := map[string]bool{}
 	for _, r := range audit.Records {
@@ -405,7 +598,7 @@ func crossValidateAudit(base *baselineDoc, audit *auditDoc) []DriftItem {
 	}
 	inBaseline := map[string]bool{}
 	var drift []DriftItem
-	for _, f := range base.Features {
+	for _, f := range base.rootFeatures(root) {
 		inBaseline[f.ID] = true
 		if removed[f.ID] {
 			drift = append(drift, DriftItem{
@@ -441,6 +634,7 @@ func crossValidateAudit(base *baselineDoc, audit *auditDoc) []DriftItem {
 
 // collector accumulates canonical features for one loaded root package.
 type collector struct {
+	path    string
 	pkg     *types.Package
 	qf      types.Qualifier
 	feats   map[string]Feature
@@ -451,8 +645,9 @@ type collector struct {
 // collectFeatures inventories the complete compiler-visible surface of pkg:
 // exported declarations, direct and promoted members, complete interface
 // method sets, alias-attributed members, and reachable hidden concrete types.
-func collectFeatures(pkg *types.Package) []Feature {
+func collectFeatures(path string, pkg *types.Package) []Feature {
 	c := &collector{
+		path:    path,
 		pkg:     pkg,
 		qf:      qualifier(pkg),
 		feats:   map[string]Feature{},
@@ -549,6 +744,7 @@ func qualifier(root *types.Package) types.Qualifier {
 // is deterministic, so the first writer wins deterministically.
 func (c *collector) add(f Feature) {
 	if _, ok := c.feats[f.ID]; !ok {
+		f.Package = c.path
 		c.feats[f.ID] = f
 	}
 }
@@ -888,8 +1084,8 @@ func stripNames(t *types.Tuple) *types.Tuple {
 // deprecationGaps reports one drift item for every audit row in the
 // deprecated or removable state whose source declaration lacks a valid
 // Go-recognized Deprecated: paragraph.
-func deprecationGaps(dir string, audit *auditDoc, scans []profileScan) ([]DriftItem, error) {
-	profiles, err := deprecationProfiles(dir, scans)
+func deprecationGaps(dir string, audit *auditDoc, scans []combinationScan, root string) ([]DriftItem, error) {
+	profiles, err := deprecationProfiles(dir, scans, root)
 	if err != nil {
 		return nil, err
 	}
@@ -920,19 +1116,31 @@ type deprecationProfile struct {
 
 // deprecationProfiles builds the source and notice indexes for every scanned
 // profile.
-func deprecationProfiles(dir string, scans []profileScan) ([]deprecationProfile, error) {
+func deprecationProfiles(dir string, scans []combinationScan, root string) ([]deprecationProfile, error) {
 	profiles := make([]deprecationProfile, len(scans))
 	for i, scan := range scans {
 		deprecated, err := deprecatedDecls(dir, scan.files)
 		if err != nil {
-			return nil, fmt.Errorf("profile %s: %w", scan.profile, err)
+			return nil, fmt.Errorf("%s: %w", scan.combination, err)
 		}
 		profiles[i] = deprecationProfile{
-			declarations: declarationSources(scan.features),
+			declarations: declarationSources(rootFeaturesOf(scan.features, root)),
 			deprecated:   deprecated,
 		}
 	}
 	return profiles, nil
+}
+
+// rootFeaturesOf returns only the root package's features; the audit and its
+// deprecation notices are scoped to the root package.
+func rootFeaturesOf(features []Feature, root string) []Feature {
+	scoped := make([]Feature, 0, len(features))
+	for _, f := range features {
+		if f.Package == root {
+			scoped = append(scoped, f)
+		}
+	}
+	return scoped
 }
 
 // declarationSources maps each public selector to the declaration that owns

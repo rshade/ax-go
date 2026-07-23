@@ -1,3 +1,5 @@
+//go:build !ax_no_otlp
+
 package ax
 
 import (
@@ -212,37 +214,6 @@ func TestExecuteExportsSpansBeforeExit(t *testing.T) {
 			}
 		})
 	}
-}
-
-func executeTelemetryCommand(t *testing.T, env map[string]string, shutdownBudget time.Duration) ([]byte, string, int) {
-	t.Helper()
-
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	root := &cobra.Command{
-		Use: "app",
-		RunE: func(cmd *cobra.Command, _ []string) error {
-			if err := cmd.Context().Err(); err != nil {
-				return err
-			}
-			return WriteJSON(cmd.OutOrStdout(), struct {
-				OK bool `json:"ok"`
-			}{OK: true})
-		},
-	}
-
-	code := Execute(
-		context.Background(),
-		root,
-		WithStdout(&stdout),
-		WithStderr(&stderr),
-		WithStdoutIsTTY(false),
-		WithTelemetryShutdownTimeout(shutdownBudget),
-		WithEnv(func(key string) string {
-			return env[key]
-		}),
-	)
-	return stdout.Bytes(), stderr.String(), code
 }
 
 // TestExecuteExportsServiceResourceIdentity verifies that service.name and

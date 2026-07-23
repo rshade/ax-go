@@ -144,11 +144,14 @@ func defaultFloorConfig() floorConfig {
 			"github.com/rshade/ax-go/internal/cli":            98.0,
 			"github.com/rshade/ax-go/internal/cmd/benchcheck": 80.0,
 			"github.com/rshade/ax-go/internal/cmd/doccover":   45.0,
-			"github.com/rshade/ax-go/internal/config":         65.0,
-			"github.com/rshade/ax-go/internal/mcp":            96.9,
-			"github.com/rshade/ax-go/internal/schema":         93.0,
-			"github.com/rshade/ax-go/internal/telemetry":      60.0,
-			"github.com/rshade/ax-go/internal/testutil":       25.0,
+			// Enrolled 2026-07-22 with the surface gate itself, calibrated ~2pp
+			// below its measured 83.8%.
+			"github.com/rshade/ax-go/internal/cmd/surfacecheck": 80.0,
+			"github.com/rshade/ax-go/internal/config":           65.0,
+			"github.com/rshade/ax-go/internal/mcp":              96.9,
+			"github.com/rshade/ax-go/internal/schema":           93.0,
+			"github.com/rshade/ax-go/internal/telemetry":        60.0,
+			"github.com/rshade/ax-go/internal/testutil":         25.0,
 		},
 		excluded: map[string]bool{},
 	}

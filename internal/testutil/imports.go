@@ -14,6 +14,7 @@ const (
 	moduleRootImportPath = "github.com/rshade/ax-go"
 	otelExportersPrefix  = "go.opentelemetry.io/otel/exporters/"
 	zerologImportPath    = "github.com/rs/zerolog"
+	grpcImportPath       = "google.golang.org/grpc"
 )
 
 // ForbiddenImport describes an import path that a public contract surface must
@@ -36,14 +37,27 @@ type ImportViolation struct {
 
 // ResolvePackageImports returns the transitive package imports for importPath
 // by running `go list -deps` from moduleDir.
-func ResolvePackageImports(ctx context.Context, moduleDir, importPath string) ([]string, error) {
+//
+// The optional tags are the build constraints to resolve the graph under. When
+// none are supplied the argv is byte-identical to the untagged form, so the
+// default build's dependency graph is what gets inspected. Supplying tags is
+// what lets a caller assert the dependency boundary of a declined
+// configuration (for example ax_no_grpc,ax_no_otlp), which is invisible to an
+// untagged `go list`.
+func ResolvePackageImports(ctx context.Context, moduleDir, importPath string, tags ...string) ([]string, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 
+	args := []string{"list", "-deps", "-f", "{{.ImportPath}}"}
+	if joined := joinBuildTags(tags); joined != "" {
+		args = append(args, "-tags", joined)
+	}
+	args = append(args, importPath)
+
 	// #nosec G204 -- importPath is a package path supplied by repository tests,
 	// not shell-interpreted input; exec.CommandContext passes it as argv.
-	cmd := exec.CommandContext(ctx, "go", "list", "-deps", "-f", "{{.ImportPath}}", importPath)
+	cmd := exec.CommandContext(ctx, "go", args...)
 	cmd.Dir = moduleDir
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -102,18 +116,35 @@ func FormatImportViolations(violations []ImportViolation) string {
 	return strings.TrimRight(b.String(), "\n")
 }
 
+// joinBuildTags renders tags as a single comma-separated `-tags` value,
+// discarding empty entries so a caller passing a zero-value string never
+// produces a trailing comma. It returns "" when no usable tag remains, which is
+// the signal to omit the flag entirely.
+func joinBuildTags(tags []string) string {
+	usable := make([]string, 0, len(tags))
+	for _, tag := range tags {
+		if tag != "" {
+			usable = append(usable, tag)
+		}
+	}
+	return strings.Join(usable, ",")
+}
+
 // AssertNoForbiddenImports fails t when importPath's dependency graph contains
-// a forbidden runtime dependency.
+// a forbidden runtime dependency. The optional tags select the build
+// configuration whose graph is inspected; omitting them inspects the default
+// build.
 func AssertNoForbiddenImports(
 	ctx context.Context,
 	t testing.TB,
 	moduleDir string,
 	importPath string,
 	forbidden []ForbiddenImport,
+	tags ...string,
 ) {
 	t.Helper()
 
-	imports, err := ResolvePackageImports(ctx, moduleDir, importPath)
+	imports, err := ResolvePackageImports(ctx, moduleDir, importPath, tags...)
 	if err != nil {
 		t.Fatalf("resolve imports for %s: %v", importPath, err)
 	}
@@ -159,12 +190,47 @@ func ForbiddenRuntimeImports() []ForbiddenImport {
 			Reason:  "gRPC instrumentation belongs to root transport helpers",
 		},
 		{
-			Pattern: "google.golang.org/grpc",
+			Pattern: grpcImportPath,
 			Reason:  "gRPC transport helpers are runtime adapters",
 		},
 		{
 			Pattern: zerologImportPath,
 			Reason:  "logging is a root runtime concern",
+		},
+	}
+}
+
+// ForbiddenGRPCTreeImports returns the dependency trees that a root-facade
+// consumer building with both ax_no_grpc and ax_no_otlp must link exactly zero
+// packages from. Each pattern covers its whole subtree, because
+// matchesForbiddenImport prefix-matches.
+//
+// This is deliberately a distinct rule set rather than a reuse of
+// ForbiddenRuntimeImports: that one forbids the entire
+// go.opentelemetry.io/otel/exporters/ prefix, which would wrongly flag
+// stdouttrace — legitimately present in the declined build, where it backs the
+// AX_OTEL_DEBUG local-span path.
+//
+// The guarantee holds for the minimal configuration only. Declining just one of
+// the two tags leaves the gRPC subtree reachable through the other root, by
+// design.
+func ForbiddenGRPCTreeImports() []ForbiddenImport {
+	return []ForbiddenImport{
+		{
+			Pattern: grpcImportPath,
+			Reason:  "gRPC runtime must not link under ax_no_grpc,ax_no_otlp",
+		},
+		{
+			Pattern: "google.golang.org/protobuf",
+			Reason:  "protobuf runtime and reflection tables must not link under ax_no_grpc,ax_no_otlp",
+		},
+		{
+			Pattern: "go.opentelemetry.io/proto/otlp",
+			Reason:  "OTLP wire definitions must not link under ax_no_grpc,ax_no_otlp",
+		},
+		{
+			Pattern: "github.com/grpc-ecosystem/grpc-gateway/v2",
+			Reason:  "generated gateway stubs must not link under ax_no_grpc,ax_no_otlp",
 		},
 	}
 }

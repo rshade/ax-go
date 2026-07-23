@@ -112,6 +112,33 @@ non-loopback HTTP bind is fail-closed without `--allow-non-loopback`. See the
 [Running as an MCP server](../../README.md#running-as-an-mcp-server) section for
 the full contract.
 
+## Building without OTLP export and the gRPC dial helper
+
+The example builds and behaves identically under ax-go's two optional negative
+build constraints, which is the point of keeping it here — a consumer adopting
+them ships something shaped like this:
+
+```sh
+make build-example-minimal
+./bin/ax-integration-minimal __schema
+```
+
+Measured on linux/amd64 for this example (stripped, `-ldflags="-s -w"`):
+
+| Build | Size | Forbidden-tree packages |
+| --- | ---: | ---: |
+| default | 17,535,241 | 109 |
+| `-tags=ax_no_grpc,ax_no_otlp` | 10,289,417 | **0** |
+
+That is −41%, a smaller ratio than the −63% a minimal root-facade consumer sees,
+because this example also links the MCP SDK and the Hujson parser — a larger
+baseline the constraints do not touch.
+
+`__schema` output is byte-identical between the two builds, and the `ax.Error`
+envelope differs only in `trace_id`, which is documented as non-deterministic.
+Exit codes, stream separation, `--dry-run`, and `--idempotency-key` are
+unchanged. See the root [README](../../README.md#slimming-the-binary-optional-otlp-and-grpc).
+
 ## Mandate audit and golden fixtures
 
 [`AUDIT.md`](AUDIT.md) maps every Core AX Mandate to the subcommand and test that

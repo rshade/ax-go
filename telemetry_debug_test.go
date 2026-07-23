@@ -23,7 +23,7 @@ func TestExecuteTelemetryDebugWritesSpansToStderr(t *testing.T) {
 	if !bytes.Equal(stdout, baselineStdout) {
 		t.Fatalf("stdout changed with debug telemetry\nbaseline: %s\ngot: %s", baselineStdout, stdout)
 	}
-	assertDebugSpanOutput(t, stderr, "app")
+	assertDebugSpanOutput(t, stderr)
 	if strings.Contains(string(stdout), "SpanContext") || strings.Contains(string(stdout), `"Name"`) {
 		t.Fatalf("stdout contains debug span data: %s", stdout)
 	}
@@ -40,27 +40,6 @@ func TestExecuteTelemetryDebugAbsentIsSilent(t *testing.T) {
 	}
 	if stderr != "" {
 		t.Fatalf("stderr = %q, want empty", stderr)
-	}
-}
-
-func TestExecuteTelemetryDebugAndOTLPBothReceiveSpans(t *testing.T) {
-	receiver := newOTLPTraceReceiver(t)
-
-	stdout, stderr, code := executeTelemetryCommand(t, map[string]string{
-		"AX_OTEL_DEBUG":               "true",
-		"OTEL_EXPORTER_OTLP_ENDPOINT": receiver.endpoint(),
-	}, defaultTelemetryShutdownTimeout)
-
-	if code != ExitSuccess {
-		t.Fatalf("Execute exit code = %d, want %d; stderr=%s", code, ExitSuccess, stderr)
-	}
-	export := receiver.next(t)
-	if len(export.traceIDs) == 0 {
-		t.Fatalf("exported trace IDs empty; span names=%v", export.names)
-	}
-	assertDebugSpanOutput(t, stderr, "app")
-	if strings.Contains(string(stdout), export.traceIDs[0]) {
-		t.Fatalf("stdout contains exported trace ID %q: %s", export.traceIDs[0], stdout)
 	}
 }
 
@@ -109,20 +88,24 @@ func TestExecuteTelemetryDebugSharesStderrWithLogger(t *testing.T) {
 	if code != ExitSuccess {
 		t.Fatalf("Execute exit code = %d, want %d; stderr=%s", code, ExitSuccess, stderr.String())
 	}
-	assertDebugSpanOutput(t, stderr.String(), "app")
+	assertDebugSpanOutput(t, stderr.String())
 	if stdout.String() != "{\"ok\":true}\n" {
 		t.Fatalf("stdout = %s, want normal payload", stdout.String())
 	}
 }
 
-func assertDebugSpanOutput(t *testing.T, stderr string, spanName string) {
+// debugSpanName is the root command name every telemetry test builds, and so
+// the span name the debug exporter is expected to emit.
+const debugSpanName = "app"
+
+func assertDebugSpanOutput(t *testing.T, stderr string) {
 	t.Helper()
 
 	if !strings.Contains(stderr, `"Name"`) {
 		t.Fatalf("stderr = %q, want debug span JSON with Name field", stderr)
 	}
-	if !strings.Contains(stderr, spanName) {
-		t.Fatalf("stderr = %q, want debug span name %q", stderr, spanName)
+	if !strings.Contains(stderr, debugSpanName) {
+		t.Fatalf("stderr = %q, want debug span name %q", stderr, debugSpanName)
 	}
 	if !strings.Contains(stderr, "SpanContext") {
 		t.Fatalf("stderr = %q, want debug span context", stderr)

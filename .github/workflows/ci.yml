@@ -61,6 +61,39 @@ jobs:
           fail_ci_if_error: false
           verbose: true
 
+  # The default configuration is covered by the "test" job above (with coverage).
+  # This job covers the three declined configurations. Code behind
+  # //go:build ax_no_grpc or //go:build ax_no_otlp is invisible to an untagged
+  # `go test ./...`, so without this job the feature would ship untested by
+  # construction.
+  test-tags:
+    name: Test (${{ matrix.tags }})
+    runs-on: ubuntu-latest
+    strategy:
+      # fail-fast: false so one broken configuration doesn't mask the others -
+      # knowing which specific tag combination broke is the point.
+      fail-fast: false
+      matrix:
+        tags:
+          - ax_no_grpc
+          - ax_no_otlp
+          - ax_no_grpc,ax_no_otlp
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run tests with race detector
+        run: go test -race -tags='${{ matrix.tags }}' ./...
+
+      - name: Run go vet
+        run: go vet -tags='${{ matrix.tags }}' ./...
+
   bench:
     name: Performance Regression Budget
     if: github.event_name == 'pull_request'
@@ -112,6 +145,36 @@ jobs:
         run: |
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           find .github/workflows -name '*.yml' -not -name '*.lock.yml' -print0 | xargs -0 actionlint
+
+  # golangci-lint accepts exactly one build-tag set per run, so the declined
+  # configurations need their own invocations. The default configuration is
+  # linted by the "lint" job above, which also owns markdownlint and actionlint
+  # (those are tag-independent and must not run four times).
+  lint-tags:
+    name: Lint (${{ matrix.tags }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        tags:
+          - ax_no_grpc
+          - ax_no_otlp
+          - ax_no_grpc,ax_no_otlp
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v7
+
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.12.2
+          args: --timeout=5m --build-tags=${{ matrix.tags }}
 
   # PRs only: lints the commits between base and head. release-please builds
   # CHANGELOG.md from Conventional Commits, so non-conforming messages fail
@@ -191,5 +254,9 @@ jobs:
       - name: Check example coverage on the primary API
         run: go run ./internal/cmd/doccover
 
-      - name: Check the public surface against its reviewed baseline
+      # surfacecheck owns its whole matrix inside one process: it sets GOOS and
+      # GOARCH per load itself. That is exactly why it belongs here rather than
+      # in crosscompile.yml, whose job-level GOOS/GOARCH env would fight the
+      # tool's own per-combination environment.
+      - name: Check the public surface against its reviewed baseline and audit
         run: go run ./internal/cmd/surfacecheck

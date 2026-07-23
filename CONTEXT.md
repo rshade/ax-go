@@ -100,7 +100,9 @@ omissions are decisions, not oversights:
 - **Access / authentication & agent identity.** `ax-go` ships secure transport
   defaults (`ax.HTTPClient`, `ax.GRPCDial`) and an auth-failure exit code (`4`),
   but holds no credentials and implements no auth/identity-delegation flow. Auth
-  mechanics belong to the adopting CLI.
+  mechanics belong to the adopting CLI. (`ax.GRPCDial` is present by default; a
+  consumer may decline it at build time — see **Optional Dependency Roots**
+  below. No insecure alternative is ever offered in its place.)
 - **Orchestration.** Triggering, coordinating, and scaling multi-agent or
   multi-step runs is out of scope. `__schema --as=mcp` / `mcp-server` is the one
   bridge `ax-go` provides — it makes an ax-go CLI a *node* an external
@@ -115,6 +117,35 @@ omissions are decisions, not oversights:
 `ax-go` is the **brake, not the engine**: the layer that makes an autonomous
 agent's actions safe, reversible, and auditable — not the layer that makes them
 proactive.
+
+## Optional Dependency Roots
+
+Two negative build constraints let a consumer decline the two heaviest
+dependency roots. Both default to off; setting neither is the state every
+existing build is already in.
+
+| Tag | Declines | Effect |
+| --- | --- | --- |
+| `ax_no_otlp` | OTLP HTTP trace export | endpoint becomes one stderr diagnostic; still fail-open |
+| `ax_no_grpc` | `ax.GRPCDial` | identifier absent from the build |
+
+The size benefit requires **both** — each removes one of two independent roots
+over the same gRPC subtree. Measured on linux/amd64: `ax_no_grpc` alone −0.00%,
+`ax_no_otlp` alone −15.1%, together **−63.3%** and exactly zero packages from
+the gRPC, protobuf, OTLP-proto, and grpc-gateway trees.
+
+**Boundary this does not cross:** tracing degrades to *no export*, never to *no
+tracing*. W3C context extraction, the recording root span, `trace_id`/`span_id`
+log correlation, and `AX_OTEL_DEBUG` span output are behaviourally identical in
+all four configurations, and every machine payload is byte-identical.
+`ax.GRPCDial` is the only public identifier whose presence varies — enforced on
+every PR by `make surface-check`.
+
+**The thin packages are not a tracing escape hatch.** `contract`, `config`,
+`schema`, and `id` link zero gRPC and always have, but they carry **no live
+tracing**: `contract.TraceIDFromContext` reads a value previously stored in the
+context and does not resolve an active span. Live tracing exists only in the
+root facade.
 
 ## Data Source of Truth
 
@@ -169,6 +200,11 @@ To check whether a proposed change respects these boundaries, ask:
 7. **Import isolation:** If the change touches `contract`, `config`, `schema`,
    or `id`, do their dependency graphs still exclude root `ax` and runtime
    adapters?
+8. **Build-tag coverage:** If the change touches code behind `//go:build
+   ax_no_grpc` or `//go:build ax_no_otlp`, has it been vetted, linted, and tested
+   *with those tags passed*? A green default run does not cover them. Does
+   `make surface-check` still pass, and if the exported surface moved
+   intentionally, was the regenerated baseline reviewed line by line?
 
 ## Roadmap Sync Behavior
 

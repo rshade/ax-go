@@ -1,1 +1,1748 @@
-{"schema_version":1,"features":[{"id":"const:DefaultHTTPTimeout","signature":"time.Duration"},{"id":"const:DefaultMaxConfigBytes","signature":"int64"},{"id":"const:ErrorSchemaVersion","signature":"untyped string"},{"id":"const:ExitAuth","signature":"untyped int"},{"id":"const:ExitInternal","signature":"untyped int"},{"id":"const:ExitNetwork","signature":"untyped int"},{"id":"const:ExitSuccess","signature":"untyped int"},{"id":"const:ExitValidation","signature":"untyped int"},{"id":"const:MaxConfigBytesCeiling","signature":"int64"},{"id":"const:ModeDetectionRule","signature":"untyped string"},{"id":"const:ModeHuman","signature":"github.com/rshade/ax-go/contract.Mode"},{"id":"const:ModeJSON","signature":"github.com/rshade/ax-go/contract.Mode"},{"id":"const:SchemaVersion","signature":"untyped string"},{"id":"const:ZeroSpanID","signature":"untyped string"},{"id":"const:ZeroTraceID","signature":"untyped string"},{"id":"field:CommandSchema.Commands","signature":"[]github.com/rshade/ax-go/schema.CommandSchema"},{"id":"field:CommandSchema.Example","signature":"string"},{"id":"field:CommandSchema.Flags","signature":"[]github.com/rshade/ax-go/schema.FlagSchema"},{"id":"field:CommandSchema.Long","signature":"string"},{"id":"field:CommandSchema.NonDeterministicFields","signature":"[]string"},{"id":"field:CommandSchema.Short","signature":"string"},{"id":"field:CommandSchema.Use","signature":"string"},{"id":"field:Envelope.Data","signature":"T"},{"id":"field:Envelope.Meta","signature":"github.com/rshade/ax-go/contract.Metadata"},{"id":"field:Error.ActionableFix","signature":"string"},{"id":"field:Error.Context","signature":"map[string]any"},{"id":"field:Error.ErrorCode","signature":"string"},{"id":"field:Error.Message","signature":"string"},{"id":"field:Error.RetryAfterSeconds","signature":"int64"},{"id":"field:Error.Retryable","signature":"*bool"},{"id":"field:Error.SchemaVersion","signature":"string"},{"id":"field:Error.Suggestions","signature":"[]string"},{"id":"field:Error.Tool","signature":"string"},{"id":"field:Error.TraceID","signature":"string"},{"id":"field:Error.Version","signature":"string"},{"id":"field:ErrorSchemaInfo.NonDeterministicFields","signature":"[]string"},{"id":"field:ErrorSchemaInfo.Optional","signature":"[]string"},{"id":"field:ErrorSchemaInfo.Required","signature":"[]string"},{"id":"field:ErrorSchemaInfo.SchemaVersion","signature":"string"},{"id":"field:FlagSchema.Default","signature":"string"},{"id":"field:FlagSchema.Name","signature":"string"},{"id":"field:FlagSchema.Required","signature":"bool"},{"id":"field:FlagSchema.Shorthand","signature":"string"},{"id":"field:FlagSchema.Type","signature":"string"},{"id":"field:FlagSchema.Usage","signature":"string"},{"id":"field:Labels.Application","signature":"string"},{"id":"field:Labels.Environment","signature":"string"},{"id":"field:Labels.Host","signature":"string"},{"id":"field:Labels.Version","signature":"string"},{"id":"field:MCPSchema.Tools","signature":"[]github.com/rshade/ax-go/schema.MCPTool"},{"id":"field:MCPTool.Description","signature":"string"},{"id":"field:MCPTool.InputSchema","signature":"map[string]any"},{"id":"field:MCPTool.Name","signature":"string"},{"id":"field:MCPTool.NonDeterministicFields","signature":"[]string"},{"id":"field:Metadata.DryRun","signature":"bool"},{"id":"field:Metadata.IdempotencyKey","signature":"string"},{"id":"field:Metadata.SpanID","signature":"string"},{"id":"field:Metadata.TraceID","signature":"string"},{"id":"field:Schema.Command","signature":"github.com/rshade/ax-go/schema.CommandSchema"},{"id":"field:Schema.ErrorEnvelope","signature":"github.com/rshade/ax-go/schema.ErrorSchemaInfo"},{"id":"field:Schema.ModeDetection","signature":"string"},{"id":"field:Schema.SchemaVersion","signature":"string"},{"id":"field:Schema.Tool","signature":"string"},{"id":"field:Schema.Version","signature":"string"},{"id":"field:Telemetry.TracerProvider","signature":"*go.opentelemetry.io/otel/sdk/trace.TracerProvider"},{"id":"func:BuildMCPSchema","signature":"func(*github.com/spf13/cobra.Command) MCPSchema"},{"id":"func:BuildSchema","signature":"func(*github.com/spf13/cobra.Command, ...SchemaOption) Schema"},{"id":"func:DryRunFromContext","signature":"func(context.Context) bool"},{"id":"func:ErrorExitCode","signature":"func(error) int"},{"id":"func:Execute","signature":"func(context.Context, *github.com/spf13/cobra.Command, ...ExecuteOption) int"},{"id":"func:Flush","signature":"func(context.Context, Logger) error"},{"id":"func:GRPCDial","signature":"func(context.Context, string, ...google.golang.org/grpc.DialOption) (*google.golang.org/grpc.ClientConn, error)"},{"id":"func:Guard","signature":"func(context.Context, func(context.Context) error) (bool, error)"},{"id":"func:HTTPClient","signature":"func() *net/http.Client"},{"id":"func:IdempotencyKeyFromContext","signature":"func(context.Context) (string, bool)"},{"id":"func:ModeFromContext","signature":"func(context.Context) (Mode, bool)"},{"id":"func:NewEntityID","signature":"func() (string, error)"},{"id":"func:NewEnvelope","signature":"func[T any](context.Context, T) Envelope[T]"},{"id":"func:NewError","signature":"func(context.Context, string, string, ...ErrorOption) *Error"},{"id":"func:NewHTTPClient","signature":"func(...HTTPClientOption) *net/http.Client"},{"id":"func:NewIdempotencyKey","signature":"func() string"},{"id":"func:NewLogger","signature":"func(context.Context, ...LoggerOption) Logger"},{"id":"func:NewSchemaCommand","signature":"func(*github.com/spf13/cobra.Command, ...SchemaOption) *github.com/spf13/cobra.Command"},{"id":"func:ParseConfig","signature":"func(context.Context, io.Reader, any, ...ParseConfigOption) error"},{"id":"func:ParseConfigFile","signature":"func(context.Context, string, any, ...ParseConfigOption) error"},{"id":"func:ParseMode","signature":"func(string) (Mode, error)"},{"id":"func:PatchConfig","signature":"func(context.Context, io.Reader, []byte, ...ParseConfigOption) ([]byte, error)"},{"id":"func:PatchConfigFile","signature":"func(context.Context, string, []byte, ...ParseConfigOption) error"},{"id":"func:Perform","signature":"func(context.Context, func(context.Context) error, func(context.Context) error) error"},{"id":"func:ResolveMode","signature":"func(string, string, bool) (Mode, error)"},{"id":"func:ResolveVersion","signature":"func(string) string"},{"id":"func:SpanIDFromContext","signature":"func(context.Context) string"},{"id":"func:StartTelemetry","signature":"func(context.Context, ...TelemetryOption) (context.Context, *Telemetry, error)"},{"id":"func:TraceIDFromContext","signature":"func(context.Context) string"},{"id":"func:WithActionableFix","signature":"func(string) ErrorOption"},{"id":"func:WithDryRun","signature":"func(context.Context, bool) context.Context"},{"id":"func:WithEnv","signature":"func(func(string) string) ExecuteOption"},{"id":"func:WithErrorCause","signature":"func(error) ErrorOption"},{"id":"func:WithErrorContext","signature":"func(map[string]any) ErrorOption"},{"id":"func:WithErrorExitCode","signature":"func(int) ErrorOption"},{"id":"func:WithErrorTool","signature":"func(string) ErrorOption"},{"id":"func:WithErrorVersion","signature":"func(string) ErrorOption"},{"id":"func:WithHTTPTimeout","signature":"func(time.Duration) HTTPClientOption"},{"id":"func:WithIdempotencyKey","signature":"func(context.Context, string) context.Context"},{"id":"func:WithLoggerLabels","signature":"func(Labels) LoggerOption"},{"id":"func:WithLoggerLevel","signature":"func(github.com/rs/zerolog.Level) LoggerOption"},{"id":"func:WithLoggerWriter","signature":"func(io.Writer) LoggerOption"},{"id":"func:WithLokiFromEnv","signature":"func() LoggerOption"},{"id":"func:WithMaxConfigBytes","signature":"func(int64) ParseConfigOption"},{"id":"func:WithMode","signature":"func(context.Context, Mode) context.Context"},{"id":"func:WithNonDeterministicFields","signature":"func[T any](*github.com/spf13/cobra.Command)"},{"id":"func:WithRetryAfterSeconds","signature":"func(int64) ErrorOption"},{"id":"func:WithRetryable","signature":"func(bool) ErrorOption"},{"id":"func:WithSchemaVersion","signature":"func(string) SchemaOption"},{"id":"func:WithStderr","signature":"func(io.Writer) ExecuteOption"},{"id":"func:WithStdin","signature":"func(io.Reader) ExecuteOption"},{"id":"func:WithStdout","signature":"func(io.Writer) ExecuteOption"},{"id":"func:WithStdoutIsTTY","signature":"func(bool) ExecuteOption"},{"id":"func:WithSuggestions","signature":"func(...string) ErrorOption"},{"id":"func:WithTelemetryEnv","signature":"func(func(string) string) TelemetryOption"},{"id":"func:WithTelemetryServiceName","signature":"func(string) TelemetryOption"},{"id":"func:WithTelemetryServiceVersion","signature":"func(string) TelemetryOption"},{"id":"func:WithTelemetryShutdownBudget","signature":"func(time.Duration) TelemetryOption"},{"id":"func:WithTelemetryShutdownTimeout","signature":"func(time.Duration) ExecuteOption"},{"id":"func:WithTelemetryStderr","signature":"func(io.Writer) TelemetryOption"},{"id":"func:WithVersion","signature":"func(string) ExecuteOption"},{"id":"func:WriteError","signature":"func(io.Writer, error) error"},{"id":"func:WriteJSON","signature":"func(io.Writer, any) error"},{"id":"func:WriteJSONLine","signature":"func(io.Writer, any) error"},{"id":"interface-method:Logger.Debug","signature":"func(context.Context) *github.com/rs/zerolog.Event"},{"id":"interface-method:Logger.Error","signature":"func(context.Context) *github.com/rs/zerolog.Event"},{"id":"interface-method:Logger.Info","signature":"func(context.Context) *github.com/rs/zerolog.Event"},{"id":"interface-method:Logger.Warn","signature":"func(context.Context) *github.com/rs/zerolog.Event"},{"id":"interface-method:Logger.WithLabels","signature":"func(Labels) Logger"},{"id":"interface-method:Logger.Zerolog","signature":"func() *github.com/rs/zerolog.Logger"},{"id":"method:*Error.Error","signature":"func() string"},{"id":"method:*Error.ExitCode","signature":"func() int"},{"id":"method:*Error.Unwrap","signature":"func() error"},{"id":"method:*Telemetry.Shutdown","signature":"func(context.Context) error"},{"id":"method:Mode.String","signature":"func() string"},{"id":"type:CommandSchema","signature":"= github.com/rshade/ax-go/schema.CommandSchema"},{"id":"type:Envelope","signature":"= github.com/rshade/ax-go/contract.Envelope[T]"},{"id":"type:Error","signature":"= github.com/rshade/ax-go/contract.Error"},{"id":"type:ErrorOption","signature":"= github.com/rshade/ax-go/contract.ErrorOption"},{"id":"type:ErrorSchemaInfo","signature":"= github.com/rshade/ax-go/schema.ErrorSchemaInfo"},{"id":"type:ExecuteOption","signature":"func(*executeConfig)"},{"id":"type:FlagSchema","signature":"= github.com/rshade/ax-go/schema.FlagSchema"},{"id":"type:HTTPClientOption","signature":"func(*httpClientConfig)"},{"id":"type:Labels","signature":"struct{Environment string; Application string; Host string; Version string}"},{"id":"type:Logger","signature":"interface{Debug(ctx context.Context) *github.com/rs/zerolog.Event; Error(ctx context.Context) *github.com/rs/zerolog.Event; Info(ctx context.Context) *github.com/rs/zerolog.Event; Warn(ctx context.Context) *github.com/rs/zerolog.Event; WithLabels(labels Labels) Logger; Zerolog() *github.com/rs/zerolog.Logger}"},{"id":"type:LoggerOption","signature":"func(*loggerConfig)"},{"id":"type:MCPSchema","signature":"= github.com/rshade/ax-go/schema.MCPSchema"},{"id":"type:MCPTool","signature":"= github.com/rshade/ax-go/schema.MCPTool"},{"id":"type:Metadata","signature":"= github.com/rshade/ax-go/contract.Metadata"},{"id":"type:Mode","signature":"= github.com/rshade/ax-go/contract.Mode"},{"id":"type:ParseConfigOption","signature":"= github.com/rshade/ax-go/config.Option"},{"id":"type:Schema","signature":"= github.com/rshade/ax-go/schema.Schema"},{"id":"type:SchemaOption","signature":"= github.com/rshade/ax-go/schema.Option"},{"id":"type:Telemetry","signature":"struct{TracerProvider *go.opentelemetry.io/otel/sdk/trace.TracerProvider}"},{"id":"type:TelemetryOption","signature":"func(*telemetryConfig)"}]}
+{
+  "schema_version": 2,
+  "packages": [
+    {
+      "path": "github.com/rshade/ax-go",
+      "features": [
+        {
+          "id": "const:DefaultHTTPTimeout",
+          "signature": "time.Duration",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:DefaultMaxConfigBytes",
+          "signature": "int64",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ErrorSchemaVersion",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ExitAuth",
+          "signature": "untyped int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ExitInternal",
+          "signature": "untyped int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ExitNetwork",
+          "signature": "untyped int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ExitSuccess",
+          "signature": "untyped int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ExitValidation",
+          "signature": "untyped int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:MaxConfigBytesCeiling",
+          "signature": "int64",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ModeDetectionRule",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ModeHuman",
+          "signature": "github.com/rshade/ax-go/contract.Mode",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ModeJSON",
+          "signature": "github.com/rshade/ax-go/contract.Mode",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:SchemaVersion",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ZeroSpanID",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ZeroTraceID",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Commands",
+          "signature": "[]github.com/rshade/ax-go/schema.CommandSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Example",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Flags",
+          "signature": "[]github.com/rshade/ax-go/schema.FlagSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Long",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.NonDeterministicFields",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Short",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Use",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Envelope.Data",
+          "signature": "T",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Envelope.Meta",
+          "signature": "github.com/rshade/ax-go/contract.Metadata",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.ActionableFix",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Context",
+          "signature": "map[string]any",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.ErrorCode",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Message",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.RetryAfterSeconds",
+          "signature": "int64",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Retryable",
+          "signature": "*bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.SchemaVersion",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Suggestions",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Tool",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.TraceID",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Version",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:ErrorSchemaInfo.NonDeterministicFields",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:ErrorSchemaInfo.Optional",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:ErrorSchemaInfo.Required",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:ErrorSchemaInfo.SchemaVersion",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Default",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Required",
+          "signature": "bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Shorthand",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Type",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Usage",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Labels.Application",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Labels.Environment",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Labels.Host",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Labels.Version",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPSchema.Tools",
+          "signature": "[]github.com/rshade/ax-go/schema.MCPTool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPTool.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPTool.InputSchema",
+          "signature": "map[string]any",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPTool.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPTool.NonDeterministicFields",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Metadata.DryRun",
+          "signature": "bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Metadata.IdempotencyKey",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Metadata.SpanID",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Metadata.TraceID",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.Command",
+          "signature": "github.com/rshade/ax-go/schema.CommandSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.ErrorEnvelope",
+          "signature": "github.com/rshade/ax-go/schema.ErrorSchemaInfo",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.ModeDetection",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.SchemaVersion",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.Tool",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.Version",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Telemetry.TracerProvider",
+          "signature": "*go.opentelemetry.io/otel/sdk/trace.TracerProvider",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:BuildMCPSchema",
+          "signature": "func(*github.com/spf13/cobra.Command) MCPSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:BuildSchema",
+          "signature": "func(*github.com/spf13/cobra.Command, ...SchemaOption) Schema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:DryRunFromContext",
+          "signature": "func(context.Context) bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ErrorExitCode",
+          "signature": "func(error) int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:Execute",
+          "signature": "func(context.Context, *github.com/spf13/cobra.Command, ...ExecuteOption) int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:Flush",
+          "signature": "func(context.Context, Logger) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:GRPCDial",
+          "signature": "func(context.Context, string, ...google.golang.org/grpc.DialOption) (*google.golang.org/grpc.ClientConn, error)",
+          "configurations": [
+            "default",
+            "no-otlp"
+          ],
+          "profiles": "all"
+        },
+        {
+          "id": "func:Guard",
+          "signature": "func(context.Context, func(context.Context) error) (bool, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:HTTPClient",
+          "signature": "func() *net/http.Client",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:IdempotencyKeyFromContext",
+          "signature": "func(context.Context) (string, bool)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ModeFromContext",
+          "signature": "func(context.Context) (Mode, bool)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewEntityID",
+          "signature": "func() (string, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewEnvelope",
+          "signature": "func[T any](context.Context, T) Envelope[T]",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewError",
+          "signature": "func(context.Context, string, string, ...ErrorOption) *Error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewHTTPClient",
+          "signature": "func(...HTTPClientOption) *net/http.Client",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewIdempotencyKey",
+          "signature": "func() string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewLogger",
+          "signature": "func(context.Context, ...LoggerOption) Logger",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewSchemaCommand",
+          "signature": "func(*github.com/spf13/cobra.Command, ...SchemaOption) *github.com/spf13/cobra.Command",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ParseConfig",
+          "signature": "func(context.Context, io.Reader, any, ...ParseConfigOption) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ParseConfigFile",
+          "signature": "func(context.Context, string, any, ...ParseConfigOption) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ParseMode",
+          "signature": "func(string) (Mode, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:PatchConfig",
+          "signature": "func(context.Context, io.Reader, []byte, ...ParseConfigOption) ([]byte, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:PatchConfigFile",
+          "signature": "func(context.Context, string, []byte, ...ParseConfigOption) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:Perform",
+          "signature": "func(context.Context, func(context.Context) error, func(context.Context) error) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ResolveMode",
+          "signature": "func(string, string, bool) (Mode, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ResolveVersion",
+          "signature": "func(string) string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:SpanIDFromContext",
+          "signature": "func(context.Context) string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:StartTelemetry",
+          "signature": "func(context.Context, ...TelemetryOption) (context.Context, *Telemetry, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:TraceIDFromContext",
+          "signature": "func(context.Context) string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithActionableFix",
+          "signature": "func(string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithDryRun",
+          "signature": "func(context.Context, bool) context.Context",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithEnv",
+          "signature": "func(func(string) string) ExecuteOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithErrorCause",
+          "signature": "func(error) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithErrorContext",
+          "signature": "func(map[string]any) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithErrorExitCode",
+          "signature": "func(int) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithErrorTool",
+          "signature": "func(string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithErrorVersion",
+          "signature": "func(string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithHTTPTimeout",
+          "signature": "func(time.Duration) HTTPClientOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithIdempotencyKey",
+          "signature": "func(context.Context, string) context.Context",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithLoggerLabels",
+          "signature": "func(Labels) LoggerOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithLoggerLevel",
+          "signature": "func(github.com/rs/zerolog.Level) LoggerOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithLoggerWriter",
+          "signature": "func(io.Writer) LoggerOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithLokiFromEnv",
+          "signature": "func() LoggerOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithMaxConfigBytes",
+          "signature": "func(int64) ParseConfigOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithMode",
+          "signature": "func(context.Context, Mode) context.Context",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithNonDeterministicFields",
+          "signature": "func[T any](*github.com/spf13/cobra.Command)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithRetryAfterSeconds",
+          "signature": "func(int64) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithRetryable",
+          "signature": "func(bool) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithSchemaVersion",
+          "signature": "func(string) SchemaOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithStderr",
+          "signature": "func(io.Writer) ExecuteOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithStdin",
+          "signature": "func(io.Reader) ExecuteOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithStdout",
+          "signature": "func(io.Writer) ExecuteOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithStdoutIsTTY",
+          "signature": "func(bool) ExecuteOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithSuggestions",
+          "signature": "func(...string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithTelemetryEnv",
+          "signature": "func(func(string) string) TelemetryOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithTelemetryServiceName",
+          "signature": "func(string) TelemetryOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithTelemetryServiceVersion",
+          "signature": "func(string) TelemetryOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithTelemetryShutdownBudget",
+          "signature": "func(time.Duration) TelemetryOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithTelemetryShutdownTimeout",
+          "signature": "func(time.Duration) ExecuteOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithTelemetryStderr",
+          "signature": "func(io.Writer) TelemetryOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithVersion",
+          "signature": "func(string) ExecuteOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WriteError",
+          "signature": "func(io.Writer, error) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WriteJSON",
+          "signature": "func(io.Writer, any) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WriteJSONLine",
+          "signature": "func(io.Writer, any) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.Debug",
+          "signature": "func(context.Context) *github.com/rs/zerolog.Event",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.Error",
+          "signature": "func(context.Context) *github.com/rs/zerolog.Event",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.Info",
+          "signature": "func(context.Context) *github.com/rs/zerolog.Event",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.Warn",
+          "signature": "func(context.Context) *github.com/rs/zerolog.Event",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.WithLabels",
+          "signature": "func(Labels) Logger",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.Zerolog",
+          "signature": "func() *github.com/rs/zerolog.Logger",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "method:*Error.Error",
+          "signature": "func() string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "method:*Error.ExitCode",
+          "signature": "func() int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "method:*Error.Unwrap",
+          "signature": "func() error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "method:*Telemetry.Shutdown",
+          "signature": "func(context.Context) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "method:Mode.String",
+          "signature": "func() string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:CommandSchema",
+          "signature": "= github.com/rshade/ax-go/schema.CommandSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Envelope",
+          "signature": "= github.com/rshade/ax-go/contract.Envelope[T]",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Error",
+          "signature": "= github.com/rshade/ax-go/contract.Error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:ErrorOption",
+          "signature": "= github.com/rshade/ax-go/contract.ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:ErrorSchemaInfo",
+          "signature": "= github.com/rshade/ax-go/schema.ErrorSchemaInfo",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:ExecuteOption",
+          "signature": "func(*executeConfig)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:FlagSchema",
+          "signature": "= github.com/rshade/ax-go/schema.FlagSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:HTTPClientOption",
+          "signature": "func(*httpClientConfig)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Labels",
+          "signature": "struct{Environment string; Application string; Host string; Version string}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Logger",
+          "signature": "interface{Debug(ctx context.Context) *github.com/rs/zerolog.Event; Error(ctx context.Context) *github.com/rs/zerolog.Event; Info(ctx context.Context) *github.com/rs/zerolog.Event; Warn(ctx context.Context) *github.com/rs/zerolog.Event; WithLabels(labels Labels) Logger; Zerolog() *github.com/rs/zerolog.Logger}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:LoggerOption",
+          "signature": "func(*loggerConfig)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:MCPSchema",
+          "signature": "= github.com/rshade/ax-go/schema.MCPSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:MCPTool",
+          "signature": "= github.com/rshade/ax-go/schema.MCPTool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Metadata",
+          "signature": "= github.com/rshade/ax-go/contract.Metadata",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Mode",
+          "signature": "= github.com/rshade/ax-go/contract.Mode",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:ParseConfigOption",
+          "signature": "= github.com/rshade/ax-go/config.Option",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Schema",
+          "signature": "= github.com/rshade/ax-go/schema.Schema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:SchemaOption",
+          "signature": "= github.com/rshade/ax-go/schema.Option",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Telemetry",
+          "signature": "struct{TracerProvider *go.opentelemetry.io/otel/sdk/trace.TracerProvider}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:TelemetryOption",
+          "signature": "func(*telemetryConfig)",
+          "configurations": "all",
+          "profiles": "all"
+        }
+      ]
+    },
+    {
+      "path": "github.com/rshade/ax-go/config",
+      "features": [
+        {
+          "id": "const:DefaultMaxBytes",
+          "signature": "int64",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:MaxBytesCeiling",
+          "signature": "int64",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:Parse",
+          "signature": "func(context.Context, io.Reader, any, ...Option) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ParseFile",
+          "signature": "func(context.Context, string, any, ...Option) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:Patch",
+          "signature": "func(context.Context, io.Reader, []byte, ...Option) ([]byte, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:PatchFile",
+          "signature": "func(context.Context, string, []byte, ...Option) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithMaxBytes",
+          "signature": "func(int64) Option",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Option",
+          "signature": "func(*options)",
+          "configurations": "all",
+          "profiles": "all"
+        }
+      ]
+    },
+    {
+      "path": "github.com/rshade/ax-go/contract",
+      "features": [
+        {
+          "id": "const:ErrorSchemaVersion",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ExitAuth",
+          "signature": "untyped int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ExitInternal",
+          "signature": "untyped int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ExitNetwork",
+          "signature": "untyped int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ExitSuccess",
+          "signature": "untyped int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ExitValidation",
+          "signature": "untyped int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ModeDetectionRule",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ModeHuman",
+          "signature": "Mode",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ModeJSON",
+          "signature": "Mode",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ZeroSpanID",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ZeroTraceID",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Envelope.Data",
+          "signature": "T",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Envelope.Meta",
+          "signature": "Metadata",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.ActionableFix",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Context",
+          "signature": "map[string]any",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.ErrorCode",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Message",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.RetryAfterSeconds",
+          "signature": "int64",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Retryable",
+          "signature": "*bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.SchemaVersion",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Suggestions",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Tool",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.TraceID",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Error.Version",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Metadata.DryRun",
+          "signature": "bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Metadata.IdempotencyKey",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Metadata.SpanID",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Metadata.TraceID",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:DryRunFromContext",
+          "signature": "func(context.Context) bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ErrorExitCode",
+          "signature": "func(error) int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:IdempotencyKeyFromContext",
+          "signature": "func(context.Context) (string, bool)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:MetadataFromContext",
+          "signature": "func(context.Context) Metadata",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ModeFromContext",
+          "signature": "func(context.Context) (Mode, bool)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewEnvelope",
+          "signature": "func[T any](context.Context, T) Envelope[T]",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewError",
+          "signature": "func(context.Context, string, string, ...ErrorOption) *Error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ParseMode",
+          "signature": "func(string) (Mode, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:ResolveMode",
+          "signature": "func(string, string, bool) (Mode, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:SpanIDFromContext",
+          "signature": "func(context.Context) string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:TraceIDFromContext",
+          "signature": "func(context.Context) string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithActionableFix",
+          "signature": "func(string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithDryRun",
+          "signature": "func(context.Context, bool) context.Context",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithErrorCause",
+          "signature": "func(error) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithErrorContext",
+          "signature": "func(map[string]any) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithErrorExitCode",
+          "signature": "func(int) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithErrorTool",
+          "signature": "func(string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithErrorVersion",
+          "signature": "func(string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithIdempotencyKey",
+          "signature": "func(context.Context, string) context.Context",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithMetadata",
+          "signature": "func(context.Context, Metadata) context.Context",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithMode",
+          "signature": "func(context.Context, Mode) context.Context",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithRetryAfterSeconds",
+          "signature": "func(int64) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithRetryable",
+          "signature": "func(bool) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithSuggestions",
+          "signature": "func(...string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WriteError",
+          "signature": "func(io.Writer, error) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WriteJSON",
+          "signature": "func(io.Writer, any) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WriteJSONLine",
+          "signature": "func(io.Writer, any) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "method:*Error.Error",
+          "signature": "func() string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "method:*Error.ExitCode",
+          "signature": "func() int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "method:*Error.Unwrap",
+          "signature": "func() error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "method:Mode.String",
+          "signature": "func() string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Envelope",
+          "signature": "struct{Data T \"json:\\\"data\\\"\"; Meta Metadata \"json:\\\"meta\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Error",
+          "signature": "struct{ErrorCode string \"json:\\\"error_code\\\"\"; Message string \"json:\\\"message\\\"\"; TraceID string \"json:\\\"trace_id\\\"\"; Tool string \"json:\\\"tool\\\"\"; Version string \"json:\\\"version\\\"\"; SchemaVersion string \"json:\\\"schema_version\\\"\"; ActionableFix string \"json:\\\"actionable_fix,omitempty\\\"\"; Context map[string]any \"json:\\\"context,omitempty\\\"\"; Suggestions []string \"json:\\\"suggestions,omitempty\\\"\"; Retryable *bool \"json:\\\"retryable,omitempty\\\"\"; RetryAfterSeconds int64 \"json:\\\"retry_after_seconds,omitempty\\\"\"; exitCode int; cause error}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:ErrorOption",
+          "signature": "func(*Error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Metadata",
+          "signature": "struct{TraceID string \"json:\\\"trace_id\\\"                  ax:\\\"nondeterministic\\\"\"; SpanID string \"json:\\\"span_id,omitempty\\\"         ax:\\\"nondeterministic\\\"\"; IdempotencyKey string \"json:\\\"idempotency_key,omitempty\\\" ax:\\\"nondeterministic\\\"\"; DryRun bool \"json:\\\"dry_run,omitempty\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Mode",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        }
+      ]
+    },
+    {
+      "path": "github.com/rshade/ax-go/id",
+      "features": [
+        {
+          "id": "func:NewEntityID",
+          "signature": "func() (string, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewIdempotencyKey",
+          "signature": "func() string",
+          "configurations": "all",
+          "profiles": "all"
+        }
+      ]
+    },
+    {
+      "path": "github.com/rshade/ax-go/mcp",
+      "features": [
+        {
+          "id": "const:TransportHTTP",
+          "signature": "Transport",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:TransportStdio",
+          "signature": "Transport",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewCommand",
+          "signature": "func(*github.com/spf13/cobra.Command, ...Option) *github.com/spf13/cobra.Command",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:Serve",
+          "signature": "func(context.Context, *github.com/spf13/cobra.Command, ...Option) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithAllowNonLoopback",
+          "signature": "func(bool) Option",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithHTTPAddr",
+          "signature": "func(string) Option",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithTransport",
+          "signature": "func(Transport) Option",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithVersion",
+          "signature": "func(string) Option",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Option",
+          "signature": "func(*options)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Transport",
+          "signature": "int",
+          "configurations": "all",
+          "profiles": "all"
+        }
+      ]
+    },
+    {
+      "path": "github.com/rshade/ax-go/schema",
+      "features": [
+        {
+          "id": "const:SchemaVersion",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Commands",
+          "signature": "[]CommandSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Example",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Flags",
+          "signature": "[]FlagSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Long",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.NonDeterministicFields",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Short",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Use",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:ErrorSchemaInfo.NonDeterministicFields",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:ErrorSchemaInfo.Optional",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:ErrorSchemaInfo.Required",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:ErrorSchemaInfo.SchemaVersion",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Default",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Required",
+          "signature": "bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Shorthand",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Type",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Usage",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPSchema.Tools",
+          "signature": "[]MCPTool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPTool.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPTool.InputSchema",
+          "signature": "map[string]any",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPTool.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPTool.NonDeterministicFields",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.Command",
+          "signature": "CommandSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.ErrorEnvelope",
+          "signature": "ErrorSchemaInfo",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.ModeDetection",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.SchemaVersion",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.Tool",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Schema.Version",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:BuildMCPSchema",
+          "signature": "func(*github.com/spf13/cobra.Command) MCPSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:BuildSchema",
+          "signature": "func(*github.com/spf13/cobra.Command, ...Option) Schema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewSchemaCommand",
+          "signature": "func(*github.com/spf13/cobra.Command, ...Option) *github.com/spf13/cobra.Command",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithNonDeterministicFields",
+          "signature": "func[T any](*github.com/spf13/cobra.Command)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithSchemaVersion",
+          "signature": "func(string) Option",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:CommandSchema",
+          "signature": "struct{Use string \"json:\\\"use\\\"\"; Short string \"json:\\\"short,omitempty\\\"\"; Long string \"json:\\\"long,omitempty\\\"\"; Example string \"json:\\\"example,omitempty\\\"\"; Flags []FlagSchema \"json:\\\"flags,omitempty\\\"\"; Commands []CommandSchema \"json:\\\"commands,omitempty\\\"\"; NonDeterministicFields []string \"json:\\\"non_deterministic_fields\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:ErrorSchemaInfo",
+          "signature": "struct{SchemaVersion string \"json:\\\"schema_version\\\"\"; Required []string \"json:\\\"required\\\"\"; Optional []string \"json:\\\"optional\\\"\"; NonDeterministicFields []string \"json:\\\"non_deterministic_fields\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:FlagSchema",
+          "signature": "struct{Name string \"json:\\\"name\\\"\"; Shorthand string \"json:\\\"shorthand,omitempty\\\"\"; Type string \"json:\\\"type\\\"\"; Default string \"json:\\\"default,omitempty\\\"\"; Usage string \"json:\\\"usage,omitempty\\\"\"; Required bool \"json:\\\"required,omitempty\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:MCPSchema",
+          "signature": "struct{Tools []MCPTool \"json:\\\"tools\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:MCPTool",
+          "signature": "struct{Name string \"json:\\\"name\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; InputSchema map[string]any \"json:\\\"inputSchema\\\"\"; NonDeterministicFields []string \"json:\\\"nonDeterministicFields\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Option",
+          "signature": "func(*options)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Schema",
+          "signature": "struct{SchemaVersion string \"json:\\\"schema_version\\\"\"; Tool string \"json:\\\"tool\\\"\"; Version string \"json:\\\"version\\\"\"; ModeDetection string \"json:\\\"mode_detection\\\"\"; Command CommandSchema \"json:\\\"command\\\"\"; ErrorEnvelope ErrorSchemaInfo \"json:\\\"error_envelope\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        }
+      ]
+    }
+  ]
+}
