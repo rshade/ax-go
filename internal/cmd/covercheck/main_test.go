@@ -341,17 +341,25 @@ func TestDefaultFloorConfig(t *testing.T) {
 		t.Fatalf("defaultFloor = %v, want %v", cfg.defaultFloor, defaultPackageFloor)
 	}
 	wantPerPackage := map[string]float64{
-		"github.com/rshade/ax-go":                           80.0,
+		// Raised 80.0 -> 85.0 on 2026-07-22: extracting the logger into
+		// internal/logcore moved root's measured coverage up to 89.8%, and the
+		// 5pp escalation is the documented response to a measured improvement.
+		"github.com/rshade/ax-go":                           85.0,
 		"github.com/rshade/ax-go/examples/integration":      85.0,
+		"github.com/rshade/ax-go/examples/logging":          98.0,
+		"github.com/rshade/ax-go/examples/rootlogging":      98.0,
 		"github.com/rshade/ax-go/internal/cli":              98.0,
 		"github.com/rshade/ax-go/internal/cmd/benchcheck":   80.0,
 		"github.com/rshade/ax-go/internal/cmd/doccover":     45.0,
+		"github.com/rshade/ax-go/internal/cmd/sizecheck":    86.0,
 		"github.com/rshade/ax-go/internal/config":           65.0,
 		"github.com/rshade/ax-go/internal/cmd/surfacecheck": 80.0,
+		"github.com/rshade/ax-go/internal/logcore":          96.5,
 		"github.com/rshade/ax-go/internal/mcp":              96.9,
 		"github.com/rshade/ax-go/internal/schema":           93.0,
 		"github.com/rshade/ax-go/internal/telemetry":        60.0,
 		"github.com/rshade/ax-go/internal/testutil":         25.0,
+		"github.com/rshade/ax-go/logging":                   98.0,
 	}
 	for path, want := range wantPerPackage {
 		if got, ok := cfg.perPackage[path]; !ok || got != want {

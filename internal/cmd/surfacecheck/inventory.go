@@ -95,8 +95,8 @@ const (
 const rootImportPath = "github.com/rshade/ax-go"
 
 // PublicPackages is the API surface subject to the stability contract: the
-// root package ax plus the public packages config, contract, id, mcp, and
-// schema. internal/ is exempt (Constitution Principle XI — the toolchain
+// root package ax plus the public packages config, contract, id, logging, mcp,
+// and schema. internal/ is exempt (Constitution Principle XI — the toolchain
 // blocks external import), and examples/ is not a consumer surface.
 //
 // This list MUST agree exactly with allowedPackages() in
@@ -110,6 +110,7 @@ func PublicPackages() []string {
 		rootImportPath + "/config",
 		rootImportPath + "/contract",
 		rootImportPath + "/id",
+		rootImportPath + "/logging",
 		rootImportPath + "/mcp",
 		rootImportPath + "/schema",
 	}

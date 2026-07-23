@@ -82,9 +82,57 @@ import (
 - `schema`: ax-native and MCP-compatible command schema shapes/builders.
 - `id`: UUID v4 idempotency keys and UUID v7 entity/resource IDs.
 
+Use the isolated logging package when you want structured, trace-correlated
+logging without the runtime:
+
+```go
+import "github.com/rshade/ax-go/logging"
+```
+
+- `logging`: the zerolog-backed logger, stream separation, and
+  `trace_id`/`span_id` on every line — with no OTel SDK, no OTLP exporter, no
+  gRPC, no Cobra, and no `net/http`.
+
 Import-isolation tests keep those public contract packages free of the root
 facade, telemetry exporters/SDK setup, logger/Loki, HTTP instrumentation, and
 gRPC runtime adapters.
+
+### Choosing a surface
+
+| You need | Import |
+|---|---|
+| Logging only, smallest binary | `logging` |
+| Stable machine contracts only | `contract`, `config`, `schema`, `id` |
+| Logging **plus** Loki direct push | root `ax` |
+| Logging plus OTel export or `ax.Execute` | root `ax` |
+
+The size difference is the point. A logging-only consumer links 103 packages;
+the same program on the root facade links 410:
+
+| Program | Stripped binary |
+|---|---|
+| imports `logging` | **2,261,257 bytes** |
+| imports root `ax` | 12,013,833 bytes |
+| reduction | **81.2%** |
+
+Measured on linux/amd64 with Go 1.26.5 and `-trimpath -ldflags="-s -w"`, and
+enforced on every PR by `make size-check` against the two committed probe
+programs `examples/logging` and `examples/rootlogging`. Absolute sizes drift
+with the toolchain; the ratio does not, because both probes move together.
+
+`logging` differs from the four contract packages in what it is allowed to
+link: `zerolog` and the OpenTelemetry trace **API** are required there (the
+logger's method set names them, and they are what makes trace correlation
+work), while `net/http` and `crypto/tls` are forbidden. `net/http` is the
+single largest size lever, which is why Loki direct push — which needs it —
+stays available only through root `ax`.
+
+Both surfaces name **one** logger. `ax.Logger`, `ax.Labels`, and
+`ax.LoggerOption` are identity-preserving aliases of the same declarations
+`logging` exposes, so a logger from either is accepted by the other with no
+conversion, and an option manufactured by root `ax` — including
+`ax.WithLokiFromEnv()` — is accepted by `logging.NewLogger`. There is one
+implementation, one backend, and one trace-correlation hook behind both names.
 
 **These packages provide no live tracing.** They link zero gRPC and always
 have, and that same import isolation keeps the OpenTelemetry SDK out of them,
@@ -491,7 +539,7 @@ else changes: no source edit, no import change, no API difference.
 
 `ax.GRPCDial` is the **only** public identifier whose presence varies with a
 build tag. This is enforced on every PR by `make surface-check`, which
-type-checks all six public packages across 4 configurations × 6 GOOS/GOARCH
+type-checks all seven public packages across 4 configurations × 6 GOOS/GOARCH
 profiles and diffs the result against a committed baseline.
 
 The target injects `git describe --tags --always --dirty` into

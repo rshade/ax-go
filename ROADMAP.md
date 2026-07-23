@@ -231,6 +231,19 @@ a runtime contract.*
 - [x] #26 go-apidiff in CI [M] — catch breaking public-API changes on PRs with a
   label-gated override; scoped to the public surface (`ax` + the `contract`,
   `config`, `schema`, `id` packages). Closed 2026-06-26.
+- [x] #144 Import-isolated `logging` package [L] — the zerolog logger, stream
+  separation, and trace correlation without the OTel SDK, exporters, gRPC,
+  protobuf, MCP SDK, Cobra, or `net/http`. A logging-only consumer drops from
+  12,013,833 to 2,261,257 bytes (−81.2%) and from 410 to 103 linked packages,
+  gated on every PR by `make size-check` against two committed probe programs.
+  Root `ax` keeps every symbol through identity-preserving aliases, so existing
+  adopters change nothing. Also remediates a standing Constitution Principle VIII
+  violation: the two `*lokiWriter` type assertions in `logger.go` are replaced by
+  the generic `Sink`/`LabelSanctioner` seam, so "never couple a log-shipping
+  backend into the core logger" is now enforced by `internal/logcore`'s C-13
+  source assertion rather than by convention alone. Shipped via
+  [`specs/017-import-isolated-logging`](specs/017-import-isolated-logging/).
+  Closed 2026-07-22.
 - [x] #78 Import-isolated public contract packages (`contract/`, `config/`,
   `schema/`, `id/`) [L] — narrow public packages for thin consumers, fully
   import-isolated from the root runtime facade, telemetry, and gRPC adapters.

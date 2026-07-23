@@ -34,6 +34,20 @@ thin consumers that do not need runtime adapters. Those packages must stay
 import-isolated from root `ax`, telemetry exporters/SDK setup, logger/Loki,
 HTTP instrumentation, and gRPC runtime helpers.
 
+`logging` is the second import-isolated surface and the one place the pattern
+bends: unlike the contract packages it is a *behavioural* surface, not a data
+contract, so it deliberately links `zerolog` and the OpenTelemetry trace **API**
+while still excluding root `ax`, the OTel SDK, exporters, gRPC, Cobra, and —
+the largest single size lever — `net/http`. That is why import isolation is
+expressed as a per-surface rule set rather than one shared forbidden list.
+
+The two public logging surfaces are **siblings over one implementation**
+(`internal/logcore`), never a chain: root `ax` and `logging` both alias the same
+declarations, and root must not import `logging`. Identity would survive either
+direction, but the sibling shape is what keeps the root runtime depending on an
+internal package rather than a public one, and what lets `logging`'s parity test
+import root `ax` to compare the two surfaces byte-for-byte.
+
 The canonical behavioral authority is the constitution at
 `.specify/memory/constitution.md`. The ADRs in `docs/adr/` are a FROZEN legacy
 decision log being retired through the Spec Kit feature workflow — each ADR's
@@ -146,6 +160,22 @@ every PR by `make surface-check`.
 tracing**: `contract.TraceIDFromContext` reads a value previously stored in the
 context and does not resolve an active span. Live tracing exists only in the
 root facade.
+
+**`logging` is different, and the distinction is worth stating precisely.** It
+does resolve an active span context, because it links the OTel trace API — so a
+line emitted under a span carries that span's real `trace_id` and `span_id`
+without the caller storing anything. What it cannot do is *create* or *export*
+spans: ID generation and export need the SDK and the exporters, which stay in
+the root facade. Reading an existing span context is cheap and dependency-light;
+producing one is not. That asymmetry is the entire reason a fully
+trace-correlated logger fits in ~2.26 MB.
+
+**Package-boundary isolation is a separate axis from the build tags above.**
+The tags shrink a *root-facade* consumer by declining optional roots; the
+`logging` package shrinks a *logging-only* consumer by never linking them in the
+first place, with no tag to pass. The two compose but do not overlap: a
+`logging` consumer's dependency graph is byte-identical under all four build
+configurations, because it links none of the trees the constraints decline.
 
 ## Data Source of Truth
 

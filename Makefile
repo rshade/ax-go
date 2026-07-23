@@ -29,7 +29,7 @@ BUILD_TAG_MATRIX?=none ax_no_grpc ax_no_otlp ax_no_grpc,ax_no_otlp
 all: build
 
 .PHONY: ci
-ci: test validate lint doc-coverage surface-check bench-check
+ci: test validate lint doc-coverage surface-check size-check bench-check
 
 .PHONY: build
 build:
@@ -125,6 +125,16 @@ surface-check:
 surface-update:
 	@echo "Regenerating the exported-surface baseline (review every line of the diff)..."
 	go run ./internal/cmd/surfacecheck -update
+
+# Binary-size gate. It builds examples/logging and examples/rootlogging with
+# production flags and enforces BOTH an absolute ceiling on the isolated binary
+# and a minimum reduction ratio against the root-facade build. The two are
+# adjusted under different rules — see the constants in
+# internal/cmd/sizecheck/main.go.
+.PHONY: size-check
+size-check:
+	@echo "Checking the import-isolated logging binary size and reduction ratio..."
+	go run ./internal/cmd/sizecheck
 
 .PHONY: doc-coverage
 doc-coverage:
@@ -222,7 +232,7 @@ clean:
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  ci            - Run test, validate, lint, doc-coverage, surface-check, bench-check"
+	@echo "  ci            - Run test, validate, lint, doc-coverage, surface-check, size-check, bench-check"
 	@echo "  build         - Compile the library (go build ./...)"
 	@echo "  build-example - Compile the integration example with version injection"
 	@echo "  build-example-minimal - Compile the example with -tags=ax_no_grpc,ax_no_otlp"
@@ -234,6 +244,7 @@ help:
 	@echo "  doc-coverage  - Check ExampleXxx coverage on the primary API"
 	@echo "  surface-check - Diff the public surface across configurations and platforms against baseline and audit"
 	@echo "  surface-update - Regenerate the exported-surface baseline for review"
+	@echo "  size-check    - Enforce the isolated logging binary ceiling and reduction ratio"
 	@echo "  lint          - Run golangci-lint per build-tag combination, markdownlint, actionlint"
 	@echo "  lint-actions  - Run actionlint on GitHub workflows"
 	@echo "  validate      - Check gofmt, go mod tidy, and go vet across the build-tag matrix"

@@ -37,39 +37,92 @@ import (
 	"strings"
 )
 
+// scannedPackages maps each package alias used to qualify a required symbol to
+// its module-relative directory. The alias — not the directory — is what appears
+// in requiredSymbols and in baseline.txt.
+func scannedPackages() map[string]string {
+	return map[string]string{
+		rootPackageAlias:    ".",
+		loggingPackageAlias: loggingPackageAlias,
+	}
+}
+
+const (
+	// rootPackageAlias qualifies symbols declared in the root package ax. It is
+	// also the prefix applied when migrating a legacy unqualified baseline line,
+	// because every entry written before qualification existed necessarily
+	// referred to the only package that was scanned.
+	rootPackageAlias = "ax"
+	// loggingPackageAlias qualifies symbols declared in the import-isolated
+	// logging package, whose directory name matches its alias.
+	loggingPackageAlias = "logging"
+
+	// Symbols named often enough across this package and its tests to be worth
+	// pinning once. axNewLogger and loggingNewLogger are the pair the whole
+	// package-qualification change exists for: they share a bare name, so only
+	// the qualified forms distinguish them.
+	axNewLogger      = rootPackageAlias + ".NewLogger"
+	loggingNewLogger = loggingPackageAlias + ".NewLogger"
+	axPatchConfig    = rootPackageAlias + ".PatchConfig"
+)
+
 // requiredSymbols returns the curated primary API surface that MUST carry a
 // verified ExampleXxx. It is intentionally a hand-maintained subset
 // (constructors, core types, and top-level entry points), not every exported
 // identifier: WithX option setters are demonstrated inside a parent example, and
 // the rest of the surface is covered by doc comments. Add a symbol here when it
 // becomes part of the primary API an agent is expected to call directly.
+//
+// Entries are PACKAGE-QUALIFIED, and that is load-bearing rather than cosmetic.
+// More than one scanned package legitimately declares the same symbol name —
+// ax.NewLogger and logging.NewLogger both exist, because the second is an alias
+// surface over the same constructor. With bare names checked against one flat
+// union of every scanned directory's examples, root's long-standing
+// ExampleNewLogger would satisfy the requirement on behalf of a package that has
+// no example at all: the contract would be stated, the gate would be green, and
+// nothing would be enforced. A gate that passes without enforcing anything is
+// worse than one that fails, because it is trusted.
 func requiredSymbols() []string {
 	return []string{
-		// constructors and entry points
-		"BuildMCPSchema",
-		"BuildSchema",
-		"Execute",
-		"Flush",
-		"NewEntityID",
-		"NewEnvelope",
-		"NewError",
-		"NewIdempotencyKey",
-		"NewLogger",
-		"ParseConfig",
-		"ParseConfigFile",
-		"PatchConfig",
-		"PatchConfigFile",
-		"ResolveVersion",
-		"StartTelemetry",
-		"WithLokiFromEnv",
-		// core types
-		"Envelope",
-		"Error",
-		"Logger",
-		"Mode",
-		"Schema",
-		"Telemetry",
+		// root package ax — constructors and entry points
+		"ax.BuildMCPSchema",
+		"ax.BuildSchema",
+		"ax.Execute",
+		"ax.Flush",
+		"ax.NewEntityID",
+		"ax.NewEnvelope",
+		"ax.NewError",
+		"ax.NewIdempotencyKey",
+		axNewLogger,
+		"ax.ParseConfig",
+		"ax.ParseConfigFile",
+		axPatchConfig,
+		"ax.PatchConfigFile",
+		"ax.ResolveVersion",
+		"ax.StartTelemetry",
+		"ax.WithLokiFromEnv",
+		// root package ax — core types
+		"ax.Envelope",
+		"ax.Error",
+		"ax.Logger",
+		"ax.Mode",
+		"ax.Schema",
+		"ax.Telemetry",
+		// import-isolated logging surface
+		loggingNewLogger,
 	}
+}
+
+// splitQualified separates a package-qualified entry into its package alias and
+// bare symbol name. An unqualified entry is attributed to the root package, which
+// is the deterministic migration rule for baseline lines written before
+// qualification existed.
+// It returns (packageAlias, symbolName).
+func splitQualified(entry string) (string, string) {
+	if idx := strings.Index(entry, "."); idx >= 0 {
+		return entry[:idx], entry[idx+1:]
+	}
+	return rootPackageAlias, entry
 }
 
 func main() {
@@ -78,9 +131,17 @@ func main() {
 		failf("locating module root: %v", err)
 	}
 
-	exported, examples, err := scanPackage(root)
-	if err != nil {
-		failf("scanning package: %v", err)
+	exported := map[string]map[string]bool{}
+	examples := map[string]map[string]bool{}
+	for alias, rel := range scannedPackages() {
+		pkgExported, pkgExamples, scanErr := scanPackage(filepath.Join(root, rel))
+		if scanErr != nil {
+			failf("scanning package %s: %v", alias, scanErr)
+		}
+		// Results stay keyed BY PACKAGE rather than unioned. Merging them is the
+		// exact bug this qualification exists to prevent.
+		exported[alias] = pkgExported
+		examples[alias] = pkgExamples
 	}
 
 	baselinePath := filepath.Join(root, "internal", "cmd", "doccover", "baseline.txt")
@@ -92,10 +153,14 @@ func main() {
 	os.Exit(report(os.Stdout, requiredSymbols(), exported, examples, baseline))
 }
 
-// scanPackage parses the root-package Go files and returns the set of exported
-// top-level symbol names (funcs and types from non-test files) and the set of
-// verified ExampleXxx function names (from _test.go files; only examples that
-// declare an output comment count).
+// scanPackage parses one package directory's Go files and returns the set of
+// exported top-level symbol names (funcs and types from non-test files) and the
+// set of verified ExampleXxx function names (from _test.go files; only examples
+// that declare an output comment count).
+//
+// It is called once per scanned package and its results are kept keyed by
+// package. Unioning them across packages would let one package's example satisfy
+// another package's requirement — see requiredSymbols.
 func scanPackage(dir string) (map[string]bool, map[string]bool, error) {
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -193,19 +258,28 @@ func hasExample(symbol string, examples map[string]bool) bool {
 // not exempted in the baseline), on a required symbol that is no longer
 // exported (renamed or removed), or on a stale baseline entry (the ratchet is
 // one-way: once covered, the baseline line must be pruned).
-func report(out io.Writer, required []string, exported, examples, baseline map[string]bool) int {
+func report(
+	out io.Writer,
+	required []string,
+	exported, examples map[string]map[string]bool,
+	baseline map[string]bool,
+) int {
 	var covered, missing, regressions, unknown []string
-	for _, symbol := range required {
-		if !exported[symbol] {
-			unknown = append(unknown, symbol)
+	for _, entry := range required {
+		pkg, symbol := splitQualified(entry)
+		// Each package is consulted only against ITS OWN scan results. A symbol
+		// required in two packages therefore needs an example in each, which is
+		// the whole point of qualification.
+		if !exported[pkg][symbol] {
+			unknown = append(unknown, entry)
 		}
-		if hasExample(symbol, examples) {
-			covered = append(covered, symbol)
+		if hasExample(symbol, examples[pkg]) {
+			covered = append(covered, entry)
 			continue
 		}
-		missing = append(missing, symbol)
-		if !baseline[symbol] {
-			regressions = append(regressions, symbol)
+		missing = append(missing, entry)
+		if !baseline[entry] {
+			regressions = append(regressions, entry)
 		}
 	}
 
@@ -282,16 +356,17 @@ func printVerdict(out io.Writer, regressions, unknown, stale []string) int {
 
 // staleBaseline returns baseline entries that are no longer required or are now
 // covered by an example, so they can be pruned.
-func staleBaseline(required []string, baseline, examples map[string]bool) []string {
+func staleBaseline(required []string, baseline map[string]bool, examples map[string]map[string]bool) []string {
 	requiredSet := map[string]bool{}
-	for _, symbol := range required {
-		requiredSet[symbol] = true
+	for _, entry := range required {
+		requiredSet[entry] = true
 	}
 
 	var stale []string
-	for symbol := range baseline {
-		if !requiredSet[symbol] || hasExample(symbol, examples) {
-			stale = append(stale, symbol)
+	for entry := range baseline {
+		pkg, symbol := splitQualified(entry)
+		if !requiredSet[entry] || hasExample(symbol, examples[pkg]) {
+			stale = append(stale, entry)
 		}
 	}
 	return stale
@@ -316,7 +391,12 @@ func readBaseline(path string) (map[string]bool, error) {
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
 		}
-		baseline[line] = true
+		// Legacy unqualified lines are migrated deterministically rather than
+		// rejected: every entry written before qualification existed referred to
+		// the only package that was scanned. Migrating keeps the ratchet one-way
+		// across the format change instead of resetting it.
+		pkg, symbol := splitQualified(line)
+		baseline[pkg+"."+symbol] = true
 	}
 	return baseline, scanner.Err()
 }

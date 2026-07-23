@@ -15,6 +15,16 @@ const (
 	otelExportersPrefix  = "go.opentelemetry.io/otel/exporters/"
 	zerologImportPath    = "github.com/rs/zerolog"
 	grpcImportPath       = "google.golang.org/grpc"
+	protobufImportPath   = "google.golang.org/protobuf"
+	cobraImportPath      = "github.com/spf13/cobra"
+	netHTTPImportPath    = "net/http"
+	cryptoTLSImportPath  = "crypto/tls"
+
+	telemetryImportPath = "github.com/rshade/ax-go/internal/telemetry"
+	mcpServerImportPath = "github.com/rshade/ax-go/internal/mcpserver"
+	otelSDKImportPath   = "go.opentelemetry.io/otel/sdk"
+	otelHTTPImportPath  = "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
+	otelGRPCImportPath  = "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 )
 
 // ForbiddenImport describes an import path that a public contract surface must
@@ -166,7 +176,7 @@ func ForbiddenRuntimeImports() []ForbiddenImport {
 			Reason:  "root runtime facade must not be imported by isolated contract packages",
 		},
 		{
-			Pattern: "github.com/rshade/ax-go/internal/telemetry",
+			Pattern: telemetryImportPath,
 			Reason:  "telemetry setup is a root runtime responsibility",
 		},
 		{
@@ -178,15 +188,15 @@ func ForbiddenRuntimeImports() []ForbiddenImport {
 			Reason:  "OTel exporters are runtime adapters",
 		},
 		{
-			Pattern: "go.opentelemetry.io/otel/sdk",
+			Pattern: otelSDKImportPath,
 			Reason:  "OTel SDK setup is a root runtime responsibility",
 		},
 		{
-			Pattern: "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+			Pattern: otelHTTPImportPath,
 			Reason:  "HTTP instrumentation belongs to root transport helpers",
 		},
 		{
-			Pattern: "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+			Pattern: otelGRPCImportPath,
 			Reason:  "gRPC instrumentation belongs to root transport helpers",
 		},
 		{
@@ -221,7 +231,7 @@ func ForbiddenGRPCTreeImports() []ForbiddenImport {
 			Reason:  "gRPC runtime must not link under ax_no_grpc,ax_no_otlp",
 		},
 		{
-			Pattern: "google.golang.org/protobuf",
+			Pattern: protobufImportPath,
 			Reason:  "protobuf runtime and reflection tables must not link under ax_no_grpc,ax_no_otlp",
 		},
 		{
@@ -233,6 +243,90 @@ func ForbiddenGRPCTreeImports() []ForbiddenImport {
 			Reason:  "generated gateway stubs must not link under ax_no_grpc,ax_no_otlp",
 		},
 	}
+}
+
+// ForbiddenLoggingImports returns the dependency trees that the import-isolated
+// public logging surface must keep out of its transitive graph.
+//
+// This is deliberately a distinct rule set rather than a reuse of
+// ForbiddenRuntimeImports, and the difference is not an oversight. The four
+// contract packages (contract, config, schema, id) forbid zerolog outright —
+// logging is a runtime concern they must not carry. The logging surface is the
+// exact opposite case: zerolog appears in Logger's exported method set and the
+// OpenTelemetry trace API is what makes trace correlation possible, so both are
+// REQUIRED here and flagging either would make the surface unbuildable.
+//
+// Two entries are absent from the contract-package list and present here:
+// net/http and crypto/tls. They are the largest single size lever — net/http
+// pulls crypto/tls behind it — and excluding them is most of what makes the
+// isolated binary small. Root ax links net/http through the Loki direct-push
+// addon and the HTTP transport helpers, which is why log shipping stays a
+// root-only capability.
+//
+// Each pattern covers its whole subtree, because matchesForbiddenImport
+// prefix-matches on a path boundary; moduleRootImportPath is exact-only so
+// isolated sibling packages stay importable by each other.
+func ForbiddenLoggingImports() []ForbiddenImport {
+	return []ForbiddenImport{
+		{
+			Pattern: moduleRootImportPath,
+			Reason:  "root runtime facade drags the exporter, gRPC, and Cobra trees the isolated surface exists to exclude",
+		},
+		{
+			Pattern: telemetryImportPath,
+			Reason:  "telemetry setup pulls the OTLP exporter",
+		},
+		{
+			Pattern: mcpServerImportPath,
+			Reason:  "MCP server runtime pulls the MCP SDK",
+		},
+		{
+			Pattern: otelExportersPrefix,
+			Reason:  "OTel exporters pull the gRPC and protobuf trees",
+		},
+		{
+			Pattern: otelSDKImportPath,
+			Reason:  "the OTel SDK is a root runtime responsibility; the logging surface reads span context through the trace API only",
+		},
+		{
+			Pattern: otelHTTPImportPath,
+			Reason:  "HTTP instrumentation belongs to root transport helpers",
+		},
+		{
+			Pattern: otelGRPCImportPath,
+			Reason:  "gRPC instrumentation belongs to root transport helpers",
+		},
+		{
+			Pattern: grpcImportPath,
+			Reason:  "gRPC transport helpers are runtime adapters",
+		},
+		{
+			Pattern: protobufImportPath,
+			Reason:  "protobuf runtime and reflection tables arrive with the OTLP exporter",
+		},
+		{
+			Pattern: cobraImportPath,
+			Reason:  "the CLI framework belongs to root ax.Execute",
+		},
+		{
+			Pattern: netHTTPImportPath,
+			Reason:  "net/http is the largest single size lever and pulls crypto/tls; Loki direct push is a root-only capability because of it",
+		},
+		{
+			Pattern: cryptoTLSImportPath,
+			Reason:  "crypto/tls follows net/http and is not reachable from a logging-only consumer",
+		},
+	}
+}
+
+// AssertLoggingSurfaceIsolated fails t when importPath's transitive dependency
+// graph contains a dependency the import-isolated logging surface must exclude.
+// The optional tags select the build configuration whose graph is inspected; the
+// contract must hold identically under all four, because the logging surface
+// never links the trees the build constraints decline.
+func AssertLoggingSurfaceIsolated(ctx context.Context, t testing.TB, importPath string, tags ...string) {
+	t.Helper()
+	AssertNoForbiddenImports(ctx, t, RepoRoot(t), importPath, ForbiddenLoggingImports(), tags...)
 }
 
 // AssertContractPackageIsolated fails t when importPath's transitive dependency

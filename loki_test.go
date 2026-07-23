@@ -13,23 +13,40 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/rshade/ax-go/internal/logcore"
 )
 
+// captureSinks returns a LoggerOption that records the sink set accumulated so
+// far. Placed LAST in an option list it observes exactly what NewLogger will
+// build the logger from, because options are applied in order before any sink is
+// sanctioned or wrapped.
+//
+// It exists because the concrete logger type moved into internal/logcore and is
+// unexported there, so these tests can no longer type-assert their way to the
+// sink slice. Reaching the same fact through the option seam is deliberate: the
+// alternative — widening logcore's closed export set to serve a test — is how a
+// contract package rots. The assertions below are unchanged in substance; only
+// the route to the sink set is.
+func captureSinks(dst *[]logcore.Sink) LoggerOption {
+	return func(cfg *logcore.Config) {
+		*dst = cfg.AdditionalSinks
+	}
+}
+
 // TestLokiNoop_NoEnvVar validates that WithLokiFromEnv is a no-op when
-// AX_LOKI_URL is unset, leaving zerologLogger.sinks empty. FR-002 / no-op path.
+// AX_LOKI_URL is unset, leaving the logger's sink set empty. FR-002 / no-op path.
 func TestLokiNoop_NoEnvVar(t *testing.T) {
 	t.Setenv("AX_LOKI_URL", "")
 	var buf bytes.Buffer
-	l := NewLogger(context.Background(),
+	var sinks []logcore.Sink
+	NewLogger(context.Background(),
 		WithLoggerWriter(&buf),
 		WithLokiFromEnv(),
+		captureSinks(&sinks),
 	)
-	zl, ok := l.(zerologLogger)
-	if !ok {
-		t.Fatal("NewLogger did not return zerologLogger")
-	}
-	if len(zl.sinks) != 0 {
-		t.Fatalf("expected 0 sinks when AX_LOKI_URL is unset, got %d", len(zl.sinks))
+	if len(sinks) != 0 {
+		t.Fatalf("expected 0 sinks when AX_LOKI_URL is unset, got %d", len(sinks))
 	}
 }
 
@@ -769,16 +786,14 @@ func TestLokiURL_NormalizesPushPath(t *testing.T) {
 func TestLokiURL_RejectsNonHTTPScheme(t *testing.T) {
 	t.Setenv("AX_LOKI_URL", "ftp://example.com:3100")
 	var buf bytes.Buffer
-	l := NewLogger(context.Background(),
+	var sinks []logcore.Sink
+	NewLogger(context.Background(),
 		WithLoggerWriter(&buf),
 		WithLokiFromEnv(),
+		captureSinks(&sinks),
 	)
-	zl, ok := l.(zerologLogger)
-	if !ok {
-		t.Fatal("NewLogger did not return zerologLogger")
-	}
-	if len(zl.sinks) != 0 {
-		t.Fatalf("expected no sink for non-http(s) scheme, got %d", len(zl.sinks))
+	if len(sinks) != 0 {
+		t.Fatalf("expected no sink for non-http(s) scheme, got %d", len(sinks))
 	}
 	if !strings.Contains(buf.String(), "scheme") {
 		t.Errorf("expected a scheme warning in writer output, got: %q", buf.String())
@@ -808,17 +823,18 @@ func TestLokiWriter_ContextCancelStopsGoroutine(t *testing.T) {
 
 	t.Setenv("AX_LOKI_URL", srv.URL)
 	ctx, cancel := context.WithCancel(context.Background())
+	var sinks []logcore.Sink
 	l := NewLogger(ctx,
 		WithLoggerWriter(io.Discard),
 		WithLokiFromEnv(),
+		captureSinks(&sinks),
 	)
-	zl, ok := l.(zerologLogger)
-	if !ok || len(zl.sinks) == 0 {
+	if len(sinks) == 0 {
 		t.Fatal("expected a Loki sink to be present")
 	}
-	lw, ok := zl.sinks[0].(*lokiWriter)
+	lw, ok := sinks[0].(*lokiWriter)
 	if !ok {
-		t.Fatalf("sink is %T, want *lokiWriter", zl.sinks[0])
+		t.Fatalf("sink is %T, want *lokiWriter", sinks[0])
 	}
 
 	// Write is synchronous, so the line is queued in the channel before
@@ -1027,5 +1043,66 @@ func TestLokiWriter_DiagnosticsFollowWriterOptionOrder(t *testing.T) {
 	}
 	if !strings.Contains(buf.String(), "ax: loki push returned 503") {
 		t.Fatalf("expected Loki diagnostic in configured writer, got: %q", buf.String())
+	}
+}
+
+// TestLokiLabelKeysMatchEmittedLabelFields pins the agreement between this
+// package's Loki stream label keys and the JSON field names internal/logcore
+// actually writes for each Labels field.
+//
+// Before this feature the two shared a constant (lokiLabelHost =
+// labelFieldHost), so a rename could not desynchronise them. The constants moved
+// into logcore with the logger and stay unexported there — its export set is
+// closed by contract — so the compiler no longer holds the invariant and a test
+// must.
+//
+// The failure this guards against is silent and severe: if a label field name
+// changed on one side only, the emitted line would still be well-formed and the
+// push would still succeed, but streamKeyFromLine would stop finding the field
+// and the label would quietly cease to be promoted. Queries would return nothing
+// with no error anywhere.
+func TestLokiLabelKeysMatchEmittedLabelFields(t *testing.T) {
+	labels := Labels{
+		Environment: "prod",
+		Application: "app",
+		Host:        "host-1",
+		Version:     "v1.2.3",
+	}
+
+	var buf bytes.Buffer
+	l := NewLogger(context.Background(), WithLoggerWriter(&buf), WithLoggerLabels(labels))
+	l.Info(context.Background()).Msg("label key agreement")
+
+	var emitted map[string]any
+	if err := json.Unmarshal(buf.Bytes(), &emitted); err != nil {
+		t.Fatalf("log line was not JSON: %v", err)
+	}
+
+	want := map[string]string{
+		lokiLabelEnvironment: labels.Environment,
+		lokiLabelApplication: labels.Application,
+		lokiLabelHost:        labels.Host,
+		lokiLabelVersion:     labels.Version,
+	}
+	for key, value := range want {
+		got, ok := emitted[key]
+		if !ok {
+			t.Errorf(
+				"Loki stream label key %q is absent from the emitted line: "+
+					"internal/logcore writes a different field name for this Labels field, "+
+					"so the label would silently stop being promoted",
+				key,
+			)
+			continue
+		}
+		if got != value {
+			t.Errorf("emitted %q = %v, want %q", key, got, value)
+		}
+	}
+
+	// level is supplied by zerolog rather than by Labels, and completes the
+	// five-key sanctioned set.
+	if _, ok := emitted[lokiLabelLevel]; !ok {
+		t.Errorf("Loki stream label key %q is absent from the emitted line", lokiLabelLevel)
 	}
 }

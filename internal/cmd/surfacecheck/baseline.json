@@ -807,7 +807,7 @@
         },
         {
           "id": "interface-method:Logger.WithLabels",
-          "signature": "func(Labels) Logger",
+          "signature": "func(github.com/rshade/ax-go/internal/logcore.Labels) github.com/rshade/ax-go/internal/logcore.Logger",
           "configurations": "all",
           "profiles": "all"
         },
@@ -897,19 +897,19 @@
         },
         {
           "id": "type:Labels",
-          "signature": "struct{Environment string; Application string; Host string; Version string}",
+          "signature": "= github.com/rshade/ax-go/internal/logcore.Labels",
           "configurations": "all",
           "profiles": "all"
         },
         {
           "id": "type:Logger",
-          "signature": "interface{Debug(ctx context.Context) *github.com/rs/zerolog.Event; Error(ctx context.Context) *github.com/rs/zerolog.Event; Info(ctx context.Context) *github.com/rs/zerolog.Event; Warn(ctx context.Context) *github.com/rs/zerolog.Event; WithLabels(labels Labels) Logger; Zerolog() *github.com/rs/zerolog.Logger}",
+          "signature": "= github.com/rshade/ax-go/internal/logcore.Logger",
           "configurations": "all",
           "profiles": "all"
         },
         {
           "id": "type:LoggerOption",
-          "signature": "func(*loggerConfig)",
+          "signature": "= github.com/rshade/ax-go/internal/logcore.Option",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1423,6 +1423,119 @@
         {
           "id": "func:NewIdempotencyKey",
           "signature": "func() string",
+          "configurations": "all",
+          "profiles": "all"
+        }
+      ]
+    },
+    {
+      "path": "github.com/rshade/ax-go/logging",
+      "features": [
+        {
+          "id": "field:Labels.Application",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Labels.Environment",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Labels.Host",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Labels.Version",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:Flush",
+          "signature": "func(context.Context, Logger) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:NewLogger",
+          "signature": "func(context.Context, ...LoggerOption) Logger",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithLoggerLabels",
+          "signature": "func(Labels) LoggerOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithLoggerLevel",
+          "signature": "func(github.com/rs/zerolog.Level) LoggerOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithLoggerWriter",
+          "signature": "func(io.Writer) LoggerOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.Debug",
+          "signature": "func(context.Context) *github.com/rs/zerolog.Event",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.Error",
+          "signature": "func(context.Context) *github.com/rs/zerolog.Event",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.Info",
+          "signature": "func(context.Context) *github.com/rs/zerolog.Event",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.Warn",
+          "signature": "func(context.Context) *github.com/rs/zerolog.Event",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.WithLabels",
+          "signature": "func(github.com/rshade/ax-go/internal/logcore.Labels) github.com/rshade/ax-go/internal/logcore.Logger",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "interface-method:Logger.Zerolog",
+          "signature": "func() *github.com/rs/zerolog.Logger",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Labels",
+          "signature": "= github.com/rshade/ax-go/internal/logcore.Labels",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Logger",
+          "signature": "= github.com/rshade/ax-go/internal/logcore.Logger",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:LoggerOption",
+          "signature": "= github.com/rshade/ax-go/internal/logcore.Option",
           "configurations": "all",
           "profiles": "all"
         }

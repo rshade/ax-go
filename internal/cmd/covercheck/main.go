@@ -139,8 +139,26 @@ func defaultFloorConfig() floorConfig {
 		repoWide:     repoWideFloor,
 		defaultFloor: defaultPackageFloor,
 		perPackage: map[string]float64{
-			"github.com/rshade/ax-go":                         80.0,
-			"github.com/rshade/ax-go/examples/integration":    85.0,
+			// Raised 80.0 -> 85.0 on 2026-07-22. Feature 017 moved the logger
+			// implementation into internal/logcore, which changes root's
+			// covered-statement ratio in a direction nobody had measured. It moved
+			// UP, to 89.8%: the extracted code was well tested and its statements
+			// now count against logcore instead. Re-checking this floor was an
+			// explicit task obligation precisely so the move could not silently
+			// mask a drop; the 5pp escalation is the documented response to a
+			// measured improvement (AGENTS.md "Escalation Path"), leaving ~4.8pp
+			// headroom.
+			"github.com/rshade/ax-go":                      85.0,
+			"github.com/rshade/ax-go/examples/integration": 85.0,
+			// Enrolled 2026-07-22 with feature 017, each calibrated ~2pp below its
+			// measured coverage per the established convention. The two example
+			// commands are the binary-size probes: they are tiny and fully
+			// exercised, so they sit close to their measured 100%.
+			"github.com/rshade/ax-go/logging":                 98.0,
+			"github.com/rshade/ax-go/internal/logcore":        96.5,
+			"github.com/rshade/ax-go/internal/cmd/sizecheck":  86.0,
+			"github.com/rshade/ax-go/examples/logging":        98.0,
+			"github.com/rshade/ax-go/examples/rootlogging":    98.0,
 			"github.com/rshade/ax-go/internal/cli":            98.0,
 			"github.com/rshade/ax-go/internal/cmd/benchcheck": 80.0,
 			"github.com/rshade/ax-go/internal/cmd/doccover":   45.0,

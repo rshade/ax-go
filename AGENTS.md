@@ -31,6 +31,18 @@ conflicts with the constitution, the constitution wins.
   packages for thin consumers. They must remain import-isolated from the root
   runtime facade, telemetry exporters/SDK setup, logger/Loki, HTTP
   instrumentation, and gRPC runtime adapters.
+- `logging/` is an approved public package and the second import-isolated
+  surface: the trace-correlated zerolog logger over `internal/logcore`, exactly
+  as `mcp` sits over `internal/mcpserver` — except that unlike `mcp`, `logging`
+  **is** import-isolated. Its forbidden set differs from the four contract
+  packages above: `zerolog` and the OTel trace **API** are required here (they
+  appear in `Logger`'s method set and provide trace correlation), while
+  `net/http` and `crypto/tls` are forbidden. That is why
+  `internal/testutil/imports.go` carries a per-surface rule set
+  (`ForbiddenLoggingImports`) rather than one shared list. A logging-only
+  consumer links 103 packages and ~2.26 MB stripped, against 410 packages and
+  ~12.0 MB through root `ax`. Loki direct push and `Execute` stay root-only,
+  because both need dependencies the isolation exists to exclude.
 - `mcp/` is an approved public package: the thin MCP server runtime surface
   (`mcp.Serve`, `mcp.NewCommand`) over `internal/mcpserver`, which confines
   the MCP Go SDK and all protocol mechanics. It belongs to the apidiff-gated
@@ -114,6 +126,11 @@ conflicts with the constitution, the constitution wins.
 - Use `github.com/rs/zerolog` for structured logging. The canonical
   constructor is `ax.NewLogger(ctx)`, returning an `ax.Logger` (initially
   backed by `*zerolog.Logger`) with trace correlation wired in.
+  `logging.NewLogger(ctx)` is an identity-preserving alias of that same
+  constructor exposed by the import-isolated surface — one implementation, one
+  backend, one trace-correlation hook, reachable by two names (constitution
+  `1.2.1`). It is not a second logger, and adding one remains forbidden by
+  Principle VI.
 - The `ax.Logger` interface exists ONLY as a migration seam for a future
   superseding decision. Do not introduce parallel-pluggable logger backends, an
   `ax.WithLogger(...)`-style runtime selection API, or a second concrete
@@ -190,9 +207,11 @@ Rules when touching gated code:
 
 `internal/cmd/surfacecheck` is the single surface gate. It is documented in
 full under [Public Surface Gate](#public-surface-gate); the short version is
-that it scans the six public packages across 4 build-tag configurations ×
+that it scans the seven public packages across 4 build-tag configurations ×
 6 `GOOS`/`GOARCH` profiles = 24 loads, and diffs the result against both
-`internal/cmd/surfacecheck/baseline.json` and the permanent audit.
+`internal/cmd/surfacecheck/baseline.json` and the permanent audit. The load
+count is 24 regardless of package count: a load is one (configuration, profile)
+combination, and every requested package is loaded within it.
 
 ```bash
 make surface-check    # verify
@@ -297,8 +316,13 @@ when they enrolled, ~2pp below their measured coverage):
 
 | Package | Floor |
 |---------|-------|
-| `github.com/rshade/ax-go` | 80% |
+| `github.com/rshade/ax-go` | 85% |
 | `github.com/rshade/ax-go/examples/integration` | 85% |
+| `github.com/rshade/ax-go/examples/logging` | 98% |
+| `github.com/rshade/ax-go/examples/rootlogging` | 98% |
+| `github.com/rshade/ax-go/internal/cmd/sizecheck` | 86% |
+| `github.com/rshade/ax-go/internal/logcore` | 96.5% |
+| `github.com/rshade/ax-go/logging` | 98% |
 | `github.com/rshade/ax-go/internal/cli` | 98% |
 | `github.com/rshade/ax-go/internal/cmd/benchcheck` | 80% |
 | `github.com/rshade/ax-go/internal/cmd/doccover` | 45% |
@@ -456,7 +480,7 @@ The public API surface is gated in CI by `internal/cmd/surfacecheck`, which
 inventories the complete compiler-visible surface (declarations, direct and
 promoted fields, complete interface method sets, value and pointer method
 sets, alias-attributed members, and reachable hidden concrete types) of all
-six public packages, across 4 build-tag configurations × 6 supported
+seven public packages, across 4 build-tag configurations × 6 supported
 GOOS/GOARCH profiles = 24 loads, and compares it against two committed
 artifacts:
 
@@ -538,6 +562,112 @@ surface nobody reviewed.
 80% per-package coverage floor in
 `internal/cmd/covercheck/main.go`.
 
+## Binary Size Gate
+
+The import-isolated `logging` surface exists to make a logging-only consumer
+small, and a guarantee nothing measures is a guarantee that decays. Binary size
+is gated in CI by `internal/cmd/sizecheck`, which builds two committed probe
+programs with production flags (`-trimpath -ldflags="-s -w"`) and enforces two
+independent budgets. Thresholds are hardcoded Go constants in
+`internal/cmd/sizecheck/main.go`, so every change is a reviewable commit
+auditable via `git blame`.
+
+### The two probes
+
+| Program | Role |
+|---------|------|
+| `examples/logging` | imports **only** `github.com/rshade/ax-go/logging`; the measured subject |
+| `examples/rootlogging` | byte-for-byte the same program on root `ax`; the ratio denominator |
+
+They differ by one import and one call. Keep them diff-clean against each
+other — anything more makes the ratio measure something other than the import
+boundary. They are committed rather than synthesised at measurement time so the
+comparison builds against this repository's own `go.mod`: no network, no
+`replace` stanza, and the difference stays reviewable in `git diff`.
+
+### The two budgets, and why they are NOT adjusted the same way
+
+| Constant | Value | Adjustable? |
+|----------|-------|-------------|
+| `maxIsolatedBinaryBytes` | 3,000,000 | **Yes**, for a reviewed reason |
+| `minReductionPercent` | 75% | **No** — lowering it is a spec change |
+
+The **absolute ceiling** drifts with the toolchain, so it carries deliberate
+headroom (measured 2,261,257 bytes on Go 1.26.5) and may be raised on the
+coverage/benchmark protocol: confirm the increase is understood — a jump almost
+always means a new transitive dependency, so check `go list -deps` first — edit
+the constant, verify, and record the reason in the commit message.
+
+The **reduction ratio** is toolchain-independent: both probes are built by the
+same compiler in the same run, so a newer Go moves them together and can never
+explain a ratio breach. A breach means the isolated surface gained weight the
+root facade did not, which is the exact regression this feature exists to
+prevent. Lowering it re-negotiates the headline claim — treat it as a spec
+change and update SC-002 in the same commit.
+
+Never move either constant to silence a failure whose cause you have not
+identified.
+
+### Stream and exit contract
+
+A pass writes one minified JSON object to stdout — including both measured sizes
+and the computed reduction — and nothing to stderr, exiting `0`. Every failure
+writes nothing to stdout and exactly one minified `ax.Error` envelope to stderr.
+Each failure carries its own code, because a maintainer resolves each
+differently — a probe that did not compile, a breached ceiling, and a breached
+ratio are never collapsed into one:
+
+| Error code | Exit | Meaning |
+|------------|------|---------|
+| `size_build_failed` | `2` | A probe did not compile; the budget was NOT checked. |
+| `size_ceiling_exceeded` | `2` | The isolated binary breached the absolute ceiling. |
+| `size_reduction_insufficient` | `2` | The isolated binary is not sufficiently smaller than the root build. |
+| `invalid_size_artifact` | `2` | Invalid flags or unexpected positional arguments. |
+| `size_permission` | `4` | Permission denied executing the Go toolchain. |
+| `size_internal` | `1` | Unexpected internal failure. |
+
+### Local verification (size)
+
+```bash
+make size-check
+```
+
+## Type Relocation Is Not a Breaking Change
+
+`go-apidiff` keys a type's identity on its **declaring package**, so moving an
+exported type into another package and leaving an identity-preserving alias
+behind (`type Error = contract.Error`) is reported as an incompatible change —
+even though every consumer compiles unchanged.
+
+This repository has already shipped that refactor once. The v0.1.0 → v0.2.0
+release moved `Error`, `Mode`, `Envelope`, `Schema`, and the config/schema option
+types into the import-isolated public packages, released as a plain `feat:`, and
+was a no-op for adopters. Running `go-apidiff` across that tag boundary today
+reports **37 findings of this shape** — including entries whose "before" and
+"after" renderings are textually identical. The apidiff gate landed afterwards
+(PR #82) and had never been reconciled against that precedent.
+
+`internal/cmd/apidiff-verdict` therefore classifies these findings and excludes
+them from the merge gate. The rule is deliberately narrow — a finding is excused
+only when:
+
+- the two renderings are **textually identical**, or
+- a bare type name gained a declaring package **inside this module** while
+  keeping its name, allowing the established prefix convention
+  (`ParseConfigOption` → `config.Option`, `LoggerOption` → `logcore.Option`).
+
+Removals, renames, signature changes, member-level changes, and relocations to
+another module all stay breaking. Excused findings are printed in their own
+**"Type relocations (not gated)"** report section — never silently dropped — and
+structural changes to the relocated types remain gated by `surface-check`, which
+inventories every field and interface method across all 24 loads. The two gates
+are complementary: apidiff for semantic compatibility, surfacecheck for exact
+structural surface.
+
+The classifier's acceptance test is the release history: it must rule the shipped
+v0.1.0 → v0.2.0 diff non-breaking, and `TestClassifierMatchesShippedReleaseHistory`
+asserts exactly that.
+
 ## Documentation Discipline (Contracts, Not Narration)
 
 Coding agents read doc comments as much as humans do, and an agent
@@ -603,7 +733,8 @@ follows them.
 - **Public API diffing in CI.** The `API Diff` workflow
   (`.github/workflows/apidiff.yml`) runs `go-apidiff` on every PR and scopes
   the result to the public surface — the root package `ax` plus the public
-  packages `config`, `contract`, `id`, `mcp`, and `schema`. `internal/` is exempt
+  packages `config`, `contract`, `id`, `logging`, `mcp`, and `schema`.
+  `internal/` is exempt
   (Constitution Principle XI; the toolchain blocks external import). An
   incompatible change to that surface **fails CI** unless the PR carries the
   `breaking-change-approved` label. Applying the label acknowledges the break

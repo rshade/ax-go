@@ -1,6 +1,25 @@
 <!--
 SYNC IMPACT REPORT
 ==================
+Amendment 2026-07-22 — Version change: 1.2.0 → 1.2.1 (PATCH)
+Bump rationale: Clarification only. No principle was added, removed, or redefined.
+Principle VIII named `ax.NewLogger(ctx)` as the constructor logging MUST go
+through. Feature 017-import-isolated-logging exposes the SAME constructor through
+an import-isolated public surface via identity-preserving type aliases, so a
+consumer calling it reaches one implementation, one backend, and one trace-
+correlation hook. Read literally, the old wording forbade that alias; read for
+intent, it forbids a SECOND logger. The clause is reworded to say what it always
+meant, and the no-second-backend half is made explicit rather than implied.
+Modified principles: VIII. Observability & ID Discipline (second bullet reworded;
+title, rationale, and every other bullet unchanged).
+Templates: plan/spec/tasks templates reviewed — no change required (none encodes a
+logging-constructor contract).
+Derived docs: AGENTS.md's "The canonical constructor is `ax.NewLogger(ctx)`"
+statement remains TRUE and unchanged — `ax.NewLogger` stays canonical; the alias
+surface is reconciled into AGENTS.md by that feature's own documentation task
+when the package exists, so no derived doc describes unshipped code.
+
+--- Amendment 2026-06-16 below ---
 Amendment 2026-06-16 — Version change: 1.1.0 → 1.2.0 (MINOR)
 Bump rationale: Added TWO new principles and removed/redefined nothing, so MINOR
 (a new principle/section) is correct — not MAJOR, not PATCH.
@@ -208,8 +227,12 @@ because prose drifts silently while examples and golden files break loudly.
 ### VIII. Observability & ID Discipline
 
 - Contexts MUST propagate W3C Trace Context by default via the OpenTelemetry SDK.
-- Logging MUST go through `ax.NewLogger(ctx)` (zerolog), with `trace_id`/`span_id`
-  on every line when a span is active.
+- Logging MUST go through `ax.NewLogger(ctx)` (zerolog) — or through an
+  identity-preserving alias of that same constructor exposed by an import-isolated
+  public surface — with `trace_id`/`span_id` on every line when a span is active.
+  An alias surface MUST resolve to one implementation and one backend; exposing a
+  second logger implementation, or a second backend behind a second constructor,
+  is forbidden by Principle VI regardless of which surface names it.
 - Loki shipping MUST be decoupled (`stderr` → Promtail/Alloy by default);
   `AX_LOKI_URL` direct push is opt-in and MUST live as a separate addon, never
   coupled into `logger.go`.
@@ -377,4 +400,4 @@ These are decisions, not oversights:
   principles and the ADR-absorption rule; every PR review verifies compliance; any
   violation MUST be justified in the plan's Complexity Tracking table.
 
-**Version**: 1.2.0 | **Ratified**: 2026-06-01 | **Last Amended**: 2026-06-16
+**Version**: 1.2.1 | **Ratified**: 2026-06-01 | **Last Amended**: 2026-07-22
