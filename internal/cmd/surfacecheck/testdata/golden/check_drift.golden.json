@@ -1,0 +1,1 @@
+{"error_code":"surface_drift","message":"public surface differs from the reviewed baseline","trace_id":"00000000000000000000000000000000","tool":"surfacecheck","version":"dev","schema_version":"1.0.0","actionable_fix":"review the sorted drift and update source, audit, and baseline intentionally","suggestions":["added func:Do"],"retryable":false}

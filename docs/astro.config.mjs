@@ -11,6 +11,7 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'ax-go',
+			logo: { src: './src/assets/ax-go-mark.svg' },
 			customCss: ['./src/styles/theme-bridge.css'],
 			social: [{ icon: 'github', label: 'GitHub', href: 'https://github.com/rshade/ax-go' }],
 			plugins: [starlightLinksValidator()],

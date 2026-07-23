@@ -1,5 +1,7 @@
 # ax-go
 
+![The ax-go mascot: a teal-cyan robot gopher shouldering an axe](docs/brand/ax-go-logo-256.png)
+
 > Agentic Experience (AX) foundation for Go CLI tools — the "Common DNA" for
 > the rshade portfolio.
 
@@ -455,6 +457,13 @@ stability and SemVer policy.
 
 Once a downstream project tags a release that pins an ax-go version, add a row
 here. See [`CONTRIBUTING.md`](CONTRIBUTING.md) for the update process.
+
+## Brand
+
+The ax-go mascot (a robot gopher shouldering an axe), the geometric logomark,
+the color palette, and usage guidelines live in
+[`docs/brand/`](docs/brand/README.md). The logomark also serves as the docs
+site-header logo and the source of the [favicon](docs/public/favicon.svg).
 
 ## Contributing
 

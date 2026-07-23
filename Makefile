@@ -17,7 +17,7 @@ BENCH_COMPARE_FLAGS=$(BENCH_FLAGS) -count=$(BENCH_COUNT)
 all: build
 
 .PHONY: ci
-ci: test validate lint doc-coverage bench-check
+ci: test validate lint doc-coverage bench-check surface-check
 
 .PHONY: build
 build:
@@ -91,6 +91,10 @@ bench-check:
 doc-coverage:
 	@echo "Checking ExampleXxx coverage on the primary API..."
 	go run ./internal/cmd/doccover
+
+.PHONY: surface-check
+surface-check:
+	@go run ./internal/cmd/surfacecheck
 
 .PHONY: lint
 lint:
@@ -175,6 +179,7 @@ help:
 	@echo "  bench         - Run benchmarks with -benchmem"
 	@echo "  bench-check   - Enforce the performance regression budget against BENCH_BASE_REF"
 	@echo "  doc-coverage  - Check ExampleXxx coverage on the primary API"
+	@echo "  surface-check - Check the root public API surface against its reviewed baseline and audit"
 	@echo "  lint          - Run golangci-lint, markdownlint, and actionlint"
 	@echo "  lint-actions  - Run actionlint on GitHub workflows"
 	@echo "  validate      - Check gofmt, go mod tidy, and go vet"
