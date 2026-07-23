@@ -86,21 +86,24 @@ Import-isolation tests keep those public contract packages free of the root
 facade, telemetry exporters/SDK setup, logger/Loki, HTTP instrumentation, and
 gRPC runtime adapters.
 
-**These packages provide no live tracing.** That same import isolation keeps the
-OpenTelemetry SDK out of them, so none of them starts a span, extracts
-`TRACEPARENT` / `TRACESTATE`, or resolves an active span context.
-`contract.TraceIDFromContext` and `contract.SpanIDFromContext` **read back
-metadata a caller already stored** with `contract.WithMetadata` — they resolve
-nothing themselves, and return `contract.ZeroTraceID` / `contract.ZeroSpanID`
-when no metadata is present. Because those zero values are well-formed W3C IDs
-rather than empty strings, a context that was never populated produces
-valid-looking output carrying no trace at all.
+**These packages provide no live tracing.** They link zero gRPC and always
+have, and that same import isolation keeps the OpenTelemetry SDK out of them,
+so none of them starts a span, extracts `TRACEPARENT` / `TRACESTATE`, or
+resolves an active span context. `contract.TraceIDFromContext` and
+`contract.SpanIDFromContext` **read back metadata a caller already stored**
+with `contract.WithMetadata` — they resolve nothing themselves, and return
+`contract.ZeroTraceID` / `contract.ZeroSpanID` when no metadata is present.
+Because those zero values are well-formed W3C IDs rather than empty strings, a
+context that was never populated produces valid-looking output carrying no
+trace at all.
 
 Live tracing is provided **only by the root `ax` package**: `ax.StartTelemetry`
 (W3C propagation and `TRACEPARENT` extraction), the recording root span
 `ax.Execute` opens around the command, and `ax.NewLogger`'s `trace_id` /
 `span_id` log correlation. Thin consumers that need real trace IDs must import
-root `ax` and accept the runtime weight the isolated packages exist to avoid.
+root `ax` and accept the runtime weight the isolated packages exist to avoid —
+or keep the root facade and drop the heavy optional pieces at build time, as
+described in [Slimming the binary](#slimming-the-binary-optional-otlp-and-grpc).
 
 Use the `mcp` package to run a CLI as a live MCP server (see
 [Running as an MCP server](#running-as-an-mcp-server)):
@@ -427,6 +430,69 @@ Build the integration example with the documented injection target:
 make build-example
 ./bin/ax-integration __schema
 ```
+
+## Slimming the binary (optional OTLP and gRPC)
+
+Two **optional, negative** build constraints let you decline the two heaviest
+dependency roots. Both default to off, so existing consumers need do nothing —
+setting neither tag is the state every build is already in.
+
+| Tag | Declines | Default |
+| --- | --- | --- |
+| `ax_no_otlp` | OTLP HTTP trace export | absent (export active) |
+| `ax_no_grpc` | `ax.GRPCDial` and gRPC client instrumentation | absent (helper present) |
+
+```sh
+go build -tags=ax_no_grpc,ax_no_otlp -ldflags="-s -w" ./cmd/yourcli
+```
+
+### Decline both, or neither
+
+The size benefit requires **both**. Each tag removes one of _two independent
+roots_ over the same gRPC subtree, so one alone buys you almost nothing:
+
+| Tags | Δ stripped size | grpc packages left |
+| --- | ---: | ---: |
+| `ax_no_grpc` | −0.00% | 66 |
+| `ax_no_otlp` | −15.1% | 64 |
+| **both** | **−63.3%** | **0** |
+
+Measured on linux/amd64 against a root-facade fixture consumer
+(14,893,218 → 5,460,130 bytes); windows/amd64 gives −62.5%. With both tags set,
+`go list -deps` reports exactly zero packages from `google.golang.org/grpc`,
+`google.golang.org/protobuf`, `go.opentelemetry.io/proto/otlp`, and
+`github.com/grpc-ecosystem/grpc-gateway/v2`.
+
+### What you keep
+
+Tracing degrades to _no export_, never to _no tracing_. In every configuration:
+
+- W3C `TRACEPARENT`/`TRACESTATE` extraction and continuation
+- a recording root span around `ax.Execute`
+- `trace_id`/`span_id` on every log line emitted inside that span
+- `AX_OTEL_DEBUG` local span output on stderr
+- `ax.HTTPClient` / `ax.NewHTTPClient`, fully instrumented
+- byte-identical `__schema` and `ax.Error` payloads, stream separation, exit
+  codes, `--dry-run`, and `--idempotency-key`
+
+### What you give up
+
+**With `ax_no_otlp`:** OTLP network export. A configured
+`OTEL_EXPORTER_OTLP_ENDPOINT` is _not_ an error — ax stays fail-open, emitting
+one `ax: otel exporter disabled: …` line on stderr per telemetry start and
+succeeding normally. That is by design, but it means a misconfigured build
+degrades silently to no export. Watch for that diagnostic.
+
+**With `ax_no_grpc`:** `ax.GRPCDial` is absent from the build. Calling it fails
+at compile time with Go's standard `undefined: ax.GRPCDial`; the toolchain gives
+a library no way to customise that message, so the explanation lives in the
+package documentation (`grpc_disabled.go`). To restore it, drop the tag — nothing
+else changes: no source edit, no import change, no API difference.
+
+`ax.GRPCDial` is the **only** public identifier whose presence varies with a
+build tag. This is enforced on every PR by `make surface-check`, which
+type-checks all six public packages across 4 configurations × 6 GOOS/GOARCH
+profiles and diffs the result against a committed baseline.
 
 The target injects `git describe --tags --always --dirty` into
 `main.version`:

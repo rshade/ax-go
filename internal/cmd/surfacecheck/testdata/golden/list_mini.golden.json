@@ -1,1 +1,1 @@
-{"schema_version":1,"features":[{"id":"const:Answer","signature":"untyped int"},{"id":"func:Do","signature":"func()"}]}
+{"schema_version":2,"packages":[{"path":"fixture/mini","features":[{"id":"const:Answer","signature":"untyped int","configurations":"all","profiles":"all"},{"id":"func:Do","signature":"func()","configurations":"all","profiles":"all"}]}]}

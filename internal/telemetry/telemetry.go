@@ -14,7 +14,6 @@ import (
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
@@ -56,6 +55,13 @@ type Config struct {
 // to a no-op/recording-only provider rather than surfacing an error; the error
 // return exists solely for signature stability in case a future change makes
 // Start fallible.
+//
+// Under the ax_no_otlp build constraint, newOTLPExporter resolves to the stub
+// in otlp_disabled.go, so a configured cfg.OTLPEndpoint takes the fail-open
+// branch above: one "otel exporter disabled" diagnostic, no export, and an
+// otherwise unchanged recording provider. Every other behaviour documented here
+// — propagation, the debug exporter, the returned context — is identical in
+// both configurations.
 func Start(ctx context.Context, cfg Config) (context.Context, *sdktrace.TracerProvider, error) {
 	if ctx == nil {
 		ctx = context.Background()
@@ -134,31 +140,6 @@ func telemetryResource(cfg Config) *resource.Resource {
 		return custom
 	}
 	return merged
-}
-
-func newOTLPExporter(ctx context.Context, cfg Config) (sdktrace.SpanExporter, error) {
-	endpoint, err := normalizeOTLPEndpoint(cfg.OTLPEndpoint)
-	if err != nil {
-		return nil, err
-	}
-	budget := cfg.ShutdownBudget
-	if budget <= 0 {
-		budget = DefaultShutdownBudget
-	}
-
-	exporter, err := otlptracehttp.New(
-		ctx,
-		otlptracehttp.WithEndpointURL(endpoint),
-		otlptracehttp.WithTimeout(budget),
-		otlptracehttp.WithRetry(otlptracehttp.RetryConfig{Enabled: false}),
-	)
-	if err != nil {
-		return nil, fmt.Errorf("create OTLP HTTP exporter: %w", err)
-	}
-	return &diagnosticExporter{
-		exporter: exporter,
-		stderr:   cfg.Stderr,
-	}, nil
 }
 
 func normalizeOTLPEndpoint(endpoint string) (string, error) {

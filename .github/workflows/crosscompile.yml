@@ -24,7 +24,7 @@ env:
 
 jobs:
   crosscompile:
-    name: Cross-compile (${{ matrix.goos }}/${{ matrix.goarch }})
+    name: Cross-compile (${{ matrix.goos }}/${{ matrix.goarch }}, ${{ matrix.tags }})
     runs-on: ubuntu-latest
     strategy:
       # fail-fast: false so one broken combination doesn't cancel the
@@ -34,9 +34,17 @@ jobs:
       matrix:
         goos: [linux, darwin, windows]
         goarch: [amd64, arm64]
+        # The four supported build-tag combinations. Both ax-go constraints
+        # are negative, so "default" is the no-tags build; the steps below
+        # translate that sentinel to an empty -tags value. Without this
+        # dimension the declined configurations would never be
+        # cross-compiled, and a platform-specific break behind a tag would
+        # reach a release unnoticed.
+        tags: [default, ax_no_grpc, ax_no_otlp, 'ax_no_grpc,ax_no_otlp']
     env:
       GOOS: ${{ matrix.goos }}
       GOARCH: ${{ matrix.goarch }}
+      BUILD_TAGS: ${{ matrix.tags }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
@@ -47,7 +55,21 @@ jobs:
           go-version: ${{ env.GO_VERSION }}
           cache: true
 
+      # "default" is the sentinel for the no-tags build. GOFLAGS carries the
+      # optional tag argument without shell word splitting; an empty value
+      # builds the default configuration with no tag flag at all.
+      - name: Resolve build tags
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "$BUILD_TAGS" = "default" ]; then
+            echo "GOFLAGS=" >> "$GITHUB_ENV"
+          else
+            echo "GOFLAGS=-tags=$BUILD_TAGS" >> "$GITHUB_ENV"
+          fi
+
       - name: Build all packages
+        shell: bash
         run: go build ./...
 
       - name: Build integration example with version injection
@@ -55,9 +77,11 @@ jobs:
         # plain `./...` build above already covers examples/integration,
         # but the version-injection ldflags is a separate code path worth
         # its own check. Output is discarded; nothing executes this binary.
+        shell: bash
         run: |
           go build -ldflags "-X main.version=ci-crosscompile" \
             -o /dev/null ./examples/integration
 
       - name: Vet all packages
+        shell: bash
         run: go vet ./...

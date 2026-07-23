@@ -12,6 +12,18 @@
 
 version: "2"
 
+run:
+  # Build tags applied to this invocation. golangci-lint accepts exactly ONE tag
+  # set per run, so full coverage of ax-go's four supported configurations needs
+  # four invocations — `make lint` iterates them via --build-tags, which
+  # overrides this list.
+  #
+  # This default is intentionally empty: it is the default build, the
+  # configuration every existing consumer is in. Do NOT add ax_no_grpc or
+  # ax_no_otlp here; doing so would silently stop linting the default build
+  # rather than adding coverage.
+  build-tags: []
+
 issues:
   # Maximum count of issues with the same text.
   # Set to 0 to disable.

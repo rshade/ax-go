@@ -148,6 +148,63 @@ conflicts with the constitution, the constitution wins.
    (ExampleXxx coverage on the primary API). All must be clean.
 8. Use `testing.B` with `-benchmem` for allocation or hot-path performance
    claims. Do not assert numeric performance targets without a benchmark.
+9. Run `make surface-check` (`internal/cmd/surfacecheck`) — the exported-surface
+   gate across all build configurations and platforms. See **Build
+   Configurations** below.
+
+### Build Configurations (tagged toolchain)
+
+Two negative build constraints, `ax_no_otlp` and `ax_no_grpc`, let a consumer
+decline OTLP export and `ax.GRPCDial`. Both default off, so the default build is
+what every existing consumer already has.
+
+**Code behind a build constraint is invisible to the default toolchain.** Neither
+`go vet ./...` nor `go test -race ./...` passes tags, and `golangci-lint` accepts
+only one tag set per run. A green default run does NOT cover the declined
+configurations — pass tags explicitly:
+
+```bash
+go build   -tags=ax_no_grpc,ax_no_otlp ./...
+go test    -race -tags=ax_no_grpc,ax_no_otlp ./...
+go vet     -tags=ax_no_grpc,ax_no_otlp ./...
+golangci-lint run --build-tags=ax_no_grpc,ax_no_otlp
+```
+
+`make test`, `make validate`, and `make lint` iterate all four combinations
+(`BUILD_TAG_MATRIX`); CI runs them as matrix jobs. The four configurations are
+exhaustive: default, `ax_no_grpc`, `ax_no_otlp`, and both.
+
+Rules when touching gated code:
+
+- Tag names are stable public contract. Renaming one is a breaking change under
+  Principle XI.
+- Parity assertions (trace extraction, root span, log correlation, machine
+  payloads) belong in **untagged** files so they run under every configuration.
+  A parity claim verified only by default proves nothing.
+- The declined build must never gain an exported symbol. `grpc_disabled.go` and
+  `otlp_disabled.go` declare none, and must not reference any type from the
+  declined dependency trees — doing so would pull the trees back in.
+- `ax.GRPCDial` is the only public identifier whose presence may vary.
+
+### Exported Surface Gate
+
+`internal/cmd/surfacecheck` is the single surface gate. It is documented in
+full under [Public Surface Gate](#public-surface-gate); the short version is
+that it scans the six public packages across 4 build-tag configurations ×
+6 `GOOS`/`GOARCH` profiles = 24 loads, and diffs the result against both
+`internal/cmd/surfacecheck/baseline.json` and the permanent audit.
+
+```bash
+make surface-check    # verify
+make surface-update   # regenerate after an INTENTIONAL API change
+git diff internal/cmd/surfacecheck/baseline.json   # review every line
+```
+
+The tag combinations, profile list, and public package list are hardcoded Go
+constants in `inventory.go`, so a matrix change is a reviewable commit
+auditable via `git blame`. The public package list is duplicated from
+`apidiff-verdict`'s `allowedPackages()` and guarded by a test that parses the
+original and compares.
 
 ### Changelog & Releases
 
@@ -245,6 +302,7 @@ when they enrolled, ~2pp below their measured coverage):
 | `github.com/rshade/ax-go/internal/cli` | 98% |
 | `github.com/rshade/ax-go/internal/cmd/benchcheck` | 80% |
 | `github.com/rshade/ax-go/internal/cmd/doccover` | 45% |
+| `github.com/rshade/ax-go/internal/cmd/surfacecheck` | 80% |
 | `github.com/rshade/ax-go/internal/config` | 65% |
 | `github.com/rshade/ax-go/internal/mcp` | 96.9% |
 | `github.com/rshade/ax-go/internal/schema` | 93% |
@@ -394,26 +452,32 @@ that branch state on their own runner.
 
 ## Public Surface Gate
 
-The root `ax` public API surface is gated in CI by
-`internal/cmd/surfacecheck`, which inventories the complete compiler-visible
-root surface (declarations, direct and promoted fields, complete interface
-method sets, value and pointer method sets, alias-attributed members, and
-reachable hidden concrete types) across all six supported GOOS/GOARCH
-profiles and compares it against two committed artifacts:
+The public API surface is gated in CI by `internal/cmd/surfacecheck`, which
+inventories the complete compiler-visible surface (declarations, direct and
+promoted fields, complete interface method sets, value and pointer method
+sets, alias-attributed members, and reachable hidden concrete types) of all
+six public packages, across 4 build-tag configurations × 6 supported
+GOOS/GOARCH profiles = 24 loads, and compares it against two committed
+artifacts:
 
 - `internal/cmd/surfacecheck/baseline.json`: the current approved canonical
-  feature IDs and signatures (schema in
+  feature IDs, signatures, and the configurations and profiles each feature is
+  present in (schema version 2; the version 1 root-only shape is described in
   `specs/015-internalize-helpers/contracts/baseline-schema.md`).
 - `specs/015-internalize-helpers/public-surface-audit.json`: the permanent,
   never-delete decision record classifying every feature as `supported` or
   `implementation-leak` with a lifecycle state (schema in
-  `specs/015-internalize-helpers/contracts/audit-schema.md`).
+  `specs/015-internalize-helpers/contracts/audit-schema.md`). The audit is
+  scoped to the **root package**, whose bare feature IDs it joins on; the
+  other five public packages are gated by the baseline alone.
 
 Run it from the module root:
 
 ```bash
-make surface-check
+make surface-check                          # verify
+make surface-update                         # regenerate the baseline
 go run ./internal/cmd/surfacecheck
+git diff internal/cmd/surfacecheck/baseline.json   # review every line
 ```
 
 From a nested directory:
@@ -430,10 +494,31 @@ exits `0`. Every failure writes nothing to stdout and exactly one minified
 
 | Error code | Exit | Meaning |
 |------------|------|---------|
-| `surface_drift` | `2` | Source, profiles, baseline, audit state, or a required `Deprecated:` paragraph disagree. |
+| `surface_drift` | `2` | Source, configurations, profiles, baseline, audit state, or a required `Deprecated:` paragraph disagree. |
 | `invalid_surface_artifact` | `2` | Missing, malformed, oversized, unsorted, duplicate, or schema-invalid baseline/audit; invalid flags. |
 | `surface_permission` | `4` | Permission denial reading artifacts or executing tooling. |
 | `surface_internal` | `1` | Unexpected internal failure. |
+
+### Presence and Divergence
+
+Presence is a **recorded fact, not an invariant**: a build constraint removing
+an identifier is the whole point of the configuration axis, and a
+platform-specific declaration is legitimate too. Each baseline entry therefore
+carries a `configurations` and a `profiles` presence set, written as the `"all"`
+sentinel or an explicit sorted list. An unreviewed change in *where* a feature
+exists is `presence-changed` drift, so the gate still fails closed.
+
+Signature, by contrast, stays a hard invariant: one feature has exactly one
+signature. A feature rendering differently between two combinations is
+`signature-divergent` and fails closed with no inventory, because there is no
+canonical signature to record.
+
+Presence is stored as the product of the two sets. `-update` verifies that
+factorisation is exact and fails with `presence-unfactored` rather than
+recording a pattern lossily — a lossy record would let the gate later accept a
+surface nobody reviewed.
+
+`ax.GRPCDial` is currently the only feature whose presence is not `"all"`.
 
 ### Change Protocol
 
@@ -449,8 +534,8 @@ exits `0`. Every failure writes nothing to stdout and exactly one minified
 - Never hand-tune the gate into silence: an `added` drift means the surface
   change is unreviewed, not that the baseline should be regenerated blindly.
 
-`internal/cmd/surfacecheck` is an internal command package and faces the 25%
-default per-package coverage floor; it has no explicit override in
+`internal/cmd/surfacecheck` is an internal command package with an explicit
+80% per-package coverage floor in
 `internal/cmd/covercheck/main.go`.
 
 ## Documentation Discipline (Contracts, Not Narration)
