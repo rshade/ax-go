@@ -71,12 +71,24 @@ func MetadataFromContext(ctx context.Context) Metadata {
 
 // TraceIDFromContext returns the explicit trace ID stored in ctx or
 // ZeroTraceID when no trace metadata is present.
+//
+// This reads back metadata a caller already stored with WithMetadata. It does
+// not resolve an active OpenTelemetry span context: this package is
+// import-isolated from the OpenTelemetry SDK and provides no live tracing, so
+// a context that was never populated yields ZeroTraceID rather than a real
+// trace ID. Live tracing comes from the root ax package, where
+// ax.StartTelemetry installs W3C propagation and extracts TRACEPARENT, and
+// ax.Execute opens a recording root span around the command.
 func TraceIDFromContext(ctx context.Context) string {
 	return MetadataFromContext(ctx).TraceID
 }
 
 // SpanIDFromContext returns the explicit span ID stored in ctx or ZeroSpanID
 // when no span metadata is present.
+//
+// Like TraceIDFromContext, this reads back metadata a caller already stored
+// with WithMetadata rather than resolving an active OpenTelemetry span
+// context. This package provides no live tracing; the root ax package does.
 func SpanIDFromContext(ctx context.Context) string {
 	return MetadataFromContext(ctx).SpanID
 }
