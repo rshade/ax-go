@@ -14,8 +14,18 @@ func TestDocumentationExplainsPublicImportChoices(t *testing.T) {
 		`"github.com/rshade/ax-go/contract"`,
 		`"github.com/rshade/ax-go/id"`,
 		`"github.com/rshade/ax-go/schema"`,
+		`"github.com/rshade/ax-go/logging"`,
 		"Use the root package for full CLI runtime",
 		"Use isolated contract packages for thin consumers",
+		"Use the isolated logging package",
+		// The choosing-a-surface table is the first thing a consumer needs and
+		// the easiest thing to lose in a docs refactor, so its rows are asserted
+		// rather than trusted. Loki staying root-only is the load-bearing row:
+		// a reader who misses it will look for log shipping in the isolated
+		// package and not find it.
+		"### Choosing a surface",
+		"| Logging only, smallest binary | `logging` |",
+		"| Logging **plus** Loki direct push | root `ax` |",
 	} {
 		assertContains(t, readme, want)
 	}

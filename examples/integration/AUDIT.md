@@ -65,3 +65,26 @@ validates the **framework contract**, not just this CLI.
   `__schema` output or an envelope shape fails CI (AC#4).
 - `AGENTS.md` → *Development Workflow* step 4 names this example as the
   canonical pattern (AC#5).
+
+## Scope boundary: what this example deliberately does not cover
+
+Every mandate above is exercised through the **root facade**, and that is the
+point — this example is the migration template for a full CLI. Two mandates are
+*also* satisfiable through the import-isolated `logging` package, and this
+example is not where that is demonstrated:
+
+| Mandate | Isolated-surface counterpart |
+| --- | --- |
+| 1 — stream separation | `examples/logging` writes its line to stderr with stdout untouched |
+| 10 — trace correlation on every log line | `logging` links the OTel trace API and stamps `trace_id`/`span_id` identically |
+
+The counterpart lives in [`examples/logging`](../logging/), with
+[`examples/rootlogging`](../rootlogging/) as its root-facade twin for binary-size
+comparison. Those two are size probes, not audit subjects: they are kept minimal
+and diff-clean against each other on purpose, and growing them to cover further
+mandates would break the `make size-check` comparison they exist to serve.
+
+Log shipping (`ax.WithLokiFromEnv`, `ax.Flush`) stays exclusively a root-facade
+capability and is audited here only, because the isolated surface cannot reach
+it — the Loki sink needs `net/http`, which is precisely what that surface
+excludes.

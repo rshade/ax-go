@@ -11,7 +11,13 @@
 // entirely. Nothing else in the repository would notice that ax_no_grpc had
 // quietly started removing a second identifier, or that a tag combination had
 // stopped compiling on windows/arm64. surfacecheck scans the 4 supported tag
-// combinations × 6 GOOS/GOARCH profiles = 24 loads of the six public packages.
+// combinations × 6 GOOS/GOARCH profiles = 24 loads of the seven public
+// packages.
+//
+// The load COUNT does not scale with the package count: a load is one
+// (configuration, profile) combination, and scanCombination loads every
+// requested package within it. Adding a seventh public package therefore leaves
+// this at 24.
 //
 // The gate is NOT a one-way ratchet (unlike doccover's baseline.txt): symbols
 // legitimately come and go, so additions and removals both surface as drift

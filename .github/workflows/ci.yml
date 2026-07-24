@@ -260,3 +260,16 @@ jobs:
       # tool's own per-combination environment.
       - name: Check the public surface against its reviewed baseline and audit
         run: go run ./internal/cmd/surfacecheck
+
+      # Binary-size gate for the import-isolated logging surface. It builds two
+      # committed probe programs with production flags (-trimpath -ldflags="-s -w")
+      # and enforces an absolute ceiling on the isolated binary plus a minimum
+      # reduction ratio against the root-facade build.
+      #
+      # The ceiling is pinned to this runner's linux/amd64 target with symbol
+      # stripping and varies by toolchain version, so it carries deliberate
+      # headroom. The ratio does not: both probes are built by the same compiler
+      # in the same run, so it is toolchain-independent and a breach always means
+      # the isolated surface gained weight the root facade did not.
+      - name: Check the isolated logging binary size and reduction ratio
+        run: make size-check

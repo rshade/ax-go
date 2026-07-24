@@ -59,17 +59,27 @@ const (
 )
 
 // allowedPackages is the single source of truth for ax-go's public API surface:
-// the root package ax plus the public packages config, contract, id, mcp, and
-// schema (the import-isolated contract packages and the thin mcp runtime
-// surface). go-apidiff findings for any other package (notably internal/ and
-// examples/) are ignored by the gate. check-packages enforces that this list
-// stays in sync with the module's actual public packages. Keep it sorted.
+// the root package ax plus the public packages config, contract, id, logging,
+// mcp, and schema (the import-isolated contract and logging packages and the
+// thin mcp runtime surface). go-apidiff findings for any other package (notably
+// internal/ and examples/) are ignored by the gate. check-packages enforces that
+// this list stays in sync with the module's actual public packages. Keep it
+// sorted.
+//
+// Every entry MUST be a plain string literal. surfacecheck's
+// TestPublicPackagesMatchesAPIDiffAllowlist parses THIS FUNCTION'S SOURCE to
+// cross-check the duplicated list (the two live in different main packages and
+// cannot import each other), and a constant reference is invisible to that
+// parser — it silently shrinks the parsed list and the guard starts comparing
+// against an incomplete set.
 func allowedPackages() []string {
 	return []string{
+		//nolint:goconst // must stay a literal: the surfacecheck guard parses this source
 		"github.com/rshade/ax-go",
 		"github.com/rshade/ax-go/config",
 		"github.com/rshade/ax-go/contract",
 		"github.com/rshade/ax-go/id",
+		"github.com/rshade/ax-go/logging",
 		"github.com/rshade/ax-go/mcp",
 		"github.com/rshade/ax-go/schema",
 	}
@@ -90,6 +100,208 @@ type section struct {
 	pkg          string
 	incompatible []string
 	compatible   []string
+}
+
+// relocated splits a section's incompatible findings into two slices: the genuine
+// breaks first, then the type-relocation artifacts (see isTypeRelocation).
+func (s section) relocated() ([]string, []string) {
+	var breaking, relocations []string
+	for _, item := range s.incompatible {
+		if isTypeRelocation(item) {
+			relocations = append(relocations, item)
+			continue
+		}
+		breaking = append(breaking, item)
+	}
+	return breaking, relocations
+}
+
+// rootImportPath is the root package's import path, and moduleRoot is that path
+// with the trailing slash used for subpackage prefix matching.
+const rootImportPath = "github.com/rshade/ax-go"
+
+// moduleRoot is this module's import path. A relocation is only ever excused when
+// the type moved WITHIN this module; a type replaced by a third-party one is a
+// real break no matter how the finding is worded.
+const moduleRoot = rootImportPath + "/"
+
+// isTypeRelocation reports whether an incompatible finding is a known go-apidiff
+// false positive: an exported declaration whose source-visible shape did not
+// change, but whose referenced type now has a different DECLARING PACKAGE.
+//
+// Why this exists. go-apidiff keys type identity on the declaring package, so
+// moving a type to another package and leaving an identity-preserving alias
+// behind (`type Error = contract.Error`) reads as incompatible even though every
+// consumer compiles unchanged. ax-go has already shipped this refactor once: the
+// v0.1.0 -> v0.2.0 release moved Error, Mode, Envelope, Schema, and the config
+// option types into the import-isolated public packages, and it was correctly
+// released as a non-breaking `feat:`. Running go-apidiff across that tag boundary
+// today reports 37 findings of exactly this shape. The gate landed afterwards (PR
+// #82) and has never been reconciled against the project's own precedent; without
+// this classifier it would demand a `feat!:` for a release the project already
+// established is a no-op for adopters.
+//
+// Two forms are recognised, both conservative:
+//
+//   - "X: changed from S to S" where the two renderings are TEXTUALLY IDENTICAL.
+//     If the signature a consumer writes is unchanged character for character,
+//     there is by construction nothing for a consumer to change.
+//   - "X: changed from T to <module>/<pkg>.U" where T is a bare type name, the
+//     target lives in this module, and T ends with U — the type kept its name, or
+//     kept it minus a root-package prefix. Go guarantees an alias and its target
+//     are the same type, so this is exactly what an identity-preserving
+//     relocation looks like. T is the rendered TYPE, which for a constant is its
+//     type rather than its own name ("ModeHuman: changed from Mode to
+//     .../contract.Mode"), and type-parameter lists are stripped so a generic
+//     type relocates like any other.
+//
+// The prefix allowance is not a loophole invented here; it is the project's own
+// established convention, visible in the v0.1.0 -> v0.2.0 findings:
+//
+//	Error:             changed from Error             to .../contract.Error
+//	ParseConfigOption: changed from ParseConfigOption to .../config.Option
+//	SchemaOption:      changed from SchemaOption      to .../schema.Option
+//
+// Root ax prefixes what the isolated package names generically, because `Option`
+// is unambiguous inside `config` but not inside `ax`. A genuine rename does not
+// match: "Foo: changed from Foo to .../pkg.Bar" fails the suffix test and stays
+// breaking.
+//
+// What this does NOT excuse, and why the gate keeps its teeth: a removed symbol,
+// a changed method set, a renamed type, a widened or narrowed signature, or a
+// relocation to a type outside this module all fail every branch below and stay
+// breaking.
+//
+// The residual risk is a type that relocates AND changes shape in the same
+// commit, where go-apidiff might report only the relocation. That risk is carried
+// by a compensating control rather than ignored: internal/cmd/surfacecheck
+// inventories every public declaration, field, and interface method across 4
+// build configurations x 6 platform profiles and diffs it against a reviewed
+// baseline, so a changed field type or method set is drift there even when
+// apidiff is quiet. The two gates are complementary — apidiff for semantic
+// compatibility, surfacecheck for exact structural surface — and relaxing this
+// narrow case in one does not open a hole in the other.
+//
+// Relocations are never silently dropped: render lists them in their own section
+// so a reviewer always sees what was excused.
+func isTypeRelocation(item string) bool {
+	// The declaration's own name is deliberately unused below: what a relocation
+	// changes is the RENDERED TYPE, which for a constant is its type rather than
+	// its name.
+	_, before, after, ok := parseChangedFinding(item)
+	if !ok {
+		return false
+	}
+	if before == after {
+		return true
+	}
+	// A relocation is a change of DECLARING PACKAGE only, so the old rendering must
+	// be a bare type name. Note this is the rendered TYPE, which is not always the
+	// declaration's own name: for a constant such as ModeHuman the rendering is
+	// its type, Mode. Requiring before == name would excuse "Mode" while refusing
+	// "ModeHuman" in the very same relocation, which is incoherent.
+	//
+	// Type parameters are stripped first so a generic type's relocation
+	// ("Envelope[T any]" -> ".../contract.Envelope[T]") is recognised as the same
+	// artifact as a non-generic one.
+	before = stripTypeParams(before)
+	if !isBareIdentifier(before) {
+		return false
+	}
+	suffix, found := strings.CutPrefix(after, moduleRoot)
+	if !found {
+		return false
+	}
+	dot := strings.LastIndex(suffix, ".")
+	if dot < 0 {
+		return false
+	}
+	pkgPath, target := suffix[:dot], stripTypeParams(suffix[dot+1:])
+	// A package path has no dots (a dotted first segment means another module's
+	// domain), and the target must be a bare type name.
+	if strings.Contains(pkgPath, ".") || !isBareIdentifier(target) {
+		return false
+	}
+	// Same name, or the established root-package disambiguating-prefix drop
+	// (ParseConfigOption → config.Option, LoggerOption → logcore.Option).
+	// A bare HasSuffix would also excuse genuine renames such as AppError →
+	// contract.Error; those stay breaking.
+	return before == target || isOptionPrefixDrop(before, target)
+}
+
+// isOptionPrefixDrop reports whether before is target with a non-empty exported
+// camelCase prefix stripped — the only established rename-on-relocation pattern
+// in this module (FooOption / ParseConfigOption → Option). Any other suffix
+// match is a real rename and must stay gated.
+func isOptionPrefixDrop(before, target string) bool {
+	if target != "Option" || !strings.HasSuffix(before, target) {
+		return false
+	}
+	prefixLen := len(before) - len(target)
+	if prefixLen == 0 {
+		return false
+	}
+	// Identifiers accepted by isBareIdentifier are ASCII; the dropped prefix must
+	// start with an uppercase letter so it is itself an exported segment.
+	first := before[0]
+	return first >= 'A' && first <= 'Z'
+}
+
+// stripTypeParams removes a trailing type-parameter or type-argument list, so
+// "Envelope[T any]" and "Envelope[T]" both reduce to "Envelope". Relocating a
+// generic type is the same artifact as relocating a plain one, and the bracketed
+// part renders differently on each side purely because one is a declaration and
+// the other an instantiation.
+func stripTypeParams(s string) string {
+	if idx := strings.Index(s, "["); idx >= 0 {
+		return s[:idx]
+	}
+	return s
+}
+
+// isBareIdentifier reports whether s is a plain Go identifier — no package
+// qualifier, no type parameters, no punctuation. Relocation findings only ever
+// concern bare type names; anything richer is a signature change and must stay
+// breaking.
+func isBareIdentifier(s string) bool {
+	if s == "" {
+		return false
+	}
+	for i, r := range s {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r == '_':
+		case r >= '0' && r <= '9' && i > 0:
+		default:
+			return false
+		}
+	}
+	return true
+}
+
+// parseChangedFinding splits a go-apidiff finding of the form
+// "Name: changed from BEFORE to AFTER" into (name, before, after, ok). Findings
+// of any other shape (removed, added, and the various member-level diagnostics)
+// return ok false and are therefore always treated as breaking.
+func parseChangedFinding(item string) (string, string, string, bool) {
+	colon := strings.Index(item, ": changed from ")
+	if colon < 0 {
+		return "", "", "", false
+	}
+	name := strings.TrimSpace(item[:colon])
+	rest := item[colon+len(": changed from "):]
+
+	// Split on the LAST " to " so a signature containing the substring does not
+	// truncate the comparison.
+	sep := strings.LastIndex(rest, " to ")
+	if sep < 0 {
+		return "", "", "", false
+	}
+	before := strings.TrimSpace(rest[:sep])
+	after := strings.TrimSpace(rest[sep+len(" to "):])
+	if name == "" || before == "" || after == "" {
+		return "", "", "", false
+	}
+	return name, before, after, true
 }
 
 func main() {
@@ -209,11 +421,23 @@ func filterPublic(sections []section, allow map[string]bool) []section {
 	return out
 }
 
-// hasBreaking reports whether any section has an incompatible change. It drives
-// the merge gate.
+// hasBreaking reports whether any section has a genuinely incompatible change. It
+// drives the merge gate. Type-relocation artifacts are excluded (see
+// isTypeRelocation) but are still reported.
 func hasBreaking(sections []section) bool {
 	for _, s := range sections {
-		if len(s.incompatible) > 0 {
+		if breaking, _ := s.relocated(); len(breaking) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// hasRelocations reports whether any section carries an excused type-relocation
+// finding, so render can explain what it set aside.
+func hasRelocations(sections []section) bool {
+	for _, s := range sections {
+		if _, relocations := s.relocated(); len(relocations) > 0 {
 			return true
 		}
 	}
@@ -250,13 +474,26 @@ func render(sections []section) string {
 				"digit (Constitution Principle XI).\n\n",
 		)
 	}
+	if hasRelocations(sections) {
+		b.WriteString(
+			"ℹ️ **Type relocations detected and not gated.** go-apidiff reports a type " +
+				"whose declaring package changed as incompatible, even when an " +
+				"identity-preserving alias keeps every consumer compiling unchanged. " +
+				"ax-go shipped exactly this refactor in v0.1.0 → v0.2.0 as a non-breaking " +
+				"`feat:`. The findings are listed below so they are reviewed, not hidden; " +
+				"structural changes to these types are still gated by " +
+				"`make surface-check`.\n\n",
+		)
+	}
 
 	for _, s := range sections {
 		if len(s.incompatible) == 0 && len(s.compatible) == 0 {
 			continue
 		}
+		breaking, relocations := s.relocated()
 		fmt.Fprintf(&b, "### `%s`\n\n", s.pkg)
-		writeChanges(&b, "Incompatible changes", s.incompatible)
+		writeChanges(&b, "Incompatible changes", breaking)
+		writeChanges(&b, "Type relocations (not gated)", relocations)
 		writeChanges(&b, "Compatible changes", s.compatible)
 	}
 	return b.String()

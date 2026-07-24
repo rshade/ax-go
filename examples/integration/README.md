@@ -16,6 +16,23 @@ only need shared machine contracts can instead use the isolated contract package
 `github.com/rshade/ax-go/config`, `github.com/rshade/ax-go/schema`, and
 `github.com/rshade/ax-go/id`.
 
+## Related examples
+
+This example is deliberately the **maximal** one: it exercises every Core AX
+Mandate through the root facade, including Loki direct push and `ax.Flush`, and
+that coverage is what `AUDIT.md` maps. Two much smaller programs exist alongside
+it for a different purpose:
+
+| Example | Imports | Purpose |
+| --- | --- | --- |
+| [`examples/logging`](../logging/) | `github.com/rshade/ax-go/logging` only | the import-isolated counterpart, and the subject of the binary-size gate |
+| [`examples/rootlogging`](../rootlogging/) | root `ax` only | the same program on the root facade; the size-ratio denominator |
+
+Those two are byte-for-byte identical apart from one import and one call, so the
+difference between their binary sizes isolates exactly one variable. They are
+built and compared on every PR by `make size-check`. Keep them diff-clean
+against each other; do not grow them into a second integration example.
+
 Run the default bounded JSON payload:
 
 ```sh

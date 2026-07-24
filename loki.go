@@ -15,6 +15,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/rshade/ax-go/internal/logcore"
 )
 
 // Loki push configuration and label key constants. Using named constants for all
@@ -42,14 +44,20 @@ const (
 	lokiChannelCap = 256
 
 	// Loki stream label keys — the five permitted low-cardinality fields.
-	// The environment/application/host/version keys share their string values
-	// with labelField* in logger.go (defined alongside Labels) so that renaming
-	// a label field stays a single-file change. trace_id, span_id, and all
-	// high-cardinality fields must never appear as stream keys (FR-009).
-	lokiLabelEnvironment = labelFieldEnvironment
-	lokiLabelApplication = labelFieldApplication
-	lokiLabelHost        = labelFieldHost
-	lokiLabelVersion     = labelFieldVersion
+	// trace_id, span_id, and all high-cardinality fields must never appear as
+	// stream keys (FR-009).
+	//
+	// These values MUST agree with the field names internal/logcore writes for
+	// each Labels field. logcore keeps those constants unexported — its export set
+	// is closed by contract — so the agreement cannot be expressed by sharing a
+	// constant across the boundary and is asserted instead by
+	// TestLokiLabelKeysMatchEmittedLabelFields, which emits a labelled line and
+	// compares the JSON keys against these values. A rename on either side fails
+	// that test rather than silently un-promoting a label.
+	lokiLabelEnvironment = "environment"
+	lokiLabelApplication = "application"
+	lokiLabelHost        = "host"
+	lokiLabelVersion     = "version"
 	lokiLabelLevel       = "level"
 )
 
@@ -95,7 +103,7 @@ type labelPair struct {
 	value string
 }
 
-// lokiWriter is a non-blocking logSink that queues zerolog log lines in a
+// lokiWriter is a non-blocking logcore.Sink that queues zerolog log lines in a
 // bounded channel and a background goroutine batches them into Loki push
 // requests. Write always returns (len(p), nil) so callers are never blocked;
 // push failures are surfaced as bounded diagnostics on the configured writer
@@ -105,7 +113,7 @@ type labelPair struct {
 type lokiWriter struct {
 	pushURL   string // resolved <AX_LOKI_URL>/loki/api/v1/push endpoint
 	authToken string
-	// errorWriter points at the loggerConfig writer field so push diagnostics
+	// errorWriter points at the logcore.Config Writer field so push diagnostics
 	// resolve the configured writer lazily at emit time: LoggerOption order
 	// between WithLokiFromEnv and WithLoggerWriter does not matter. Nil only in
 	// tests that construct lokiWriter directly; diagf guards it.
@@ -145,13 +153,18 @@ func (lw *lokiWriter) Write(p []byte) (int, error) {
 	return len(p), nil
 }
 
-// drain signals the background goroutine to flush buffered entries without
+// Drain signals the background goroutine to flush buffered entries without
 // stopping it, then waits for the flush to finish. The wait respects the
 // caller's context deadline but is always capped at 2 seconds to avoid hanging
 // the process during shutdown. Any entries still in-flight after the deadline
 // are dropped. Returns nil in all cases (network failures during flush are
 // already dropped by postBatch).
-func (lw *lokiWriter) drain(ctx context.Context) error {
+//
+// It is exported to satisfy logcore.Sink across the package boundary: Go
+// qualifies an unexported method name by its defining package, so a lowercase
+// drain here could never satisfy an interface declared in logcore. lokiWriter
+// itself stays unexported, so no public surface changes.
+func (lw *lokiWriter) Drain(ctx context.Context) error {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -288,12 +301,18 @@ func (lw *lokiWriter) streamKeyFromLine(line string) lokiStreamKey {
 	return key
 }
 
-// sanctionLabels records the non-empty pairs of labels as sanctioned for
+// SanctionLabels records the non-empty pairs of labels as sanctioned for
 // promotion into Loki stream labels. NewLogger calls it with the final
 // WithLoggerLabels value (after all options have run, so LoggerOption order
 // does not matter) and Logger.WithLabels calls it for derived loggers, so
 // promotion always follows the labels the operator actually declared.
-func (lw *lokiWriter) sanctionLabels(labels Labels) {
+//
+// It is exported to satisfy logcore.LabelSanctioner across the package boundary,
+// for the same language reason as Drain. logcore asserts that OPTIONAL capability
+// rather than requiring it, so a sink with no label concept is left alone; that
+// generic seam is what replaced the two *lokiWriter type assertions that used to
+// sit in logger.go in violation of Constitution Principle VIII.
+func (lw *lokiWriter) SanctionLabels(labels Labels) {
 	lw.labelMu.Lock()
 	defer lw.labelMu.Unlock()
 	if lw.sanctionedLabels == nil {
@@ -475,7 +494,7 @@ func (lw *lokiWriter) diagf(format string, args ...any) {
 // WithLoggerWriter does not matter for them. Construction-time URL warnings are
 // emitted when the option runs and go to the writer configured at that point.
 func WithLokiFromEnv() LoggerOption {
-	return func(cfg *loggerConfig) {
+	return func(cfg *logcore.Config) {
 		rawURL := os.Getenv("AX_LOKI_URL")
 		if rawURL == "" {
 			return // no-op: AX_LOKI_URL not set
@@ -483,11 +502,11 @@ func WithLokiFromEnv() LoggerOption {
 
 		parsed, err := url.Parse(rawURL)
 		if err != nil {
-			fmt.Fprintf(cfg.writer, "ax: AX_LOKI_URL %q is malformed: %v\n", rawURL, err)
+			fmt.Fprintf(cfg.Writer, "ax: AX_LOKI_URL %q is malformed: %v\n", rawURL, err)
 			return
 		}
 		if parsed.Host == "" {
-			fmt.Fprintf(cfg.writer,
+			fmt.Fprintf(cfg.Writer,
 				"ax: AX_LOKI_URL %q is missing a scheme://host "+
 					"(expected e.g. http://localhost:3100)\n", rawURL)
 			return
@@ -496,7 +515,7 @@ func WithLokiFromEnv() LoggerOption {
 		// Only http(s) is supported; reject other schemes (e.g. ftp) rather than
 		// constructing a sink that fails opaquely at request time.
 		if parsed.Scheme != "http" && parsed.Scheme != "https" {
-			fmt.Fprintf(cfg.writer, "ax: AX_LOKI_URL scheme %q is not http(s)\n", parsed.Scheme)
+			fmt.Fprintf(cfg.Writer, "ax: AX_LOKI_URL scheme %q is not http(s)\n", parsed.Scheme)
 			return
 		}
 
@@ -505,7 +524,7 @@ func WithLokiFromEnv() LoggerOption {
 		if parsed.Scheme == "http" {
 			host := parsed.Hostname()
 			if host != "localhost" && host != "127.0.0.1" && host != "::1" {
-				fmt.Fprintf(cfg.writer, "ax: AX_LOKI_URL uses insecure http transport\n")
+				fmt.Fprintf(cfg.Writer, "ax: AX_LOKI_URL uses insecure http transport\n")
 			}
 		}
 
@@ -517,44 +536,13 @@ func WithLokiFromEnv() LoggerOption {
 		lw := &lokiWriter{
 			pushURL:       pushURL,
 			authToken:     os.Getenv("AX_LOKI_AUTH_TOKEN"),
-			errorWriter:   &cfg.writer,
+			errorWriter:   &cfg.Writer,
 			ch:            make(chan lokiEntry, lokiChannelCap),
 			flushRequests: make(chan chan struct{}),
 			client:        HTTPClient(),
 			done:          make(chan struct{}),
 		}
-		go lw.run(cfg.ctx)
-		cfg.additionalSinks = append(cfg.additionalSinks, lw)
+		go lw.run(cfg.Ctx)
+		cfg.AdditionalSinks = append(cfg.AdditionalSinks, lw)
 	}
-}
-
-// Flush performs a best-effort, non-destructive drain of any buffered Loki log
-// entries for the given Logger. It blocks until the buffer is empty, the context
-// is cancelled, or an internal 2-second deadline elapses — whichever comes
-// first. Remaining entries are dropped after the deadline.
-//
-// The error return is reserved for future sink implementations: the Loki sink's
-// drain returns nil on every path (push failures are fail-open diagnostics on
-// the configured writer, never returned errors), so Flush currently always
-// returns nil. Callers should keep checking it — new sinks may surface drain
-// failures — but a failed Loki push must never change the CLI exit code.
-//
-// Flush is a no-op (returns nil) when:
-//   - l has no Loki sink (AX_LOKI_URL was not set)
-//   - l is nil
-//   - the sink's background goroutine already stopped because its logger context
-//     was cancelled
-//
-// Callers may invoke Flush multiple times; later writes remain deliverable by a
-// later Flush call. Callers should invoke Flush in their shutdown path, before
-// os.Exit or cobra.Command cleanup, to ensure in-flight log lines reach Loki.
-func Flush(ctx context.Context, l Logger) error {
-	if l == nil {
-		return nil
-	}
-	f, ok := l.(flusher)
-	if !ok {
-		return nil
-	}
-	return f.flush(ctx)
 }

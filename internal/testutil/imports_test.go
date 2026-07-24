@@ -280,6 +280,154 @@ func TestForbiddenGRPCTreeImportsNamesOffendingDependency(t *testing.T) {
 	}
 }
 
+// TestForbiddenLoggingImportsPermitsTheLoggingBackend is the reason the logging
+// surface needs its own rule set rather than reusing ForbiddenRuntimeImports.
+// The four contract packages (contract, config, schema, id) forbid zerolog
+// outright — logging is a runtime concern they must not carry. The logging
+// surface is the opposite case: zerolog appears in Logger's exported method set
+// and the OTel trace API is what makes trace correlation possible, so both are
+// required, and flagging either would make the isolated surface unbuildable.
+func TestForbiddenLoggingImportsPermitsTheLoggingBackend(t *testing.T) {
+	required := []string{
+		"github.com/rs/zerolog",
+		"go.opentelemetry.io/otel/trace",
+		"github.com/rshade/ax-go/contract",
+		"github.com/rshade/ax-go/internal/logcore",
+		"context",
+		"io",
+		"os",
+	}
+
+	if got := FindForbiddenImports(
+		"github.com/rshade/ax-go/logging",
+		required,
+		ForbiddenLoggingImports(),
+	); len(got) != 0 {
+		t.Fatalf("ForbiddenLoggingImports flagged required dependencies: %#v", got)
+	}
+}
+
+// TestForbiddenRuntimeImportsStillForbidsZerolog pins the complement of the case
+// above: adding a per-surface rule set must not relax the four existing contract
+// packages. If this ever passes, ForbiddenRuntimeImports was edited when
+// ForbiddenLoggingImports should have been.
+func TestForbiddenRuntimeImportsStillForbidsZerolog(t *testing.T) {
+	got := FindForbiddenImports(
+		"github.com/rshade/ax-go/contract",
+		[]string{"github.com/rs/zerolog"},
+		ForbiddenRuntimeImports(),
+	)
+	if len(got) != 1 {
+		t.Fatalf("ForbiddenRuntimeImports returned %d violations for zerolog, want 1: %#v", len(got), got)
+	}
+}
+
+// TestForbiddenLoggingImportsFlagsEveryExcludedTree walks the contract table one
+// dependency at a time so a missing rule fails loudly and names itself, rather
+// than being absorbed into a single "some import was flagged" assertion. net/http
+// and crypto/tls are the two entries absent from the contract-package list and
+// the largest single size lever, which is why they are enumerated explicitly.
+func TestForbiddenLoggingImportsFlagsEveryExcludedTree(t *testing.T) {
+	tests := []struct {
+		name       string
+		importPath string
+		wantRoot   string
+	}{
+		{
+			name:       "root facade",
+			importPath: "github.com/rshade/ax-go",
+			wantRoot:   "github.com/rshade/ax-go",
+		},
+		{
+			name:       "telemetry setup",
+			importPath: "github.com/rshade/ax-go/internal/telemetry",
+			wantRoot:   "github.com/rshade/ax-go/internal/telemetry",
+		},
+		{
+			name:       "mcp server runtime",
+			importPath: "github.com/rshade/ax-go/internal/mcpserver",
+			wantRoot:   "github.com/rshade/ax-go/internal/mcpserver",
+		},
+		{
+			name:       "otel sdk subpackage",
+			importPath: "go.opentelemetry.io/otel/sdk/trace",
+			wantRoot:   "go.opentelemetry.io/otel/sdk",
+		},
+		{
+			name:       "otel exporter",
+			importPath: "go.opentelemetry.io/otel/exporters/otlp/otlptrace",
+			wantRoot:   "go.opentelemetry.io/otel/exporters/",
+		},
+		{
+			name:       "otelhttp instrumentation",
+			importPath: "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+			wantRoot:   "go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp",
+		},
+		{
+			name:       "otelgrpc instrumentation",
+			importPath: "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+			wantRoot:   "go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc",
+		},
+		{
+			name:       "grpc subpackage",
+			importPath: "google.golang.org/grpc/status",
+			wantRoot:   "google.golang.org/grpc",
+		},
+		{
+			name:       "protobuf subpackage",
+			importPath: "google.golang.org/protobuf/proto",
+			wantRoot:   "google.golang.org/protobuf",
+		},
+		{
+			name:       "cobra",
+			importPath: "github.com/spf13/cobra",
+			wantRoot:   "github.com/spf13/cobra",
+		},
+		{
+			name:       "net/http",
+			importPath: "net/http",
+			wantRoot:   "net/http",
+		},
+		{
+			name:       "crypto/tls",
+			importPath: "crypto/tls",
+			wantRoot:   "crypto/tls",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			got := FindForbiddenImports(
+				"github.com/rshade/ax-go/logging",
+				[]string{tc.importPath},
+				ForbiddenLoggingImports(),
+			)
+			if len(got) != 1 {
+				t.Fatalf("FindForbiddenImports(%q) returned %d violations, want 1: %#v", tc.importPath, len(got), got)
+			}
+			if got[0].Pattern != tc.wantRoot {
+				t.Fatalf("Pattern = %q, want %q", got[0].Pattern, tc.wantRoot)
+			}
+		})
+	}
+}
+
+// TestForbiddenLoggingImportsDoesNotFlagHTTPLookalikes guards the net/http rule
+// against over-matching. net/http/httptest is genuinely forbidden (it pulls the
+// same tree), but net/textproto and net/url are not — a rule written as a bare
+// "net/" prefix would flag them and send a maintainer chasing a phantom.
+func TestForbiddenLoggingImportsDoesNotFlagHTTPLookalikes(t *testing.T) {
+	allowed := []string{"net/url", "net/textproto", "net"}
+
+	if got := FindForbiddenImports(
+		"github.com/rshade/ax-go/logging",
+		allowed,
+		ForbiddenLoggingImports(),
+	); len(got) != 0 {
+		t.Fatalf("ForbiddenLoggingImports flagged permitted stdlib packages: %#v", got)
+	}
+}
+
 // newTaggedFixtureModule writes a throwaway module whose single package splits
 // its import across a default file and a fixture_no_http-gated sibling.
 func newTaggedFixtureModule(t *testing.T) string {
