@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.4.0](https://github.com/rshade/ax-go/compare/v0.3.0...v0.4.0) (2026-07-24)
+
+
+### Added
+
+* **ci:** enforce performance regression budget in CI ([#107](https://github.com/rshade/ax-go/issues/107)) ([77af8f4](https://github.com/rshade/ax-go/commit/77af8f44b2f19cb2a171d7a59b396d8917cae0e9)), closes [#22](https://github.com/rshade/ax-go/issues/22)
+* **logging:** add import-isolated logging package over internal/logcore ([#151](https://github.com/rshade/ax-go/issues/151)) ([93dd453](https://github.com/rshade/ax-go/commit/93dd4531b4db72df2e282ff3a6b7003f35617f35)), closes [#144](https://github.com/rshade/ax-go/issues/144)
+* **schema:** enumerate non-deterministic fields per command output ([808b612](https://github.com/rshade/ax-go/commit/808b612580285fde15e1229b72952cf65ba1140b)), closes [#16](https://github.com/rshade/ax-go/issues/16)
+* **schema:** enumerate non-deterministic fields per command output ([#146](https://github.com/rshade/ax-go/issues/146)) ([808b612](https://github.com/rshade/ax-go/commit/808b612580285fde15e1229b72952cf65ba1140b))
+* **surfacecheck:** gate the root public API surface against a reviewed baseline ([#148](https://github.com/rshade/ax-go/issues/148)) ([99eda4a](https://github.com/rshade/ax-go/commit/99eda4a53b0786b90bc59bd5d1fe34b08a58b913)), closes [#18](https://github.com/rshade/ax-go/issues/18)
+* **telemetry:** make OTLP export and gRPC dial independently opt-out… ([#150](https://github.com/rshade/ax-go/issues/150)) ([6e8f38a](https://github.com/rshade/ax-go/commit/6e8f38ac47f09c5c1dd9053cd7bac7b6520158c2))
+
+
+### Fixed
+
+* **deps:** update github.com/tailscale/hujson digest to 10d7940 ([#116](https://github.com/rshade/ax-go/issues/116)) ([6883ed3](https://github.com/rshade/ax-go/commit/6883ed3b257babc744e64f8aa58b430a0831f784))
+* **deps:** update github.com/tailscale/hujson digest to 78b5b16 ([#141](https://github.com/rshade/ax-go/issues/141)) ([62b4beb](https://github.com/rshade/ax-go/commit/62b4beb0dc051cbf8cb486bfc906c0b0d075c08b))
+* **deps:** update golang.org/x/perf digest to 82a0b07 ([#108](https://github.com/rshade/ax-go/issues/108)) ([0a9aab0](https://github.com/rshade/ax-go/commit/0a9aab05f8a1e319b9e55f16fa10e193aa402fec))
+* **deps:** update module go.opentelemetry.io/proto/otlp to v1.11.0 ([#147](https://github.com/rshade/ax-go/issues/147)) ([d53e4f7](https://github.com/rshade/ax-go/commit/d53e4f7cbeb2370a14e6671d27c0dda8a09fd590))
+* **deps:** update module google.golang.org/grpc to v1.82.0 ([#97](https://github.com/rshade/ax-go/issues/97)) ([b6744c8](https://github.com/rshade/ax-go/commit/b6744c8f95e4044fb0c0c9dda75e0cf78325c091))
+* **deps:** update module google.golang.org/grpc to v1.82.1 ([#114](https://github.com/rshade/ax-go/issues/114)) ([6658ce8](https://github.com/rshade/ax-go/commit/6658ce80c37fd0f2cb26d3b4cdd7bb8e2b70821d))
+* kimi evaluation fixes ([#117](https://github.com/rshade/ax-go/issues/117)) ([60fa703](https://github.com/rshade/ax-go/commit/60fa703238ad46da23fe24887f1863e598299b44))
+
+
+### Documentation
+
+* add Diátaxis tutorial, how-to, and explanation pages ([#98](https://github.com/rshade/ax-go/issues/98)) ([5bf703a](https://github.com/rshade/ax-go/commit/5bf703a7c8bf040ad3bdf60e05544b860cd35642))
+* add SECURITY.md vulnerability disclosure policy ([fc8f87d](https://github.com/rshade/ax-go/commit/fc8f87d3078a3641a34c7b4c04d6f3d9ce55cbf6)), closes [#19](https://github.com/rshade/ax-go/issues/19)
+* **contract:** document that import-isolated packages carry no live … ([#149](https://github.com/rshade/ax-go/issues/149)) ([31b1ea5](https://github.com/rshade/ax-go/commit/31b1ea58809762a6df243ba5829cd78b515c4a5e)), closes [#145](https://github.com/rshade/ax-go/issues/145)
+
 ## [0.3.0](https://github.com/rshade/ax-go/compare/v0.2.0...v0.3.0) (2026-06-30)
 
 
