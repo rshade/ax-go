@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.1](https://github.com/rshade/ax-go/compare/v0.4.0...v0.4.1) (2026-08-10)
+
+
+### Fixed
+
+* **deps:** update github.com/tailscale/hujson digest to b80ff77 ([#152](https://github.com/rshade/ax-go/issues/152)) ([763ba39](https://github.com/rshade/ax-go/commit/763ba394866980f5d8b257a2499555095a8f148b))
+* **deps:** update module github.com/modelcontextprotocol/go-sdk to v1.7.0 ([#155](https://github.com/rshade/ax-go/issues/155)) ([998bdd8](https://github.com/rshade/ax-go/commit/998bdd83b8eef2b448ea854174c759462f5f95ab))
+* **deps:** update module go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc to v0.70.0 ([#162](https://github.com/rshade/ax-go/issues/162)) ([306a300](https://github.com/rshade/ax-go/commit/306a30009269de3025d5f8cb90185c6694259ea8))
+* **deps:** update module google.golang.org/grpc to v1.83.0 ([#157](https://github.com/rshade/ax-go/issues/157)) ([021a3f6](https://github.com/rshade/ax-go/commit/021a3f6927d7b99dd2f2cc4808f25ada347e0858))
+* **deps:** update opentelemetry-go monorepo to v1.45.0 ([#161](https://github.com/rshade/ax-go/issues/161)) ([1bbfce3](https://github.com/rshade/ax-go/commit/1bbfce3e4f87359738b891c0fb839eea1619289a))
+
 ## [0.4.0](https://github.com/rshade/ax-go/compare/v0.3.0...v0.4.0) (2026-07-24)
 
 
