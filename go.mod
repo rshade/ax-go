@@ -4,7 +4,7 @@ go 1.26.5
 
 require (
 	github.com/google/uuid v1.6.0
-	github.com/modelcontextprotocol/go-sdk v1.6.1
+	github.com/modelcontextprotocol/go-sdk v1.7.0
 	github.com/rs/zerolog v1.35.1
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/pflag v1.0.10
@@ -42,8 +42,10 @@ require (
 	go.opentelemetry.io/otel/metric v1.45.0 // indirect
 	golang.org/x/net v0.57.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
+	golang.org/x/sync v0.22.0 // indirect
 	golang.org/x/sys v0.47.0 // indirect
 	golang.org/x/text v0.40.0 // indirect
+	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20260720211330-0afa2a65878a // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260720211330-0afa2a65878a // indirect
 )
