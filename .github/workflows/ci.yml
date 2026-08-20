@@ -131,7 +131,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12.2
+          version: v2.13.1
           args: --timeout=5m
 
       - name: Run markdownlint
@@ -173,7 +173,7 @@ jobs:
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: v2.12.2
+          version: v2.13.1
           args: --timeout=5m --build-tags=${{ matrix.tags }}
 
   # PRs only: lints the commits between base and head. release-please builds
