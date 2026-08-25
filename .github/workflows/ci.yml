@@ -11,7 +11,6 @@ permissions:
   contents: read
 
 env:
-  GO_VERSION: '1.26.5'
   # Bypass the Go proxy for rshade modules - fetch directly from GitHub.
   GOPRIVATE: github.com/rshade/*
 
@@ -25,11 +24,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v7
+      - name: Set up mise (Go)
+        uses: jdx/mise-action@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          install_args: go
 
       - name: Run tests with race detector and coverage
         run: |
@@ -82,11 +80,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Go
-        uses: actions/setup-go@v7
+      - name: Set up mise (Go)
+        uses: jdx/mise-action@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          install_args: go
 
       - name: Run tests with race detector
         run: go test -race -tags='${{ matrix.tags }}' ./...
@@ -104,11 +101,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set up Go
-        uses: actions/setup-go@v7
+      - name: Set up mise (Go)
+        uses: jdx/mise-action@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          install_args: go
 
       - name: Enforce performance regression budget
         env:
@@ -122,17 +118,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Go
-        uses: actions/setup-go@v7
+      - name: Set up mise (Go, golangci-lint, actionlint)
+        uses: jdx/mise-action@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          install_args: go golangci-lint actionlint
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.12.2
-          args: --timeout=5m
+        run: golangci-lint run --timeout=5m
 
       - name: Run markdownlint
         shell: bash
@@ -142,9 +134,7 @@ jobs:
             AGENTS.md README.md CONTRIBUTING.md .github/copilot-instructions.md 'docs/**/*.md'
 
       - name: Run actionlint
-        run: |
-          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
-          find .github/workflows -name '*.yml' -not -name '*.lock.yml' -print0 | xargs -0 actionlint
+        run: find .github/workflows -name '*.yml' -not -name '*.lock.yml' -print0 | xargs -0 actionlint
 
   # golangci-lint accepts exactly one build-tag set per run, so the declined
   # configurations need their own invocations. The default configuration is
@@ -164,17 +154,13 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Go
-        uses: actions/setup-go@v7
+      - name: Set up mise (Go, golangci-lint)
+        uses: jdx/mise-action@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          install_args: go golangci-lint
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
-        with:
-          version: v2.12.2
-          args: --timeout=5m --build-tags=${{ matrix.tags }}
+        run: golangci-lint run --timeout=5m --build-tags=${{ matrix.tags }}
 
   # PRs only: lints the commits between base and head. release-please builds
   # CHANGELOG.md from Conventional Commits, so non-conforming messages fail
@@ -206,14 +192,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Go
-        uses: actions/setup-go@v7
+      - name: Set up mise (Go, govulncheck)
+        uses: jdx/mise-action@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
-
-      - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          install_args: 'go "go:golang.org/x/vuln/cmd/govulncheck"'
 
       - name: Run govulncheck
         run: govulncheck ./...
@@ -225,11 +207,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up Go
-        uses: actions/setup-go@v7
+      - name: Set up mise (Go)
+        uses: jdx/mise-action@v4
         with:
-          go-version: ${{ env.GO_VERSION }}
-          cache: true
+          install_args: go
+
+      - name: Check go.mod matches mise.toml's pinned Go version
+        run: |
+          go_mod_version="$(awk '/^go /{print $2; exit}' go.mod)"
+          mise_go_version="$(awk -F'"' '/^go =/{print $2; exit}' mise.toml)"
+          if [ "$go_mod_version" != "$mise_go_version" ]; then
+            echo "go.mod's go directive ($go_mod_version) does not match mise.toml's pinned go version ($mise_go_version)."
+            echo "mise.toml is the source of truth for the Go version - update go.mod (and the README compatibility table) to match."
+            exit 1
+          fi
 
       - name: Check gofmt
         run: |

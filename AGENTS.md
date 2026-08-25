@@ -7,7 +7,7 @@
 and still ergonomic for human engineers.
 
 The module is `github.com/rshade/ax-go`, the package name should be `ax`, and
-the project currently targets Go `1.26.5`. The canonical source of truth for
+the project currently targets Go `1.26.7`. The canonical source of truth for
 behavior and public API decisions is the constitution at
 `.specify/memory/constitution.md`. The ADRs in `docs/adr/` are a FROZEN legacy
 decision log being retired through the Spec Kit feature workflow; where an ADR
@@ -168,6 +168,13 @@ conflicts with the constitution, the constitution wins.
 9. Run `make surface-check` (`internal/cmd/surfacecheck`) — the exported-surface
    gate across all build configurations and platforms. See **Build
    Configurations** below.
+
+Go, golangci-lint, actionlint, and govulncheck are pinned once in
+[`mise.toml`](mise.toml) — the single source of truth CI reads via
+`jdx/mise-action`. Run `make ensure` (requires [mise](https://mise.jdx.dev/))
+to install every pinned tool locally at the same version CI uses. `go.mod`'s
+`go` directive must match `mise.toml`'s pinned `go` version; `make validate`
+and CI's `validate` job fail closed if they disagree.
 
 ### Build Configurations (tagged toolchain)
 
