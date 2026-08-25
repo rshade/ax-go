@@ -36,8 +36,11 @@ versions.
 
 Update `README.md` → `## Compatibility` when:
 
-1. **The minimum Go version changes** — update the `go` directive in `go.mod`
-   and the ax-go row's "Minimum Go version" column.
+1. **The minimum Go version changes** — bump the `go` value in
+   [`mise.toml`](mise.toml) (the single source of truth for the toolchain
+   version), then update `go.mod`'s `go` directive and the ax-go row's
+   "Minimum Go version" column to match. `make validate` (and CI's
+   `validate` job) fails closed if `go.mod` and `mise.toml` disagree.
 2. **A new ax-go minor or major is released** — add or update the ax-go row.
 3. **A downstream consumer tags its first ax-go-pinned release** — add a
    consumer row with the consumer name, the pinned ax-go version, and a brief
@@ -53,7 +56,8 @@ needed to surface the items.
 The checklist items are:
 
 - `README.md` → `## Compatibility` table reflects the new ax-go version
-- If `go.mod`'s `go` directive changed, the "Minimum Go version" column is updated
+- If `mise.toml`'s pinned Go version changed, `go.mod`'s `go` directive and
+  the "Minimum Go version" column are updated to match
 - Any new downstream consumer that pinned this release has a row in the "Downstream consumers" table
 - `CHANGELOG.md` preview looks correct (no missing or miscategorised entries)
 
@@ -61,6 +65,10 @@ To change the checklist content, edit the `body:` field in
 `.github/workflows/release-checklist.yml`.
 
 ## Quality gates
+
+Go, golangci-lint, actionlint, and govulncheck are pinned once in
+[`mise.toml`](mise.toml). Install [mise](https://mise.jdx.dev/), then run
+`make ensure` to fetch every pinned tool at the version CI uses.
 
 Before opening a PR, run:
 

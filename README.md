@@ -571,7 +571,7 @@ every open item filed as a labeled GitHub issue.
 
 | ax-go version   | Minimum Go version | Notes                                                         |
 | --------------- | ------------------ | ------------------------------------------------------------- |
-| v0.x (current)  | 1.26.5             | Pre-v1.0; `0.x.PATCH` is always safe; `0.MINOR.0` may break |
+| v0.x (current)  | 1.26.7             | Pre-v1.0; `0.x.PATCH` is always safe; `0.MINOR.0` may break |
 | v1.x            | TBD                | Stable API; targeted via the Spec Kit stability workflow      |
 
 The minimum Go version is the `go` directive in [`go.mod`](go.mod). Patch

@@ -1,11 +1,15 @@
-GOLANGCI_LINT?=$(HOME)/go/bin/golangci-lint
-GOLANGCI_LINT_VERSION?=2.12.2
+# Go, golangci-lint, actionlint, and govulncheck versions are pinned once in
+# mise.toml (see the ensure-mise-tools target); these vars only override where
+# the resulting binaries are found. GOLANGCI_LINT_VERSION is read back out of
+# mise.toml rather than duplicated here, so the `lint` target's version guard
+# can never drift from what `mise install` actually puts on PATH.
+GOLANGCI_LINT?=golangci-lint
+GOLANGCI_LINT_VERSION:=$(shell awk -F'"' '/^golangci-lint =/{print $$2}' mise.toml)
 MARKDOWNLINT?=markdownlint
 MARKDOWNLINT_VERSION?=0.49.0
 MARKDOWNLINT_FILES?=AGENTS.md README.md CONTRIBUTING.md .github/copilot-instructions.md docs/**/*.md
-ACTIONLINT?=$(HOME)/go/bin/actionlint
-ACTIONLINT_VERSION?=1.7.12
-GOVULNCHECK_VERSION?=1.6.0
+ACTIONLINT?=actionlint
+GOVULNCHECK?=govulncheck
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.0-unknown)
 BENCH_CPU?=1
 BENCH_COUNT?=10
@@ -145,8 +149,9 @@ doc-coverage:
 lint:
 	@echo "Running golangci-lint (expected version $(GOLANGCI_LINT_VERSION))..."
 	@$(GOLANGCI_LINT) --version 2>/dev/null | grep -q "$(GOLANGCI_LINT_VERSION)" || \
-		(echo "golangci-lint $(GOLANGCI_LINT_VERSION) required. Install with"; \
-		echo "  curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$HOME/go/bin v$(GOLANGCI_LINT_VERSION)"; exit 1)
+		(echo "golangci-lint $(GOLANGCI_LINT_VERSION) required (pinned in mise.toml). Run: mise install"; \
+		echo "  If that version is already installed, check for another golangci-lint earlier on"; \
+		echo "  PATH (e.g. a stray 'go install'ed copy) shadowing the mise shim."; exit 1)
 	@echo "Linting each build-tag combination (golangci-lint accepts one tag set per run)..."
 	@for tags in $(BUILD_TAG_MATRIX); do \
 		if [ "$$tags" = "none" ]; then \
@@ -168,12 +173,19 @@ lint:
 lint-actions:
 	@echo "Running actionlint..."
 	@command -v $(ACTIONLINT) >/dev/null 2>&1 || \
-		(echo "actionlint not found. Install with"; \
-		echo "  go install github.com/rhysd/actionlint/cmd/actionlint@v$(ACTIONLINT_VERSION)"; exit 1)
+		(echo "actionlint not found. Version is pinned in mise.toml. Run: mise install"; exit 1)
 	find .github/workflows -name '*.yml' -not -name '*.lock.yml' -print0 | xargs -0 $(ACTIONLINT)
 
 .PHONY: validate
 validate:
+	@echo "Checking go.mod matches mise.toml's pinned Go version..."
+	@go_mod_version="$$(awk '/^go /{print $$2; exit}' go.mod)"; \
+	mise_go_version="$$(awk -F'"' '/^go =/{print $$2; exit}' mise.toml)"; \
+	if [ "$$go_mod_version" != "$$mise_go_version" ]; then \
+		echo "go.mod's go directive ($$go_mod_version) does not match mise.toml's pinned go version ($$mise_go_version)."; \
+		echo "mise.toml is the source of truth for the Go version - update go.mod (and the README compatibility table) to match."; \
+		exit 1; \
+	fi
 	@echo "Checking gofmt..."
 	@test -z "$$(gofmt -s -l . | tee /dev/stderr)" || (echo "Run gofmt -s -w ."; exit 1)
 	@echo "Checking go mod tidy..."
@@ -193,19 +205,25 @@ validate:
 .PHONY: security
 security:
 	@echo "Running govulncheck..."
-	@command -v govulncheck >/dev/null 2>&1 || go install golang.org/x/vuln/cmd/govulncheck@v$(GOVULNCHECK_VERSION)
-	govulncheck ./...
+	@command -v $(GOVULNCHECK) >/dev/null 2>&1 || \
+		(echo "govulncheck not found. Version is pinned in mise.toml. Run: mise install"; exit 1)
+	$(GOVULNCHECK) ./...
 
 .PHONY: ensure
-ensure: ensure-golangci-lint ensure-markdownlint ensure-actionlint
+ensure: ensure-mise-tools ensure-markdownlint
 	@echo "All dev tools are ready."
 
-.PHONY: ensure-golangci-lint
-ensure-golangci-lint:
-	@echo "==> golangci-lint $(GOLANGCI_LINT_VERSION)"
-	@$(GOLANGCI_LINT) --version 2>/dev/null | grep -q "$(GOLANGCI_LINT_VERSION)" || \
-		(echo "    Installing golangci-lint v$(GOLANGCI_LINT_VERSION)..." && \
-		curl -sSfL https://raw.githubusercontent.com/golangci/golangci-lint/master/install.sh | sh -s -- -b $$HOME/go/bin v$(GOLANGCI_LINT_VERSION))
+# Go, golangci-lint, actionlint, and govulncheck are all pinned in mise.toml;
+# `mise install` puts every one of them on PATH via shims at the exact
+# version CI uses (.github/workflows/*.yml via jdx/mise-action). Bumping a
+# version is a one-line mise.toml edit instead of a hunt across the Makefile
+# and every workflow file.
+.PHONY: ensure-mise-tools
+ensure-mise-tools:
+	@echo "==> Go, golangci-lint, actionlint, govulncheck (pinned in mise.toml)"
+	@command -v mise >/dev/null 2>&1 || \
+		(echo "    mise not found. Install: https://mise.jdx.dev/installing-mise.html"; exit 1)
+	mise install
 	@echo "    OK"
 
 .PHONY: ensure-markdownlint
@@ -214,14 +232,6 @@ ensure-markdownlint:
 	@command -v $(MARKDOWNLINT) >/dev/null 2>&1 || \
 		(echo "    Installing markdownlint-cli@$(MARKDOWNLINT_VERSION)..." && \
 		npm install -g markdownlint-cli@$(MARKDOWNLINT_VERSION))
-	@echo "    OK"
-
-.PHONY: ensure-actionlint
-ensure-actionlint:
-	@echo "==> actionlint"
-	@command -v $(ACTIONLINT) >/dev/null 2>&1 || \
-		(echo "    Installing actionlint..." && \
-		go install github.com/rhysd/actionlint/cmd/actionlint@v$(ACTIONLINT_VERSION))
 	@echo "    OK"
 
 .PHONY: clean
