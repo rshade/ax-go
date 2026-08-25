@@ -144,6 +144,29 @@ func TestWriteErrorEnvelope(t *testing.T) {
 	}
 }
 
+func TestConfirmationRequiredErrorEnvelope(t *testing.T) {
+	_, err := Confirm(WithMode(context.Background(), ModeJSON), "delete the record")
+	if err == nil {
+		t.Fatal("Confirm error = nil, want confirmation_required")
+	}
+	var stderr bytes.Buffer
+	if writeErr := WriteError(&stderr, err); writeErr != nil {
+		t.Fatalf("WriteError returned error: %v", writeErr)
+	}
+	assertGolden(t, "testdata/confirmation_required.golden.json", stderr.Bytes())
+
+	var got Error
+	if decodeErr := json.Unmarshal(stderr.Bytes(), &got); decodeErr != nil {
+		t.Fatalf("stderr did not contain JSON: %v", decodeErr)
+	}
+	if got.ErrorCode != "confirmation_required" || got.ActionableFix != "pass --yes to confirm this operation" {
+		t.Fatalf("confirmation envelope = %+v", got)
+	}
+	if ErrorExitCode(err) != ExitValidation {
+		t.Fatalf("ErrorExitCode = %d, want %d", ErrorExitCode(err), ExitValidation)
+	}
+}
+
 func TestErrorExitCodeContextErrors(t *testing.T) {
 	cases := []struct {
 		name string

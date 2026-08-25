@@ -302,6 +302,14 @@ failed patch operation uses the frozen `error_code` `config_patch_invalid`
   output envelope, killing duplicate-create from agent retries.
 - **`--dry-run`** — universal middleware that emits the same envelope with
   `dry_run: true` and performs no side effects.
+- **`--yes`** — explicit approval for a confirmation-gated operation. In
+  machine mode, `ax.Confirm(ctx, subject)` returns a
+  `confirmation_required` error (exit `2`) with the remediation
+  `pass --yes to confirm this operation`; the gate never reads stdin, writes
+  output, opens a pager, or prompts. In human mode it returns the distinct
+  `ConfirmationPromptRequired` outcome so the adopting CLI owns its prompt.
+  Approval and `--dry-run` are orthogonal: a dry-run without `--yes` still
+  refuses, while `--dry-run --yes` previews the approved path.
 - **`ax.Guard` / `ax.Perform`** — helpers that guard a side-effecting operation
   on the dry-run flag, so commands stop hand-rolling
   `if ax.DryRunFromContext(ctx) { ... } else { ... }`. `Guard` runs an effect
@@ -327,6 +335,11 @@ failed patch operation uses the frozen `error_code` `config_patch_invalid`
 - **`--format` flag / `AGENT_MODE` env var / TTY auto-detect** — selects machine
   vs. human output mode. The precedence is `--format` flag, then `AGENT_MODE`,
   then TTY detection.
+
+MCP carries the same decision per call with a boolean `yes` argument. Omit it
+or pass `false` to observe the structured refusal; pass `true` to approve that
+call only. A non-boolean value is a validation error, and approval never leaks
+to the next call.
 
 ### Standard `ax.Error` envelope
 
@@ -441,7 +454,9 @@ go run ./examples/integration stream --format=json --count=3
 go run ./examples/integration patch-config --format=json --config=config.json \
   --patch='[{"op":"replace","path":"/name","value":"Grace"}]'
 go run ./examples/integration __schema
-go run ./examples/integration fail --format=json
+  go run ./examples/integration fail --format=json
+  go run ./examples/integration confirm --format=json
+  go run ./examples/integration confirm --format=json --yes
 ```
 
 ## Build-time version injection

@@ -9,6 +9,8 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+
+	"github.com/rshade/ax-go/internal/cli"
 )
 
 func TestExecuteLogLinesCarryRootSpanContextWithoutCollector(t *testing.T) {
@@ -122,7 +124,11 @@ func TestExecuteContinuesInboundTraceparent(t *testing.T) {
 }
 
 func TestExecuteTelemetryFailOpen(t *testing.T) {
-	baselineStdout, _, baselineCode := executeTelemetryCommand(t, map[string]string{}, defaultTelemetryShutdownTimeout)
+	baselineStdout, _, baselineCode := executeTelemetryCommand(
+		t,
+		map[string]string{},
+		defaultTelemetryShutdownTimeout,
+	)
 
 	tests := []struct {
 		name string
@@ -146,10 +152,19 @@ func TestExecuteTelemetryFailOpen(t *testing.T) {
 			stdout, stderr, code := executeTelemetryCommand(t, tc.env, 100*time.Millisecond)
 
 			if code != baselineCode {
-				t.Fatalf("Execute exit code = %d, want baseline %d; stderr=%s", code, baselineCode, stderr)
+				t.Fatalf(
+					"Execute exit code = %d, want baseline %d; stderr=%s",
+					code,
+					baselineCode,
+					stderr,
+				)
 			}
 			if !bytes.Equal(stdout, baselineStdout) {
-				t.Fatalf("stdout changed under telemetry failure\nbaseline: %s\ngot: %s", baselineStdout, stdout)
+				t.Fatalf(
+					"stdout changed under telemetry failure\nbaseline: %s\ngot: %s",
+					baselineStdout,
+					stdout,
+				)
 			}
 			if !strings.Contains(stderr, "ax: otel") {
 				t.Fatalf("stderr = %q, want telemetry diagnostic", stderr)
@@ -213,6 +228,194 @@ func TestExecuteInjectsAXContext(t *testing.T) {
 	}
 }
 
+func TestExecuteResolvesApprovalAndBlocksWithoutWritingStdout(t *testing.T) {
+	tests := []struct {
+		name       string
+		args       []string
+		wantCode   int
+		wantEffect bool
+	}{
+		{name: "without approval", args: []string{"--format=json"}, wantCode: ExitValidation},
+		{
+			name:       "with approval",
+			args:       []string{"--format=json", "--yes"},
+			wantCode:   ExitSuccess,
+			wantEffect: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			effect := false
+			root := &cobra.Command{Use: "app", RunE: func(cmd *cobra.Command, _ []string) error {
+				outcome, err := Confirm(cmd.Context(), "apply the change")
+				if err != nil {
+					return err
+				}
+				if outcome == ConfirmationApproved {
+					effect = true
+				}
+				return WriteJSON(cmd.OutOrStdout(), struct {
+					OK bool `json:"ok"`
+				}{OK: true})
+			}}
+			root.SetArgs(tt.args)
+
+			code := Execute(context.Background(), root,
+				WithStdout(&stdout), WithStderr(&stderr), WithVersion("v1"),
+				WithEnv(func(string) string { return "" }), WithStdoutIsTTY(false))
+			if code != tt.wantCode {
+				t.Fatalf(
+					"Execute exit code = %d, want %d; stderr=%s",
+					code,
+					tt.wantCode,
+					stderr.String(),
+				)
+			}
+			if effect != tt.wantEffect {
+				t.Errorf("effect = %v, want %v", effect, tt.wantEffect)
+			}
+			if !tt.wantEffect && stdout.Len() != 0 {
+				t.Fatalf("blocked stdout = %q, want empty", stdout.String())
+			}
+			if tt.wantEffect && stderr.Len() != 0 {
+				t.Fatalf("approved stderr = %q, want empty", stderr.String())
+			}
+			if !tt.wantEffect {
+				var got Error
+				if err := json.Unmarshal(stderr.Bytes(), &got); err != nil {
+					t.Fatalf("blocked stderr is not JSON: %v", err)
+				}
+				if got.ErrorCode != "confirmation_required" || got.ActionableFix == "" {
+					t.Fatalf("blocked envelope = %+v", got)
+				}
+			}
+		})
+	}
+}
+
+func TestExecuteApprovalAndDryRunAreOrthogonal(t *testing.T) {
+	tests := []struct {
+		name         string
+		args         []string
+		wantCode     int
+		wantApproved bool
+		wantDryRun   bool
+		wantEffect   bool
+	}{
+		{name: "blocked real", args: []string{"--format=json"}, wantCode: ExitValidation},
+		{
+			name:     "blocked dry-run",
+			args:     []string{"--format=json", "--dry-run"},
+			wantCode: ExitValidation,
+		},
+		{
+			name:         "approved real",
+			args:         []string{"--format=json", "--yes"},
+			wantCode:     ExitSuccess,
+			wantApproved: true,
+			wantEffect:   true,
+		},
+		{
+			name:         "approved dry-run",
+			args:         []string{"--format=json", "--yes", "--dry-run"},
+			wantCode:     ExitSuccess,
+			wantApproved: true,
+			wantDryRun:   true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			effect := false
+			root := &cobra.Command{Use: "app", RunE: func(cmd *cobra.Command, _ []string) error {
+				outcome, err := Confirm(cmd.Context(), "apply the change")
+				if err != nil {
+					return err
+				}
+				if outcome == ConfirmationApproved && !DryRunFromContext(cmd.Context()) {
+					effect = true
+				}
+				return WriteJSON(cmd.OutOrStdout(), struct {
+					Approved bool `json:"approved"`
+					DryRun   bool `json:"dry_run"`
+				}{Approved: outcome == ConfirmationApproved, DryRun: DryRunFromContext(cmd.Context())})
+			}}
+			root.SetArgs(tt.args)
+			code := Execute(
+				context.Background(),
+				root,
+				WithStdout(&stdout),
+				WithStderr(&stderr),
+				WithEnv(
+					func(string) string { return "" },
+				),
+				WithStdoutIsTTY(false),
+				WithVersion("v1"),
+			)
+			if code != tt.wantCode {
+				t.Fatalf("exit code = %d, want %d; stderr=%s", code, tt.wantCode, stderr.String())
+			}
+			if effect != tt.wantEffect {
+				t.Errorf("effect = %v, want %v", effect, tt.wantEffect)
+			}
+			if tt.wantCode == ExitSuccess {
+				var got struct {
+					Approved bool `json:"approved"`
+					DryRun   bool `json:"dry_run"`
+				}
+				if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+					t.Fatalf("stdout is not JSON: %v", err)
+				}
+				if got.Approved != tt.wantApproved || got.DryRun != tt.wantDryRun {
+					t.Fatalf(
+						"payload = %+v, want approved=%v dry_run=%v",
+						got,
+						tt.wantApproved,
+						tt.wantDryRun,
+					)
+				}
+			}
+		})
+	}
+}
+
+func TestExecutePreservesPipedStdinAndAuthorYesCollision(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	var read bool
+	root := &cobra.Command{Use: "app", RunE: func(cmd *cobra.Command, _ []string) error {
+		buf := make([]byte, 4)
+		_, _ = cmd.InOrStdin().Read(buf)
+		read = true
+		return WriteJSON(cmd.OutOrStdout(), struct {
+			OK bool `json:"ok"`
+		}{OK: true})
+	}}
+	root.PersistentFlags().Bool(cli.FlagYes, true, "author approval")
+	root.SetArgs([]string{"--format=json"})
+	code := Execute(
+		context.Background(),
+		root,
+		WithStdin(strings.NewReader("data")),
+		WithStdout(&stdout),
+		WithStderr(
+			&stderr,
+		),
+		WithEnv(func(string) string { return "" }),
+		WithStdoutIsTTY(false),
+		WithVersion("v1"),
+	)
+	if code != ExitSuccess || !read || stdout.Len() == 0 || stderr.Len() != 0 {
+		t.Fatalf(
+			"code=%d read=%v stdout=%q stderr=%q",
+			code,
+			read,
+			stdout.String(),
+			stderr.String(),
+		)
+	}
+}
+
 func decodeLogRecords(t *testing.T, logs string) []map[string]any {
 	t.Helper()
 
@@ -238,7 +441,12 @@ func TestExecuteWritesErrorsToStderr(t *testing.T) {
 	root := &cobra.Command{
 		Use: "app",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return NewError(cmd.Context(), "validation_error", "bad input", WithErrorExitCode(ExitValidation))
+			return NewError(
+				cmd.Context(),
+				"validation_error",
+				"bad input",
+				WithErrorExitCode(ExitValidation),
+			)
 		},
 	}
 
@@ -286,7 +494,12 @@ func TestExecuteResolvesVersionWhenWithVersionOmitted(t *testing.T) {
 		root := &cobra.Command{
 			Use: "app",
 			RunE: func(cmd *cobra.Command, _ []string) error {
-				return NewError(cmd.Context(), "validation_error", "bad input", WithErrorExitCode(ExitValidation))
+				return NewError(
+					cmd.Context(),
+					"validation_error",
+					"bad input",
+					WithErrorExitCode(ExitValidation),
+				)
 			},
 		}
 
@@ -307,7 +520,10 @@ func TestExecuteResolvesVersionWhenWithVersionOmitted(t *testing.T) {
 			t.Fatalf("stderr was not JSON: %v", err)
 		}
 		if got["version"] == "" || got["version"] == nil {
-			t.Fatalf("error envelope version = %v, want non-empty ResolveVersion fallback", got["version"])
+			t.Fatalf(
+				"error envelope version = %v, want non-empty ResolveVersion fallback",
+				got["version"],
+			)
 		}
 	})
 
@@ -331,7 +547,12 @@ func TestExecuteResolvesVersionWhenWithVersionOmitted(t *testing.T) {
 		)
 
 		if code != ExitSuccess {
-			t.Fatalf("Execute exit code = %d, want %d; stderr=%s", code, ExitSuccess, stderr.String())
+			t.Fatalf(
+				"Execute exit code = %d, want %d; stderr=%s",
+				code,
+				ExitSuccess,
+				stderr.String(),
+			)
 		}
 		var got Schema
 		if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
@@ -351,7 +572,12 @@ func TestExecuteDoesNotMutateCallerError(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	callerErr := NewError(context.Background(), "validation_error", "bad input", WithErrorExitCode(ExitValidation))
+	callerErr := NewError(
+		context.Background(),
+		"validation_error",
+		"bad input",
+		WithErrorExitCode(ExitValidation),
+	)
 	// NewError stamps ZeroTraceID for a span-less context at construction;
 	// normalization must leave that value — and the empty Tool/Version — as-is.
 	wantTraceID := callerErr.TraceID
@@ -377,7 +603,11 @@ func TestExecuteDoesNotMutateCallerError(t *testing.T) {
 		t.Fatalf("Execute exit code = %d, want %d", code, ExitValidation)
 	}
 	if callerErr.TraceID != wantTraceID {
-		t.Fatalf("caller error TraceID mutated to %q, want unchanged %q", callerErr.TraceID, wantTraceID)
+		t.Fatalf(
+			"caller error TraceID mutated to %q, want unchanged %q",
+			callerErr.TraceID,
+			wantTraceID,
+		)
 	}
 	if callerErr.Tool != "" {
 		t.Fatalf("caller error Tool mutated to %q, want unchanged (empty)", callerErr.Tool)
@@ -412,7 +642,12 @@ func TestExecuteErrorSpanStatusDescriptionCarriesMessage(t *testing.T) {
 	root := &cobra.Command{
 		Use: "app",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			return NewError(cmd.Context(), "validation_error", "bad input", WithErrorExitCode(ExitValidation))
+			return NewError(
+				cmd.Context(),
+				"validation_error",
+				"bad input",
+				WithErrorExitCode(ExitValidation),
+			)
 		},
 	}
 
@@ -434,7 +669,10 @@ func TestExecuteErrorSpanStatusDescriptionCarriesMessage(t *testing.T) {
 		t.Fatalf("Execute exit code = %d, want %d", code, ExitValidation)
 	}
 	if !strings.Contains(stderr.String(), `"Description": "bad input"`) {
-		t.Fatalf("stderr = %q, want span status description carrying the error message", stderr.String())
+		t.Fatalf(
+			"stderr = %q, want span status description carrying the error message",
+			stderr.String(),
+		)
 	}
 }
 

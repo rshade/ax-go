@@ -16,6 +16,9 @@ func TestContextHelpers(t *testing.T) {
 	if _, ok := IdempotencyKeyFromContext(ctx); ok {
 		t.Fatal("IdempotencyKeyFromContext ok=true on empty context")
 	}
+	if ApprovalFromContext(ctx) {
+		t.Fatal("ApprovalFromContext = true on empty context")
+	}
 
 	ctx = WithMode(ctx, ModeJSON)
 	ctx = WithDryRun(ctx, true)
@@ -31,6 +34,15 @@ func TestContextHelpers(t *testing.T) {
 	key, ok := IdempotencyKeyFromContext(ctx)
 	if !ok || key != "key-1" {
 		t.Fatalf("IdempotencyKeyFromContext = %q, %v; want key-1, true", key, ok)
+	}
+
+	ctx = WithApproval(ctx, true)
+	if !ApprovalFromContext(ctx) {
+		t.Fatal("ApprovalFromContext = false, want true")
+	}
+	ctx = WithApproval(ctx, false)
+	if ApprovalFromContext(ctx) {
+		t.Fatal("ApprovalFromContext = true after explicit false")
 	}
 }
 

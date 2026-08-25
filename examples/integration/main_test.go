@@ -15,6 +15,7 @@ import (
 	"time"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/spf13/cobra"
 
 	ax "github.com/rshade/ax-go"
 	"github.com/rshade/ax-go/mcp"
@@ -60,6 +61,104 @@ func TestRunDefaultCommand(t *testing.T) {
 	}
 	if logLine["application"] != appName {
 		t.Fatalf("application label = %v, want %s", logLine["application"], appName)
+	}
+}
+
+func TestRunConfirmationCommand(t *testing.T) {
+	tests := []struct {
+		name          string
+		args          []string
+		wantCode      int
+		wantConfirmed bool
+	}{
+		{
+			name:     "machine mode refuses without yes",
+			args:     []string{confirmCommandName, "--format=json"},
+			wantCode: ax.ExitValidation,
+		},
+		{
+			name:          "yes approves without prompt",
+			args:          []string{confirmCommandName, "--format=json", "--yes"},
+			wantCode:      ax.ExitSuccess,
+			wantConfirmed: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			code := run(
+				context.Background(), tt.args, strings.NewReader(""), &stdout, &stderr,
+				func(string) string { return "" },
+			)
+			if code != tt.wantCode {
+				t.Fatalf("exit code = %d, want %d; stderr=%s", code, tt.wantCode, stderr.String())
+			}
+			if !tt.wantConfirmed {
+				if stdout.Len() != 0 {
+					t.Fatalf("blocked stdout = %q, want empty", stdout.String())
+				}
+				var got ax.Error
+				if err := json.Unmarshal(stderr.Bytes(), &got); err != nil {
+					t.Fatalf("blocked stderr is not an error envelope: %v", err)
+				}
+				if got.ErrorCode != "confirmation_required" {
+					t.Fatalf("error code = %q, want confirmation_required", got.ErrorCode)
+				}
+				return
+			}
+			var got ax.Envelope[confirmationPayload]
+			if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+				t.Fatalf("approved stdout is not an envelope: %v", err)
+			}
+			if !got.Data.Confirmed || stderr.Len() != 0 {
+				t.Fatalf("approved result = %+v, stderr=%q", got.Data, stderr.String())
+			}
+		})
+	}
+}
+
+func TestRunConfirmationCommandPromptsInHumanMode(t *testing.T) {
+	tests := []struct {
+		name          string
+		input         string
+		wantConfirmed bool
+	}{
+		{name: "human approves", input: "yes\n", wantConfirmed: true},
+		{name: "human declines", input: "no\n"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			root := &cobra.Command{Use: appName}
+			root.AddCommand(newConfirmCommand())
+			root.SetArgs([]string{confirmCommandName})
+
+			code := ax.Execute(
+				context.Background(),
+				root,
+				ax.WithStdin(strings.NewReader(tt.input)),
+				ax.WithStdout(&stdout),
+				ax.WithStderr(&stderr),
+				ax.WithEnv(func(string) string { return "" }),
+				ax.WithStdoutIsTTY(true),
+				ax.WithVersion("v1"),
+			)
+			if code != ax.ExitSuccess {
+				t.Fatalf("exit code = %d, want %d; stderr=%s", code, ax.ExitSuccess, stderr.String())
+			}
+			if !strings.Contains(stderr.String(), "[y/N]") {
+				t.Fatalf("human stderr = %q, want confirmation prompt", stderr.String())
+			}
+
+			var got ax.Envelope[confirmationPayload]
+			if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+				t.Fatalf("human stdout is not an envelope: %v; stdout=%q", err, stdout.String())
+			}
+			if got.Data.Confirmed != tt.wantConfirmed {
+				t.Fatalf("confirmed = %v, want %v", got.Data.Confirmed, tt.wantConfirmed)
+			}
+		})
 	}
 }
 
@@ -136,7 +235,13 @@ func TestRunStreamCommandEmitsNDJSON(t *testing.T) {
 
 	code := run(
 		context.Background(),
-		[]string{"stream", "--format=json", "--idempotency-key=test-key", "--count=2", "--name=Ada"},
+		[]string{
+			"stream",
+			"--format=json",
+			"--idempotency-key=test-key",
+			"--count=2",
+			"--name=Ada",
+		},
 		strings.NewReader(""),
 		&stdout,
 		&stderr,
@@ -204,7 +309,10 @@ func TestRunFailCommandWritesErrorEnvelopeToStderr(t *testing.T) {
 		t.Fatalf("version = %q, want %q", got.Version, want)
 	}
 	if got.Retryable == nil || *got.Retryable {
-		t.Fatalf("retryable = %v, want explicit false (validation failures are not retryable)", got.Retryable)
+		t.Fatalf(
+			"retryable = %v, want explicit false (validation failures are not retryable)",
+			got.Retryable,
+		)
 	}
 }
 

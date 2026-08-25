@@ -7,6 +7,7 @@ type contextKey string
 const (
 	modeContextKey           contextKey = "ax.mode"
 	dryRunContextKey         contextKey = "ax.dry_run"
+	approvalContextKey       contextKey = "ax.approval"
 	idempotencyKeyContextKey contextKey = "ax.idempotency_key"
 	metadataContextKey       contextKey = "ax.metadata"
 )
@@ -31,6 +32,17 @@ func WithDryRun(ctx context.Context, dryRun bool) context.Context {
 func DryRunFromContext(ctx context.Context) bool {
 	dryRun, _ := ctx.Value(dryRunContextKey).(bool)
 	return dryRun
+}
+
+// WithApproval returns a context carrying the per-invocation confirmation decision.
+func WithApproval(ctx context.Context, granted bool) context.Context {
+	return context.WithValue(ctx, approvalContextKey, granted)
+}
+
+// ApprovalFromContext reports whether explicit confirmation was granted.
+func ApprovalFromContext(ctx context.Context) bool {
+	granted, _ := ctx.Value(approvalContextKey).(bool)
+	return granted
 }
 
 // WithIdempotencyKey returns a context carrying the idempotency key for the run.

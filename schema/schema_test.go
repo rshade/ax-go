@@ -168,6 +168,16 @@ func TestBuildMCPSchemaGolden(t *testing.T) {
 	assertGolden(t, filepath.Join("..", "testdata", "schema_mcp.golden.json"), stdout.Bytes())
 }
 
+func TestBuildSchemaReflectsYesAsOrdinaryBooleanFlag(t *testing.T) {
+	root := &cobra.Command{Use: "app"}
+	root.PersistentFlags().Bool("yes", false, "confirm a confirmation-gated operation")
+	built := BuildSchema(root)
+	if len(built.Command.Flags) != 1 || built.Command.Flags[0].Name != "yes" ||
+		built.Command.Flags[0].Type != "bool" || built.Command.Flags[0].Default != "false" {
+		t.Fatalf("yes schema flag = %#v, want ordinary false bool flag", built.Command.Flags)
+	}
+}
+
 func TestBuildMCPSchemaAdvertisesMultiValueFlagsAsArrays(t *testing.T) {
 	root := &cobra.Command{Use: "app", Short: "test app"}
 	root.Flags().StringSlice("tags", []string{"default"}, "tags to apply")

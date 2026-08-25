@@ -5,6 +5,24 @@
       "path": "github.com/rshade/ax-go",
       "features": [
         {
+          "id": "const:ConfirmationApproved",
+          "signature": "ConfirmationOutcome",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ConfirmationBlocked",
+          "signature": "ConfirmationOutcome",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ConfirmationPromptRequired",
+          "signature": "ConfirmationOutcome",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "const:DefaultHTTPTimeout",
           "signature": "time.Duration",
           "configurations": "all",
@@ -395,6 +413,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:ApprovalFromContext",
+          "signature": "func(context.Context) bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:BuildMCPSchema",
           "signature": "func(*github.com/spf13/cobra.Command) MCPSchema",
           "configurations": "all",
@@ -403,6 +427,12 @@
         {
           "id": "func:BuildSchema",
           "signature": "func(*github.com/spf13/cobra.Command, ...SchemaOption) Schema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:Confirm",
+          "signature": "func(context.Context, string) (ConfirmationOutcome, error)",
           "configurations": "all",
           "profiles": "all"
         },
@@ -574,6 +604,12 @@
         {
           "id": "func:WithActionableFix",
           "signature": "func(string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithApproval",
+          "signature": "func(context.Context, bool) context.Context",
           "configurations": "all",
           "profiles": "all"
         },
@@ -850,6 +886,12 @@
         {
           "id": "type:CommandSchema",
           "signature": "= github.com/rshade/ax-go/schema.CommandSchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:ConfirmationOutcome",
+          "signature": "uint8",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1194,6 +1236,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:ApprovalFromContext",
+          "signature": "func(context.Context) bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:DryRunFromContext",
           "signature": "func(context.Context) bool",
           "configurations": "all",
@@ -1262,6 +1310,12 @@
         {
           "id": "func:WithActionableFix",
           "signature": "func(string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithApproval",
+          "signature": "func(context.Context, bool) context.Context",
           "configurations": "all",
           "profiles": "all"
         },

@@ -179,6 +179,29 @@ func ExampleNewIdempotencyKey() {
 	// Output: 36
 }
 
+// ExampleConfirm demonstrates all three stateless confirmation outcomes. The
+// gate never prompts; a caller owns the prompt-required branch.
+func ExampleConfirm() {
+	approved, _ := ax.Confirm(
+		ax.WithApproval(ax.WithMode(context.Background(), ax.ModeJSON), true),
+		"delete the record",
+	)
+	fmt.Println(approved == ax.ConfirmationApproved)
+
+	_, blockedErr := ax.Confirm(ax.WithMode(context.Background(), ax.ModeJSON), "delete the record")
+	var blocked *ax.Error
+	if errors.As(blockedErr, &blocked) {
+		fmt.Println(blocked.ErrorCode)
+	}
+
+	prompt, _ := ax.Confirm(ax.WithMode(context.Background(), ax.ModeHuman), "delete the record")
+	fmt.Println(prompt == ax.ConfirmationPromptRequired)
+	// Output:
+	// true
+	// confirmation_required
+	// true
+}
+
 // ExampleNewEntityID returns a UUID v7 resource identifier in canonical
 // 36-character form.
 func ExampleNewEntityID() {

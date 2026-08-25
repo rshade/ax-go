@@ -63,6 +63,25 @@ func TestDryRunFromContextMissingKeyReturnsFalse(t *testing.T) {
 	}
 }
 
+func TestApprovalContextRoundTrip(t *testing.T) {
+	tests := []struct {
+		name    string
+		ctx     context.Context
+		granted bool
+	}{
+		{name: "absent defaults false", ctx: context.Background(), granted: false},
+		{name: "explicit false", ctx: WithApproval(context.Background(), false), granted: false},
+		{name: "explicit true", ctx: WithApproval(context.Background(), true), granted: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := ApprovalFromContext(tt.ctx); got != tt.granted {
+				t.Fatalf("ApprovalFromContext = %v, want %v", got, tt.granted)
+			}
+		})
+	}
+}
+
 func TestIdempotencyKeyContextRoundTrip(t *testing.T) {
 	tests := []struct {
 		name   string

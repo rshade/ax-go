@@ -31,6 +31,7 @@ import (
 const (
 	formatFlagName         = cli.FlagFormat
 	dryRunFlagName         = cli.FlagDryRun
+	yesFlagName            = cli.FlagYes
 	idempotencyKeyFlagName = cli.FlagIdempotencyKey
 )
 
@@ -64,6 +65,7 @@ type dispatcher struct {
 type callConfig struct {
 	mode           contract.Mode
 	dryRun         bool
+	approval       bool
 	idempotencyKey string
 }
 
@@ -116,6 +118,7 @@ func newDispatcher(ctx context.Context, root *cobra.Command, cfg Config) *dispat
 func ensurePersistentFlags(root *cobra.Command) {
 	cli.EnsurePersistentStringFlag(root, formatFlagName, "", "output format: json or human")
 	cli.EnsurePersistentBoolFlag(root, dryRunFlagName, false, "emit the envelope without side effects")
+	cli.EnsurePersistentBoolFlag(root, yesFlagName, false, "confirm a confirmation-gated operation")
 	cli.EnsurePersistentStringFlag(
 		root,
 		idempotencyKeyFlagName,
@@ -256,8 +259,10 @@ func (d *dispatcher) buildArgs(
 		}
 	}
 
-	// The engine always injects the agent-safety/output flags, so they count as
-	// satisfied when checking required flags.
+	// The engine always injects format and idempotency-key. Dry-run retains its
+	// established default-value behavior. Approval counts as satisfied only when
+	// the MCP client explicitly supplied yes; the server never grants or supplies
+	// approval on the client's behalf.
 	setFlags[formatFlagName] = struct{}{}
 	setFlags[dryRunFlagName] = struct{}{}
 	setFlags[idempotencyKeyFlagName] = struct{}{}
@@ -269,6 +274,9 @@ func (d *dispatcher) buildArgs(
 	flagArgs = append(flagArgs, "--"+formatFlagName+"="+string(contract.ModeJSON))
 	if cc.dryRun {
 		flagArgs = append(flagArgs, "--"+dryRunFlagName+"=true")
+	}
+	if _, provided := setFlags[yesFlagName]; provided {
+		flagArgs = append(flagArgs, "--"+yesFlagName+"="+strconv.FormatBool(cc.approval))
 	}
 	if cc.idempotencyKey == "" {
 		cc.idempotencyKey = id.NewIdempotencyKey()
@@ -294,6 +302,13 @@ func (d *dispatcher) applyCallConfigArg(
 			return true, d.validationError(ctx, fmt.Sprintf("argument %q must be a boolean", key))
 		}
 		cc.dryRun = boolVal
+		return true, nil
+	case yesFlagName:
+		boolVal, isBool := value.(bool)
+		if !isBool {
+			return true, d.validationError(ctx, fmt.Sprintf("argument %q must be a boolean", key))
+		}
+		cc.approval = boolVal
 		return true, nil
 	case idempotencyKeyFlagName:
 		strVal, isString := value.(string)
@@ -485,6 +500,7 @@ func (d *dispatcher) validationError(ctx context.Context, message string) *contr
 func applyCallConfig(ctx context.Context, cc callConfig) context.Context {
 	ctx = contract.WithMode(ctx, cc.mode)
 	ctx = contract.WithDryRun(ctx, cc.dryRun)
+	ctx = contract.WithApproval(ctx, cc.approval)
 	ctx = contract.WithIdempotencyKey(ctx, cc.idempotencyKey)
 	return ctx
 }
