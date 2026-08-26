@@ -151,5 +151,7 @@ and not an `ax-go` runtime import.
 
 - [Expose your command tree with `__schema`](/ax-go/guides/expose-schema/) — for
   the full CLI runtime, which is a root `ax` concern.
+- [Test a command built on ax-go](/ax-go/guides/test-a-command/) — `axtest`
+  follows a different isolation rationale than the packages on this page.
 - [Why Agentic Experience?](/ax-go/explanation/why-agentic-experience/) — why
   stream separation puts every log line on stderr in the first place.

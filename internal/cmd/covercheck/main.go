@@ -170,6 +170,10 @@ func defaultFloorConfig() floorConfig {
 			"github.com/rshade/ax-go/internal/schema":           93.0,
 			"github.com/rshade/ax-go/internal/telemetry":        60.0,
 			"github.com/rshade/ax-go/internal/testutil":         25.0,
+			// Enrolled 2026-08-25 with feature 019, calibrated ~2pp below its
+			// measured 100% (go test -race -coverprofile ./axtest/...), following
+			// the convention used for the other near-100% surfaces above.
+			"github.com/rshade/ax-go/axtest": 98.0,
 		},
 		excluded: map[string]bool{},
 	}

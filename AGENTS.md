@@ -48,6 +48,15 @@ conflicts with the constitution, the constitution wins.
   the MCP Go SDK and all protocol mechanics. It belongs to the apidiff-gated
   public surface but is not an import-isolated contract package; the contract
   packages must never import it (enforced by `mcp/import_isolation_test.go`).
+- `axtest/` is an approved public package: a full-lifecycle command test
+  helper wrapping `ax.Execute` (`axtest.Run`, `axtest.Decode`,
+  `axtest.RunAndDecode`). It is organizationally isolated — designed to be
+  imported only from `_test.go` files, and an automated check
+  (`axtest/import_isolation_test.go`) fails if any non-test source file
+  anywhere in this module imports it — not size-isolated: it depends on the
+  full root `ax` package and Cobra without restriction, because there is
+  nothing size-sensitive to hide from a package that never links into a
+  production binary.
 - `testdata/` contains golden fixtures for stable public JSON contracts.
 - `cmd/` is reserved for runnable support binaries and does not exist yet.
   The MCP server runtime is not a `cmd/` launcher: spec 011 shipped
@@ -227,7 +236,7 @@ Rules when touching gated code:
 
 `internal/cmd/surfacecheck` is the single surface gate. It is documented in
 full under [Public Surface Gate](#public-surface-gate); the short version is
-that it scans the seven public packages across 4 build-tag configurations ×
+that it scans the eight public packages across 4 build-tag configurations ×
 6 `GOOS`/`GOARCH` profiles = 24 loads, and diffs the result against both
 `internal/cmd/surfacecheck/baseline.json` and the permanent audit. The load
 count is 24 regardless of package count: a load is one (configuration, profile)
@@ -352,6 +361,7 @@ when they enrolled, ~2pp below their measured coverage):
 | `github.com/rshade/ax-go/internal/schema` | 93% |
 | `github.com/rshade/ax-go/internal/telemetry` | 60% |
 | `github.com/rshade/ax-go/internal/testutil` | 25% |
+| `github.com/rshade/ax-go/axtest` | 98% |
 
 Any package without an explicit override (including newly added packages and
 `internal/cmd/covercheck` itself) faces the 25% per-package default.
@@ -500,7 +510,7 @@ The public API surface is gated in CI by `internal/cmd/surfacecheck`, which
 inventories the complete compiler-visible surface (declarations, direct and
 promoted fields, complete interface method sets, value and pointer method
 sets, alias-attributed members, and reachable hidden concrete types) of all
-seven public packages, across 4 build-tag configurations × 6 supported
+eight public packages, across 4 build-tag configurations × 6 supported
 GOOS/GOARCH profiles = 24 loads, and compares it against two committed
 artifacts:
 
@@ -513,7 +523,7 @@ artifacts:
   `implementation-leak` with a lifecycle state (schema in
   `specs/015-internalize-helpers/contracts/audit-schema.md`). The audit is
   scoped to the **root package**, whose bare feature IDs it joins on; the
-  other five public packages are gated by the baseline alone.
+  other seven public packages are gated by the baseline alone.
 
 Run it from the module root:
 

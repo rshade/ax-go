@@ -344,7 +344,10 @@ func TestDefaultFloorConfig(t *testing.T) {
 		// Raised 80.0 -> 85.0 on 2026-07-22: extracting the logger into
 		// internal/logcore moved root's measured coverage up to 89.8%, and the
 		// 5pp escalation is the documented response to a measured improvement.
-		"github.com/rshade/ax-go":                           85.0,
+		"github.com/rshade/ax-go": 85.0,
+		// Enrolled 2026-08-25 with feature 019, calibrated ~2pp below its
+		// measured 100%.
+		"github.com/rshade/ax-go/axtest":                    98.0,
 		"github.com/rshade/ax-go/examples/integration":      85.0,
 		"github.com/rshade/ax-go/examples/logging":          98.0,
 		"github.com/rshade/ax-go/examples/rootlogging":      98.0,

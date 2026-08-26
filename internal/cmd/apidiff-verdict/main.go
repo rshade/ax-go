@@ -59,12 +59,12 @@ const (
 )
 
 // allowedPackages is the single source of truth for ax-go's public API surface:
-// the root package ax plus the public packages config, contract, id, logging,
-// mcp, and schema (the import-isolated contract and logging packages and the
-// thin mcp runtime surface). go-apidiff findings for any other package (notably
-// internal/ and examples/) are ignored by the gate. check-packages enforces that
-// this list stays in sync with the module's actual public packages. Keep it
-// sorted.
+// the root package ax plus the public packages axtest, config, contract, id,
+// logging, mcp, and schema (the import-isolated contract and logging packages,
+// the thin mcp runtime surface, and the organizationally isolated test-helper
+// package). go-apidiff findings for any other package (notably internal/ and
+// examples/) are ignored by the gate. check-packages enforces that this list
+// stays in sync with the module's actual public packages. Keep it sorted.
 //
 // Every entry MUST be a plain string literal. surfacecheck's
 // TestPublicPackagesMatchesAPIDiffAllowlist parses THIS FUNCTION'S SOURCE to
@@ -76,6 +76,7 @@ func allowedPackages() []string {
 	return []string{
 		//nolint:goconst // must stay a literal: the surfacecheck guard parses this source
 		"github.com/rshade/ax-go",
+		"github.com/rshade/ax-go/axtest",
 		"github.com/rshade/ax-go/config",
 		"github.com/rshade/ax-go/contract",
 		"github.com/rshade/ax-go/id",

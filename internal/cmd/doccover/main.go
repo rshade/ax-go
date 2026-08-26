@@ -44,6 +44,7 @@ func scannedPackages() map[string]string {
 	return map[string]string{
 		rootPackageAlias:    ".",
 		loggingPackageAlias: loggingPackageAlias,
+		axtestPackageAlias:  axtestPackageAlias,
 	}
 }
 
@@ -56,6 +57,9 @@ const (
 	// loggingPackageAlias qualifies symbols declared in the import-isolated
 	// logging package, whose directory name matches its alias.
 	loggingPackageAlias = "logging"
+	// axtestPackageAlias qualifies symbols declared in the axtest package,
+	// whose directory name matches its alias.
+	axtestPackageAlias = "axtest"
 
 	// Symbols named often enough across this package and its tests to be worth
 	// pinning once. axNewLogger and loggingNewLogger are the pair the whole
@@ -110,6 +114,10 @@ func requiredSymbols() []string {
 		"ax.Telemetry",
 		// import-isolated logging surface
 		loggingNewLogger,
+		// axtest full-lifecycle command test helper
+		"axtest.Run",
+		"axtest.Decode",
+		"axtest.RunAndDecode",
 	}
 }
 

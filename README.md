@@ -164,6 +164,67 @@ import "github.com/rshade/ax-go/mcp"
   ax-go command tree as a live MCP server over the official MCP Go SDK. The SDK
   and all protocol/transport/dispatch mechanics stay behind `internal/mcpserver`.
 
+Use the `axtest` package from your test files to run a command tree through
+the real `ax.Execute` startup lifecycle and decode its result:
+
+```go
+import "github.com/rshade/ax-go/axtest"
+```
+
+- `axtest`: `axtest.Run` executes a command tree exactly as a production
+  binary does — agent-safety flags mounted, mode resolved — and returns
+  captured stdout, stderr, and the exit code; `axtest.Decode[T]` unwraps an
+  `ax.Envelope[T]`'s `Data` field with no hand-declared wrapper struct; and
+  `axtest.RunAndDecode[T]` composes both for the success-path common case.
+  Unlike the packages above, `axtest` is not size-isolated — it depends on the
+  full root `ax` package and Cobra without restriction — because it isolates
+  discoverability and a stable home for test tooling, not binary size. An
+  automated check enforces that it is imported only from `_test.go` files, so
+  it never links into a production binary regardless.
+
+### Testing a command built on ax-go
+
+`axtest.Run` solves a specific piece of friction: a bare `cobra.Command`'s own
+`Execute()` has never seen `--dry-run`, `--yes`, `--format`, or
+`--idempotency-key` — those flags are mounted by `ax.Execute`'s internal
+`prepareCommand`, not by Cobra itself. Calling `root.Execute()` directly in a
+test fails with `unknown flag: --dry-run` even though the same flag works fine
+in production.
+
+```go
+func TestReconcileDryRun(t *testing.T) {
+    root := newRootCmd()
+
+    result := axtest.Run(context.Background(), t, root, []string{"reconcile", "--format=json", "--dry-run"})
+    if result.ExitCode != 0 {
+        t.Fatalf("exit code = %d, want 0; stderr:\n%s", result.ExitCode, result.Stderr)
+    }
+
+    data := axtest.Decode[reconcileResult](t, result.Stdout)
+    if data.Reconciled != 0 {
+        t.Errorf("dry run reconciled %d resources, want 0", data.Reconciled)
+    }
+}
+```
+
+No wrapper struct was declared to reach `reconcileResult` out of the
+envelope's `data` key, and `--dry-run` is recognized because `Run` executes
+the tree through the same lifecycle a production binary uses. Pass
+`--format=json` explicitly whenever a test decodes stdout so the test does not
+depend on `AGENT_MODE` or TTY detection. When a test only cares about a
+successful outcome, `RunAndDecode` composes `Run` and `Decode` in one call:
+
+```go
+data, exitCode := axtest.RunAndDecode[statusResult](context.Background(), t, root, []string{"status", "--format=json"})
+if exitCode != 0 {
+    t.Fatalf("exit code = %d, want 0", exitCode)
+}
+```
+
+See [`specs/019-axtest-package/quickstart.md`](specs/019-axtest-package/quickstart.md)
+for the full walkthrough, including testing a confirmation-gated command's
+blocked and approved outcomes.
+
 ## Core Standards
 
 These are the non-negotiable mandates every tool built on ax-go must follow.
@@ -554,7 +615,7 @@ else changes: no source edit, no import change, no API difference.
 
 `ax.GRPCDial` is the **only** public identifier whose presence varies with a
 build tag. This is enforced on every PR by `make surface-check`, which
-type-checks all seven public packages across 4 configurations × 6 GOOS/GOARCH
+type-checks all eight public packages across 4 configurations × 6 GOOS/GOARCH
 profiles and diffs the result against a committed baseline.
 
 The target injects `git describe --tags --always --dirty` into

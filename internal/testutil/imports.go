@@ -1,11 +1,15 @@
 package testutil
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -356,6 +360,135 @@ func RepoRoot(t testing.TB) string {
 			t.Fatal("go.mod not found above working directory")
 		}
 		dir = parent
+	}
+}
+
+// ModulePackage is the subset of `go list -json`'s per-package output that the
+// reverse-direction import check needs: a package's import path and the
+// imports of its own non-test compilation unit. go list -json keeps this
+// field (Imports) distinct from TestImports and XTestImports, which is the
+// whole mechanism FindNonTestImporters relies on to ignore legitimate use from
+// a _test.go file.
+type ModulePackage struct {
+	ImportPath string   `json:"ImportPath"`
+	Imports    []string `json:"Imports"`
+}
+
+// BuildProfile identifies the target operating system and architecture for a
+// cross-platform go list invocation.
+type BuildProfile struct {
+	GOOS   string
+	GOARCH string
+}
+
+// String returns the canonical "goos/goarch" spelling.
+func (p BuildProfile) String() string { return p.GOOS + "/" + p.GOARCH }
+
+// ResolveModulePackages runs `go list -json ./...` from moduleDir for profile
+// and decodes every package's ImportPath and Imports fields. go list -json
+// emits one JSON object per package back-to-back rather than as a JSON array,
+// so the output is read with json.NewDecoder in a loop rather than a single
+// Unmarshal call. The optional tags select the build-tag configuration to
+// resolve, allowing a caller to check every supported profile and
+// configuration in turn.
+func ResolveModulePackages(
+	ctx context.Context,
+	moduleDir string,
+	profile BuildProfile,
+	tags ...string,
+) ([]ModulePackage, error) {
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	args := []string{"list", "-json"}
+	if joined := joinBuildTags(tags); joined != "" {
+		args = append(args, "-tags", joined)
+	}
+	args = append(args, "./...")
+
+	// #nosec G204 -- moduleDir and tags are supplied by repository tests, not
+	// shell-interpreted input; exec.CommandContext passes them as argv.
+	cmd := exec.CommandContext(ctx, "go", args...)
+	cmd.Dir = moduleDir
+	cmd.Env = buildProfileEnvironment(profile)
+	out, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := errors.AsType[*exec.ExitError](err); ok {
+			return nil, fmt.Errorf(
+				"go list -json ./... in %s for %s: %w: %s",
+				moduleDir, profile, err, strings.TrimSpace(string(exitErr.Stderr)),
+			)
+		}
+		return nil, fmt.Errorf("go list -json ./... in %s for %s: %w", moduleDir, profile, err)
+	}
+
+	var packages []ModulePackage
+	decoder := json.NewDecoder(bytes.NewReader(out))
+	for decoder.More() {
+		var pkg ModulePackage
+		if decodeErr := decoder.Decode(&pkg); decodeErr != nil {
+			return nil, fmt.Errorf("decode go list -json output in %s for %s: %w", moduleDir, profile, decodeErr)
+		}
+		packages = append(packages, pkg)
+	}
+	return packages, nil
+}
+
+func buildProfileEnvironment(profile BuildProfile) []string {
+	current := os.Environ()
+	env := make([]string, 0, len(current))
+	for _, setting := range current {
+		if strings.HasPrefix(setting, "GOOS=") || strings.HasPrefix(setting, "GOARCH=") ||
+			strings.HasPrefix(setting, "CGO_ENABLED=") {
+			continue
+		}
+		env = append(env, setting)
+	}
+	return append(env, "GOOS="+profile.GOOS, "GOARCH="+profile.GOARCH, "CGO_ENABLED=0")
+}
+
+// FindNonTestImporters returns the import path of every package in packages
+// whose own (non-test) Imports field contains targetImportPath. It
+// deliberately reads only Imports, never TestImports/XTestImports: those two
+// fields are how go list itself already separates test-file imports from
+// production ones, so a legitimate reference from a _test.go file never
+// appears here.
+func FindNonTestImporters(packages []ModulePackage, targetImportPath string) []string {
+	var violators []string
+	for _, pkg := range packages {
+		if slices.Contains(pkg.Imports, targetImportPath) {
+			violators = append(violators, pkg.ImportPath)
+		}
+	}
+	return violators
+}
+
+// AssertNoProductionImport fails t when any non-test source file selected for
+// profile in moduleDir imports targetImportPath. The optional tags select the
+// build-tag configuration to check. Files hidden behind a different profile
+// or configuration are invisible to one call, so a caller enforcing a
+// module-wide rule must iterate every supported combination.
+func AssertNoProductionImport(
+	ctx context.Context,
+	t testing.TB,
+	moduleDir string,
+	targetImportPath string,
+	profile BuildProfile,
+	tags ...string,
+) {
+	t.Helper()
+
+	packages, err := ResolveModulePackages(ctx, moduleDir, profile, tags...)
+	if err != nil {
+		t.Fatalf("resolve module packages in %s for %s: %v", moduleDir, profile, err)
+	}
+	violators := FindNonTestImporters(packages, targetImportPath)
+	if len(violators) > 0 {
+		t.Errorf(
+			"%s must be imported only from _test.go files, but is imported by: %s",
+			targetImportPath, strings.Join(violators, ", "),
+		)
 	}
 }
 
