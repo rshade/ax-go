@@ -174,7 +174,9 @@ Go, golangci-lint, actionlint, and govulncheck are pinned once in
 `jdx/mise-action`. Run `make ensure` (requires [mise](https://mise.jdx.dev/))
 to install every pinned tool locally at the same version CI uses. `go.mod`'s
 `go` directive must match `mise.toml`'s pinned `go` version; `make validate`
-and CI's `validate` job fail closed if they disagree.
+and CI's `validate` job fail closed if they disagree. `mise.toml` also pins
+`specify-cli` (the Spec Kit CLI backing the `speckit-*` workflow commands)
+via the `pipx:` backend; it is a local dev-only tool no CI job installs.
 
 ### Build Configurations (tagged toolchain)
 
