@@ -118,5 +118,7 @@ deliberately rather than slipping through.
 ## Related
 
 - **Tutorial:** [Build your first agent-ready CLI](/ax-go/tutorials/build-your-first-cli/)
+- **Guide:** [Test a command built on ax-go](/ax-go/guides/test-a-command/) —
+  run the same flags this page documents through a real test.
 - **Explanation:** [Why Agentic Experience?](/ax-go/explanation/why-agentic-experience/)
   — why self-description matters to an agent.

@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -459,12 +460,97 @@ func newTaggedFixtureModule(t *testing.T) string {
 }
 
 func containsImport(imports []string, want string) bool {
-	for _, importPath := range imports {
-		if importPath == want {
-			return true
+	return slices.Contains(imports, want)
+}
+
+// TestFindNonTestImportersReportsOnlyViolators is the fixture-based unit test
+// for the reverse-direction check axtest needs: given one package whose own
+// (non-test) Imports field names the target and one package with no reference
+// to it at all, only the violator is reported.
+func TestFindNonTestImportersReportsOnlyViolators(t *testing.T) {
+	const target = "github.com/rshade/ax-go/axtest"
+	packages := []ModulePackage{
+		{
+			ImportPath: "github.com/rshade/ax-go/cmd/leaky",
+			Imports:    []string{"github.com/rshade/ax-go", target},
+		},
+		{
+			ImportPath: "github.com/rshade/ax-go/contract",
+			Imports:    []string{"context", "encoding/json"},
+		},
+	}
+
+	got := FindNonTestImporters(packages, target)
+	want := []string{"github.com/rshade/ax-go/cmd/leaky"}
+	if !slices.Equal(got, want) {
+		t.Fatalf("FindNonTestImporters() = %v, want %v", got, want)
+	}
+}
+
+// TestResolveModulePackagesAppliesBuildProfile is the platform-specific
+// regression guard for axtest's reverse import check. A host-only go list
+// would miss both fixture imports on linux/amd64; pinning the target profile
+// must select the production files for the requested GOOS and GOARCH.
+func TestResolveModulePackagesAppliesBuildProfile(t *testing.T) {
+	const target = "example.com/platform/target"
+	dir := newPlatformFixtureModule(t)
+	tests := []struct {
+		name    string
+		profile BuildProfile
+		want    []string
+	}{
+		{
+			name:    "linux amd64 selects neither platform file",
+			profile: BuildProfile{GOOS: "linux", GOARCH: "amd64"},
+			want:    nil,
+		},
+		{
+			name:    "windows selects GOOS file",
+			profile: BuildProfile{GOOS: "windows", GOARCH: "amd64"},
+			want:    []string{"example.com/platform/osconsumer"},
+		},
+		{
+			name:    "arm64 selects GOARCH file",
+			profile: BuildProfile{GOOS: "linux", GOARCH: "arm64"},
+			want:    []string{"example.com/platform/archconsumer"},
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			packages, err := ResolveModulePackages(context.Background(), dir, tc.profile)
+			if err != nil {
+				t.Fatalf("ResolveModulePackages(%s): %v", tc.profile, err)
+			}
+			if got := FindNonTestImporters(packages, target); !slices.Equal(got, tc.want) {
+				t.Fatalf("FindNonTestImporters() = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func newPlatformFixtureModule(t *testing.T) string {
+	t.Helper()
+
+	dir := t.TempDir()
+	files := map[string]string{
+		"go.mod":                       "module example.com/platform\n\ngo 1.26.4\n",
+		"target/target.go":             "package target\n",
+		"osconsumer/consumer.go":       "package osconsumer\n",
+		"osconsumer/import_windows.go": "package osconsumer\n\nimport _ \"example.com/platform/target\"\n",
+		"archconsumer/consumer.go":     "package archconsumer\n",
+		"archconsumer/import_arm64.go": "package archconsumer\n\nimport _ \"example.com/platform/target\"\n",
+	}
+	for name, body := range files {
+		path := filepath.Join(dir, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+			t.Fatalf("mkdir for %s: %v", name, err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatalf("write %s: %v", name, err)
 		}
 	}
-	return false
+	return dir
 }
 
 func TestAssertNoForbiddenImportsReportsSurfaceDependencyAndReason(t *testing.T) {

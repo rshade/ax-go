@@ -204,6 +204,7 @@ func TestCheckAllowlist(t *testing.T) {
 		{
 			name: "exact match passes",
 			goList: "github.com/rshade/ax-go ax\n" +
+				"github.com/rshade/ax-go/axtest axtest\n" +
 				"github.com/rshade/ax-go/config config\n" +
 				"github.com/rshade/ax-go/contract contract\n" +
 				"github.com/rshade/ax-go/id id\n" +
@@ -242,6 +243,7 @@ func TestCheckAllowlist(t *testing.T) {
 		{
 			name: "internal package named like a public leaf is ignored",
 			goList: "github.com/rshade/ax-go ax\n" +
+				"github.com/rshade/ax-go/axtest axtest\n" +
 				"github.com/rshade/ax-go/config config\n" +
 				"github.com/rshade/ax-go/contract contract\n" +
 				"github.com/rshade/ax-go/id id\n" +

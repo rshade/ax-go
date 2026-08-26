@@ -15,9 +15,12 @@ func TestDocumentationExplainsPublicImportChoices(t *testing.T) {
 		`"github.com/rshade/ax-go/id"`,
 		`"github.com/rshade/ax-go/schema"`,
 		`"github.com/rshade/ax-go/logging"`,
+		`"github.com/rshade/ax-go/axtest"`,
 		"Use the root package for full CLI runtime",
 		"Use isolated contract packages for thin consumers",
 		"Use the isolated logging package",
+		"Use the `axtest` package from your test files",
+		"### Testing a command built on ax-go",
 		// The choosing-a-surface table is the first thing a consumer needs and
 		// the easiest thing to lose in a docs refactor, so its rows are asserted
 		// rather than trusted. Loki staying root-only is the load-bearing row:

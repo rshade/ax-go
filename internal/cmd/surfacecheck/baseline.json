@@ -1012,6 +1012,53 @@
       ]
     },
     {
+      "path": "github.com/rshade/ax-go/axtest",
+      "features": [
+        {
+          "id": "field:Result.ExitCode",
+          "signature": "int",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Result.Stderr",
+          "signature": "[]byte",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Result.Stdout",
+          "signature": "[]byte",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:Decode",
+          "signature": "func[T any](testing.TB, []byte) T",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:Run",
+          "signature": "func(context.Context, testing.TB, *github.com/spf13/cobra.Command, []string, ...github.com/rshade/ax-go.ExecuteOption) Result",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:RunAndDecode",
+          "signature": "func[T any](context.Context, testing.TB, *github.com/spf13/cobra.Command, []string, ...github.com/rshade/ax-go.ExecuteOption) (T, int)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Result",
+          "signature": "struct{Stdout []byte; Stderr []byte; ExitCode int}",
+          "configurations": "all",
+          "profiles": "all"
+        }
+      ]
+    },
+    {
       "path": "github.com/rshade/ax-go/config",
       "features": [
         {
