@@ -30,35 +30,80 @@ type multiFlagPayload struct {
 	LargeUintID uint64   `json:"large_uint_id"`
 }
 
+func confirmationRoot(effect *int) *cobra.Command {
+	root := &cobra.Command{Use: "demo", RunE: noopRunE}
+	gated := &cobra.Command{
+		Use:   "gated",
+		Short: "confirmation gate",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if !contract.ApprovalFromContext(cmd.Context()) {
+				return contract.NewError(cmd.Context(), "confirmation_required",
+					"confirmation required: apply the change",
+					contract.WithActionableFix("pass --yes to confirm this operation"),
+					contract.WithErrorExitCode(contract.ExitValidation))
+			}
+			(*effect)++
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: "approved"}),
+			)
+		},
+	}
+	root.AddCommand(gated)
+	return root
+}
+
 // dispatchTestRoot builds a command tree exercising the dispatch paths: an
 // "echo" leaf (flag mapping, mode reporting, a stderr diagnostic for
 // stream-separation tests), a "fail" leaf (ax.Error envelope, exit 2), and a
 // "boom" leaf that panics (panic-recovery).
 func dispatchTestRoot() *cobra.Command {
-	root := &cobra.Command{Use: "demo", Short: "root", RunE: func(cmd *cobra.Command, _ []string) error {
-		return contract.WriteJSON(cmd.OutOrStdout(), contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: "root"}))
-	}}
+	root := &cobra.Command{
+		Use:   "demo",
+		Short: "root",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: "root"}),
+			)
+		},
+	}
 
 	var name string
-	echo := &cobra.Command{Use: "echo", Short: "echo", RunE: func(cmd *cobra.Command, _ []string) error {
-		fmt.Fprintln(cmd.ErrOrStderr(), echoStderrMarker)
-		mode, _ := contract.ModeFromContext(cmd.Context())
-		return contract.WriteJSON(cmd.OutOrStdout(), contract.NewEnvelope(cmd.Context(), dispatchPayload{
-			Name: name,
-			Mode: mode.String(),
-		}))
-	}}
+	echo := &cobra.Command{
+		Use:   "echo",
+		Short: "echo",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			fmt.Fprintln(cmd.ErrOrStderr(), echoStderrMarker)
+			mode, _ := contract.ModeFromContext(cmd.Context())
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), dispatchPayload{
+					Name: name,
+					Mode: mode.String(),
+				}),
+			)
+		},
+	}
 	echo.Flags().StringVar(&name, "name", "anon", "name to echo")
 	root.AddCommand(echo)
 
-	root.AddCommand(&cobra.Command{Use: "fail", Short: "fail", RunE: func(cmd *cobra.Command, _ []string) error {
-		return contract.NewError(cmd.Context(), "demo_failure", "intentional failure",
-			contract.WithErrorExitCode(contract.ExitValidation))
-	}})
+	root.AddCommand(
+		&cobra.Command{
+			Use:   "fail",
+			Short: "fail",
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				return contract.NewError(cmd.Context(), "demo_failure", "intentional failure",
+					contract.WithErrorExitCode(contract.ExitValidation))
+			},
+		},
+	)
 
-	root.AddCommand(&cobra.Command{Use: "boom", Short: "boom", RunE: func(*cobra.Command, []string) error {
-		panic("kaboom")
-	}})
+	root.AddCommand(
+		&cobra.Command{Use: "boom", Short: "boom", RunE: func(*cobra.Command, []string) error {
+			panic("kaboom")
+		}},
+	)
 
 	return root
 }
@@ -71,15 +116,22 @@ func multiFlagRoot() *cobra.Command {
 	var counts []int
 	var largeID int64
 	var largeUintID uint64
-	cmd := &cobra.Command{Use: "multi", Short: "multi", RunE: func(cmd *cobra.Command, _ []string) error {
-		return contract.WriteJSON(cmd.OutOrStdout(), contract.NewEnvelope(cmd.Context(), multiFlagPayload{
-			Tags:        tags,
-			Names:       names,
-			Counts:      counts,
-			LargeID:     largeID,
-			LargeUintID: largeUintID,
-		}))
-	}}
+	cmd := &cobra.Command{
+		Use:   "multi",
+		Short: "multi",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), multiFlagPayload{
+					Tags:        tags,
+					Names:       names,
+					Counts:      counts,
+					LargeID:     largeID,
+					LargeUintID: largeUintID,
+				}),
+			)
+		},
+	}
 	cmd.Flags().StringSliceVar(&tags, "tags", []string{"default-tag"}, "tags")
 	cmd.Flags().StringArrayVar(&names, "names", []string{"default-name"}, "names")
 	cmd.Flags().IntSliceVar(&counts, "counts", []int{7}, "counts")
@@ -149,7 +201,11 @@ func decodeErrorEnvelope(t *testing.T, payload string) contract.Error {
 	return envelope
 }
 
-func mustMultiCall(t *testing.T, d *dispatcher, args map[string]any) contract.Envelope[multiFlagPayload] {
+func mustMultiCall(
+	t *testing.T,
+	d *dispatcher,
+	args map[string]any,
+) contract.Envelope[multiFlagPayload] {
 	t.Helper()
 	res := mustCall(t, d, "demo-multi", args)
 	if res.IsError {
@@ -173,7 +229,11 @@ func TestDispatchSuccess(t *testing.T) {
 		t.Errorf("data.name = %q, want %q", env.Data.Name, "Ada")
 	}
 	if env.Data.Mode != string(contract.ModeJSON) {
-		t.Errorf("data.mode = %q, want %q (machine mode must be forced)", env.Data.Mode, contract.ModeJSON)
+		t.Errorf(
+			"data.mode = %q, want %q (machine mode must be forced)",
+			env.Data.Mode,
+			contract.ModeJSON,
+		)
 	}
 }
 
@@ -285,7 +345,11 @@ func TestDispatchValidationErrors(t *testing.T) {
 		{name: "unknown tool", tool: "demo-nope", args: nil},
 		{name: "unknown argument", tool: "demo-echo", args: map[string]any{"bogus": "x"}},
 		{name: "dry-run not a bool", tool: "demo-echo", args: map[string]any{"dry-run": "yes"}},
-		{name: "idempotency-key not a string", tool: "demo-echo", args: map[string]any{"idempotency-key": 7.0}},
+		{
+			name: "idempotency-key not a string",
+			tool: "demo-echo",
+			args: map[string]any{"idempotency-key": 7.0},
+		},
 	}
 
 	for _, tc := range cases {
@@ -389,17 +453,106 @@ func TestDispatchAgentSafetyPassthrough(t *testing.T) {
 	}
 }
 
+func TestDispatchConfirmationApprovalIsPerCall(t *testing.T) {
+	var effect int
+	d := newTestDispatcher(confirmationRoot(&effect))
+
+	tests := []struct {
+		name       string
+		args       map[string]any
+		wantError  bool
+		wantCode   string
+		wantEffect int
+	}{
+		{name: "absent refusal", wantError: true, wantCode: "confirmation_required"},
+		{
+			name:      "explicit false refusal",
+			args:      map[string]any{"yes": false},
+			wantError: true,
+			wantCode:  "confirmation_required",
+		},
+		{name: "explicit true approval", args: map[string]any{"yes": true}, wantEffect: 1},
+		{
+			name:       "non boolean validation",
+			args:       map[string]any{"yes": "true"},
+			wantError:  true,
+			wantCode:   "validation_error",
+			wantEffect: 1,
+		},
+		{
+			name:       "approval does not leak",
+			wantError:  true,
+			wantCode:   "confirmation_required",
+			wantEffect: 1,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := mustCall(t, d, "demo-gated", tt.args)
+			if res.IsError != tt.wantError {
+				t.Fatalf(
+					"IsError = %v, want %v; result=%s",
+					res.IsError,
+					tt.wantError,
+					resultText(t, res),
+				)
+			}
+			if tt.wantError {
+				envelope := decodeErrorEnvelope(t, resultText(t, res))
+				if envelope.ErrorCode != tt.wantCode {
+					t.Fatalf("error_code = %q, want %q", envelope.ErrorCode, tt.wantCode)
+				}
+			} else if !strings.Contains(resultText(t, res), "approved") {
+				t.Fatalf("approved result = %q", resultText(t, res))
+			}
+			if effect != tt.wantEffect {
+				t.Fatalf("effect count = %d after %s, want %d", effect, tt.name, tt.wantEffect)
+			}
+		})
+	}
+}
+
 // requiredFlagRoot builds a tree with a "deploy" leaf carrying a required
 // "target" flag, exercising the required-argument validation path.
 func requiredFlagRoot() *cobra.Command {
 	root := &cobra.Command{Use: "demo", Short: "root", RunE: noopRunE}
 
 	var target string
-	deploy := &cobra.Command{Use: "deploy", Short: "deploy", RunE: func(cmd *cobra.Command, _ []string) error {
-		return contract.WriteJSON(cmd.OutOrStdout(), contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: target}))
-	}}
+	deploy := &cobra.Command{
+		Use:   "deploy",
+		Short: "deploy",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: target}),
+			)
+		},
+	}
 	deploy.Flags().StringVar(&target, "target", "", "deploy target")
 	_ = deploy.MarkFlagRequired("target")
+	root.AddCommand(deploy)
+
+	return root
+}
+
+func requiredYesFlagRoot(effect *int) *cobra.Command {
+	root := &cobra.Command{Use: "demo", Short: "root", RunE: noopRunE}
+
+	var approved bool
+	deploy := &cobra.Command{
+		Use:   "deploy",
+		Short: "deploy",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			(*effect)++
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: "ran"}),
+			)
+		},
+	}
+	deploy.Flags().BoolVar(&approved, yesFlagName, false, "approve deployment")
+	_ = deploy.MarkFlagRequired(yesFlagName)
 	root.AddCommand(deploy)
 
 	return root
@@ -434,9 +587,14 @@ func poisonAssignmentRoot() *cobra.Command {
 	poison.Flags().Var(&panicOnReplaceSlice{}, "vals", "panics when assigned a value")
 	root.AddCommand(poison)
 
-	root.AddCommand(&cobra.Command{Use: "ok", Short: "ok", RunE: func(cmd *cobra.Command, _ []string) error {
-		return contract.WriteJSON(cmd.OutOrStdout(), contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: "ok"}))
-	}})
+	root.AddCommand(
+		&cobra.Command{Use: "ok", Short: "ok", RunE: func(cmd *cobra.Command, _ []string) error {
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: "ok"}),
+			)
+		}},
+	)
 
 	return root
 }
@@ -471,6 +629,34 @@ func TestDispatchMissingRequiredFlagIsValidationError(t *testing.T) {
 	}
 	if env := decodeErrorEnvelope(t, resultText(t, res)); env.ErrorCode != "validation_error" {
 		t.Errorf("error_code = %q, want %q", env.ErrorCode, "validation_error")
+	}
+}
+
+func TestDispatchMissingRequiredYesFlagIsValidationError(t *testing.T) {
+	effect := 0
+	d := newTestDispatcher(requiredYesFlagRoot(&effect))
+	target, err := d.resolveTarget("demo-deploy")
+	if err != nil {
+		t.Fatalf("resolve required-yes tool: %v", err)
+	}
+
+	_, _, _, validationErr := d.buildArgs(context.Background(), target, "demo-deploy", nil)
+	if validationErr == nil {
+		t.Fatal("buildArgs accepted an omitted required yes argument")
+	}
+	if validationErr.ErrorCode != "validation_error" || validationErr.ExitCode() != contract.ExitValidation {
+		t.Fatalf("buildArgs error = %+v, want validation_error with exit 2", validationErr)
+	}
+
+	res := mustCall(t, d, "demo-deploy", nil)
+	if !res.IsError {
+		t.Fatalf("expected IsError for an omitted required yes flag, got: %s", resultText(t, res))
+	}
+	if envelope := decodeErrorEnvelope(t, resultText(t, res)); envelope.ErrorCode != "validation_error" {
+		t.Fatalf("error_code = %q, want validation_error", envelope.ErrorCode)
+	}
+	if effect != 0 {
+		t.Fatalf("command effect count = %d, want 0", effect)
 	}
 }
 

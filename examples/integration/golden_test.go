@@ -78,6 +78,22 @@ func TestGoldenSchema(t *testing.T) {
 	if code != ax.ExitSuccess {
 		t.Fatalf("exit code = %d, want %d", code, ax.ExitSuccess)
 	}
+	var discovered ax.Schema
+	if err := json.Unmarshal([]byte(stdout), &discovered); err != nil {
+		t.Fatalf("decode schema: %v", err)
+	}
+	foundYes := false
+	for _, flag := range discovered.Command.Flags {
+		if flag.Name == "yes" {
+			foundYes = true
+			if flag.Type != "bool" || flag.Default != "false" {
+				t.Fatalf("yes schema flag = %+v, want bool default false", flag)
+			}
+		}
+	}
+	if !foundYes {
+		t.Fatal("schema did not expose auto-mounted yes flag")
+	}
 	assertGolden(t, "schema_ax.golden.json", testutil.MaskNonDeterministic([]byte(stdout)))
 }
 

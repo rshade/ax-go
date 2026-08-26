@@ -92,6 +92,17 @@ conflicts with the constitution, the constitution wins.
     key in the output envelope.
   - `--dry-run`, producing the same envelope with `dry_run: true` and no side
     effects.
+  - `--yes`, the no-prompt invariant: in agent mode a CLI never blocks on a
+    stdin prompt, a pager, `$EDITOR`, or a spinner. `ax.Confirm` gates any
+    confirmation point and returns one of three outcomes — approved, blocked,
+    or prompt-required — never a prompt of its own. A blocked machine-mode
+    confirmation fails fast with exit `2` and a `confirmation_required`
+    envelope whose `actionable_fix` names `--yes`; human mode instead returns
+    prompt-required so the adopting CLI still owns its own prompt. Approval and
+    `--dry-run` are orthogonal: a dry run of a gated command is still blocked,
+    so a rehearsal never predicts success the real run would refuse. The MCP
+    server runtime threads approval as a per-call boolean `yes` argument and
+    never grants it on the client's behalf.
   - output mode resolution through `--format`, `AGENT_MODE`, and TTY detection.
 - Errors use the standard `ax.Error` envelope and are emitted to `stderr`.
 - **Output is deterministic.** Given the same inputs, two runs of the same
@@ -786,5 +797,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/015-internalize-helpers/plan.md
+at specs/018-yes-no-prompt-invariant/plan.md
 <!-- SPECKIT END -->

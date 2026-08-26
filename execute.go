@@ -159,6 +159,7 @@ func prepareCommand(root *cobra.Command, cfg executeConfig) {
 
 	cli.EnsurePersistentStringFlag(root, cli.FlagFormat, "", "output format: json or human")
 	cli.EnsurePersistentBoolFlag(root, cli.FlagDryRun, false, "emit the envelope without side effects")
+	cli.EnsurePersistentBoolFlag(root, cli.FlagYes, false, "confirm a confirmation-gated operation")
 	cli.EnsurePersistentStringFlag(
 		root,
 		cli.FlagIdempotencyKey,
@@ -185,6 +186,7 @@ func wrapPersistentPreRun(root *cobra.Command, cfg executeConfig) {
 	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
 		format := cli.LookupFlagString(cmd, cli.FlagFormat)
 		dryRun := cli.LookupFlagBool(cmd, cli.FlagDryRun)
+		approval := cli.LookupFlagBool(cmd, cli.FlagYes)
 		idempotencyKey := cli.LookupFlagString(cmd, cli.FlagIdempotencyKey)
 		if idempotencyKey == "" {
 			idempotencyKey = NewIdempotencyKey()
@@ -203,6 +205,7 @@ func wrapPersistentPreRun(root *cobra.Command, cfg executeConfig) {
 		ctx := cmd.Context()
 		ctx = WithMode(ctx, mode)
 		ctx = WithDryRun(ctx, dryRun)
+		ctx = WithApproval(ctx, approval)
 		ctx = WithIdempotencyKey(ctx, idempotencyKey)
 		cmd.SetContext(ctx)
 		trace.SpanFromContext(ctx).SetName(cmd.CommandPath())

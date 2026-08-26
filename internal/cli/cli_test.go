@@ -19,6 +19,7 @@ func TestFlagConstants(t *testing.T) {
 		{name: "FlagFormat", got: FlagFormat, want: "format"},
 		{name: "FlagDryRun", got: FlagDryRun, want: "dry-run"},
 		{name: "FlagIdempotencyKey", got: FlagIdempotencyKey, want: "idempotency-key"},
+		{name: "FlagYes", got: FlagYes, want: "yes"},
 	}
 
 	for _, tc := range cases {
@@ -28,6 +29,32 @@ func TestFlagConstants(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEnsurePersistentYesFlag(t *testing.T) {
+	t.Run("installs false boolean default", func(t *testing.T) {
+		root := &cobra.Command{Use: "demo"}
+		EnsurePersistentBoolFlag(root, FlagYes, false, "confirm the operation")
+
+		flag := root.PersistentFlags().Lookup(FlagYes)
+		if flag == nil {
+			t.Fatalf("persistent flag %q was not installed", FlagYes)
+		}
+		if flag.DefValue != "false" || flag.Value.Type() != "bool" {
+			t.Errorf("installed flag = (DefValue %q, Type %q), want (false, bool)", flag.DefValue, flag.Value.Type())
+		}
+	})
+
+	t.Run("preserves an author-declared collision", func(t *testing.T) {
+		root := &cobra.Command{Use: "demo"}
+		root.PersistentFlags().Bool(FlagYes, true, "author approval")
+
+		EnsurePersistentBoolFlag(root, FlagYes, false, "engine approval")
+		flag := root.PersistentFlags().Lookup(FlagYes)
+		if flag.DefValue != "true" || flag.Usage != "author approval" {
+			t.Errorf("author flag was overwritten: (DefValue %q, Usage %q)", flag.DefValue, flag.Usage)
+		}
+	})
 }
 
 // TestEnsurePersistentStringFlag asserts the install contract: the flag lands
@@ -75,6 +102,57 @@ func TestEnsurePersistentBoolFlag(t *testing.T) {
 	flag = root.PersistentFlags().Lookup(FlagDryRun)
 	if flag.DefValue != "false" {
 		t.Errorf("second install overwrote the default: DefValue %q, want %q", flag.DefValue, "false")
+	}
+}
+
+func TestEnsurePersistentBoolFlagKeepsRootLocalCollisionInheritable(t *testing.T) {
+	tests := []struct {
+		name     string
+		flagName string
+	}{
+		{name: "dry run", flagName: FlagDryRun},
+		{name: "approval", flagName: FlagYes},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			root := &cobra.Command{Use: "app"}
+			root.Flags().Bool(tt.flagName, true, "author root-only flag")
+			child := &cobra.Command{
+				Use: "sub",
+				RunE: func(cmd *cobra.Command, _ []string) error {
+					if !LookupFlagBool(cmd, tt.flagName) {
+						t.Fatalf("child did not resolve inherited --%s", tt.flagName)
+					}
+					return nil
+				},
+			}
+			root.AddCommand(child)
+
+			EnsurePersistentBoolFlag(root, tt.flagName, false, "AX persistent flag")
+
+			local := root.Flags().Lookup(tt.flagName)
+			if local == nil || local.DefValue != "true" || local.Usage != "author root-only flag" {
+				t.Fatalf("author root-local flag was not preserved: %#v", local)
+			}
+			persistent := root.PersistentFlags().Lookup(tt.flagName)
+			if persistent == nil {
+				t.Fatalf("persistent --%s was not installed for child inheritance", tt.flagName)
+			}
+			if persistent.DefValue != "false" || persistent.Usage != "AX persistent flag" {
+				t.Fatalf(
+					"persistent --%s = (default %q, usage %q), want AX defaults",
+					tt.flagName,
+					persistent.DefValue,
+					persistent.Usage,
+				)
+			}
+
+			root.SetArgs([]string{"sub", "--" + tt.flagName})
+			if err := root.Execute(); err != nil {
+				t.Fatalf("child execution with inherited --%s: %v", tt.flagName, err)
+			}
+		})
 	}
 }
 

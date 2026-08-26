@@ -26,6 +26,16 @@ func DryRunFromContext(ctx context.Context) bool {
 	return contract.DryRunFromContext(ctx)
 }
 
+// WithApproval returns a context carrying the per-invocation confirmation decision.
+func WithApproval(ctx context.Context, granted bool) context.Context {
+	return contract.WithApproval(ctx, granted)
+}
+
+// ApprovalFromContext reports whether explicit confirmation was granted.
+func ApprovalFromContext(ctx context.Context) bool {
+	return contract.ApprovalFromContext(ctx)
+}
+
 // WithIdempotencyKey returns a context carrying the idempotency key for the run.
 func WithIdempotencyKey(ctx context.Context, key string) context.Context {
 	return contract.WithIdempotencyKey(ctx, key)

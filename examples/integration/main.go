@@ -1,11 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/spf13/cobra"
@@ -24,6 +26,7 @@ const authzCommandName = "authz"
 const crashCommandName = "crash"
 const patchConfigCommandName = "patch-config"
 const streamCommandName = "stream"
+const confirmCommandName = "confirm"
 const lokiFlushBudget = 3 * time.Second
 const fetchRetryAfterSeconds = 5
 
@@ -56,12 +59,31 @@ type patchConfigPayload struct {
 	Patched bool   `json:"patched"`
 }
 
+type confirmationPayload struct {
+	Confirmed bool `json:"confirmed"`
+}
+
 func main() {
 	os.Exit(run(context.Background(), os.Args[1:], os.Stdin, os.Stdout, os.Stderr, os.Getenv))
 }
 
-func run(ctx context.Context, args []string, stdin io.Reader, stdout, stderr io.Writer, env func(string) string) int {
-	return runWithEntityID(ctx, args, stdin, stdout, stderr, env, ax.ResolveVersion(version), ax.NewEntityID)
+func run(
+	ctx context.Context,
+	args []string,
+	stdin io.Reader,
+	stdout, stderr io.Writer,
+	env func(string) string,
+) int {
+	return runWithEntityID(
+		ctx,
+		args,
+		stdin,
+		stdout,
+		stderr,
+		env,
+		ax.ResolveVersion(version),
+		ax.NewEntityID,
+	)
 }
 
 // runWithEntityID is the test seam for run: it injects the resolved version and
@@ -90,7 +112,11 @@ func runWithEntityID(
 	)
 }
 
-func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string, error)) *cobra.Command {
+func newRootCommand(
+	stdin io.Reader,
+	resolved string,
+	newEntityID func() (string, error),
+) *cobra.Command {
 	var name string
 	var configPath string
 
@@ -107,6 +133,7 @@ func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string
   ax-integration fetch
   ax-integration authz
   ax-integration crash
+  ax-integration confirm --format=json --yes
   ax-integration __schema`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			logger := ax.NewLogger(
@@ -135,7 +162,10 @@ func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string
 				return err
 			}
 
-			logger.Info(cmd.Context()).Str("event", "integration_run").Str("name", name).Msg("integration example ran")
+			logger.Info(cmd.Context()).
+				Str("event", "integration_run").
+				Str("name", name).
+				Msg("integration example ran")
 
 			payload := helloPayload{
 				Greeting: "hello",
@@ -151,7 +181,8 @@ func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string
 	}
 
 	root.Flags().StringVar(&name, "name", "agent", "name to include in the JSON payload")
-	root.Flags().StringVar(&configPath, "config", "", "optional Hujson config file path, or - for stdin")
+	root.Flags().
+		StringVar(&configPath, "config", "", "optional Hujson config file path, or - for stdin")
 	ax.WithNonDeterministicFields[helloPayload](root)
 	root.AddCommand(newStreamCommand())
 	root.AddCommand(newPatchConfigCommand())
@@ -159,12 +190,65 @@ func newRootCommand(stdin io.Reader, resolved string, newEntityID func() (string
 	root.AddCommand(newFetchCommand())
 	root.AddCommand(newAuthzCommand())
 	root.AddCommand(newCrashCommand())
+	root.AddCommand(newConfirmCommand())
 
 	// Opt in to the MCP server: `ax-integration mcp-server` exposes this CLI's
 	// command tree as a live MCP server with no per-tool work (feature 011).
 	root.AddCommand(mcp.NewCommand(root, mcp.WithVersion(resolved)))
 
 	return root
+}
+
+func newConfirmCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   confirmCommandName,
+		Short: "Run a confirmation-gated operation",
+		Example: `  ax-integration confirm --format=json --yes
+  ax-integration confirm --format=json`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			const subject = "run the confirmation-gated integration operation"
+			outcome, err := ax.Confirm(
+				cmd.Context(),
+				subject,
+			)
+			if err != nil {
+				return err
+			}
+			if outcome == ax.ConfirmationPromptRequired {
+				approved, promptErr := promptForConfirmation(cmd, subject)
+				if promptErr != nil {
+					return promptErr
+				}
+				if !approved {
+					return ax.WriteJSON(
+						cmd.OutOrStdout(),
+						ax.NewEnvelope(cmd.Context(), confirmationPayload{}),
+					)
+				}
+			}
+			confirmed, err := ax.Guard(cmd.Context(), func(context.Context) error { return nil })
+			if err != nil {
+				return err
+			}
+			return ax.WriteJSON(
+				cmd.OutOrStdout(),
+				ax.NewEnvelope(cmd.Context(), confirmationPayload{Confirmed: confirmed}),
+			)
+		},
+	}
+}
+
+func promptForConfirmation(cmd *cobra.Command, subject string) (bool, error) {
+	if _, err := fmt.Fprintf(cmd.ErrOrStderr(), "%s? [y/N] ", subject); err != nil {
+		return false, fmt.Errorf("write confirmation prompt: %w", err)
+	}
+
+	response, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
+	if err != nil && !errors.Is(err, io.EOF) {
+		return false, fmt.Errorf("read confirmation response: %w", err)
+	}
+	response = strings.TrimSpace(response)
+	return strings.EqualFold(response, "y") || strings.EqualFold(response, "yes"), nil
 }
 
 func newStreamCommand() *cobra.Command {
@@ -349,7 +433,11 @@ func newCrashCommand() *cobra.Command {
 	}
 }
 
-func readConfig(ctx context.Context, stdin io.Reader, path string) (integrationConfig, bool, error) {
+func readConfig(
+	ctx context.Context,
+	stdin io.Reader,
+	path string,
+) (integrationConfig, bool, error) {
 	if path == "" {
 		return integrationConfig{}, false, nil
 	}

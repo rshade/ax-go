@@ -18,6 +18,8 @@ const (
 	// FlagIdempotencyKey carries an opaque key that suppresses duplicate-create
 	// retries.
 	FlagIdempotencyKey = "idempotency-key"
+	// FlagYes explicitly approves a confirmation-gated operation.
+	FlagYes = "yes"
 )
 
 // EnsurePersistentStringFlag adds a persistent string flag unless it exists.
@@ -28,7 +30,9 @@ func EnsurePersistentStringFlag(root *cobra.Command, name, value, usage string) 
 	root.PersistentFlags().String(name, value, usage)
 }
 
-// EnsurePersistentBoolFlag adds a persistent bool flag unless it exists.
+// EnsurePersistentBoolFlag adds a persistent bool flag unless a persistent
+// flag with the same name already exists. A root-local collision is preserved:
+// Cobra lets the local flag serve the root while children inherit this AX flag.
 func EnsurePersistentBoolFlag(root *cobra.Command, name string, value bool, usage string) {
 	if root.PersistentFlags().Lookup(name) != nil {
 		return

@@ -3,6 +3,9 @@ package ax
 import (
 	"bytes"
 	"context"
+	"encoding/json"
+	"slices"
+	"sort"
 	"testing"
 )
 
@@ -62,4 +65,49 @@ func TestWriteJSONLineGolden(t *testing.T) {
 		t.Fatalf("WriteJSONLine returned error: %v", err)
 	}
 	assertGolden(t, "testdata/ndjson_line.golden.json", buf.Bytes())
+}
+
+// TestSuccessEnvelopeUnaffectedByApproval pins FR-019: approval state is an
+// error-path concern only and must never reach the success envelope. The
+// existing envelope golden cannot catch a field that appears solely when
+// approval is granted, because it is rendered from a context that never carries
+// one, so the key set is asserted here under both approval states.
+func TestSuccessEnvelopeUnaffectedByApproval(t *testing.T) {
+	base := pinnedEnvelopeContext(t, "00000000-0000-4000-8000-000000000003")
+	data := struct {
+		Name string `json:"name"`
+	}{Name: "example"}
+
+	render := func(t *testing.T, ctx context.Context) []byte {
+		t.Helper()
+		var buf bytes.Buffer
+		if err := WriteJSON(&buf, NewEnvelope(ctx, data)); err != nil {
+			t.Fatalf("WriteJSON returned error: %v", err)
+		}
+		return buf.Bytes()
+	}
+
+	withoutApproval := render(t, base)
+	withApproval := render(t, WithApproval(base, true))
+	if !bytes.Equal(withoutApproval, withApproval) {
+		t.Fatalf("approval changed the success envelope:\n without = %s\n with    = %s",
+			withoutApproval, withApproval)
+	}
+
+	var decoded struct {
+		Meta map[string]any `json:"meta"`
+	}
+	if err := json.Unmarshal(withApproval, &decoded); err != nil {
+		t.Fatalf("envelope did not decode: %v", err)
+	}
+	gotKeys := make([]string, 0, len(decoded.Meta))
+	for key := range decoded.Meta {
+		gotKeys = append(gotKeys, key)
+	}
+	sort.Strings(gotKeys)
+
+	wantKeys := []string{"idempotency_key", "span_id", "trace_id"}
+	if !slices.Equal(gotKeys, wantKeys) {
+		t.Fatalf("success envelope meta keys = %v, want %v", gotKeys, wantKeys)
+	}
 }
