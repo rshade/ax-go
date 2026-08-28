@@ -429,6 +429,7 @@ commit auditable via `git blame`.
 | `BenchmarkParseConfigBoundedRead/*`, `BenchmarkParseConfigDefaultCapRead` | Hujson/config parse path |
 | `BenchmarkBuildCommand` | `__schema` reflection path |
 | `BenchmarkWriteError` | Error envelope marshal path |
+| `BenchmarkGuardAudit`, `BenchmarkGuardAuditDisabled`, `BenchmarkPerformAudit` | Guard/Perform audit-logging path |
 
 A benchmark added on the current branch but absent from `BENCH_BASE_REF` is
 absent from the comparison until it lands on the base branch — this is not a
@@ -807,5 +808,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/018-yes-no-prompt-invariant/plan.md
+at specs/020-guard-audit-logging/plan.md
 <!-- SPECKIT END -->

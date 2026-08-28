@@ -416,6 +416,98 @@ func TestExecutePreservesPipedStdinAndAuthorYesCollision(t *testing.T) {
 	}
 }
 
+// TestExecuteRoutesGuardAuditLinesToConfiguredStderr proves Guard's internal
+// NewLogger(ctx) call (which passes no WithWriter option) picks up the writer
+// Execute resolved via WithStderr, rather than escaping to the raw process
+// os.Stderr. Before logcore.WithDiagnosticWriter was threaded through
+// Execute's ctx, this buffer stayed empty even though the audit lines really
+// fired — they landed on the real process stderr instead.
+func TestExecuteRoutesGuardAuditLinesToConfiguredStderr(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	root := &cobra.Command{
+		Use: "app",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			_, guardErr := Guard(cmd.Context(), func(context.Context) error { return nil })
+			if guardErr != nil {
+				return guardErr
+			}
+			return WriteJSON(cmd.OutOrStdout(), struct {
+				OK bool `json:"ok"`
+			}{OK: true})
+		},
+	}
+
+	code := Execute(
+		context.Background(),
+		root,
+		WithStdout(&stdout),
+		WithStderr(&stderr),
+		WithEnv(func(string) string { return "" }),
+		WithStdoutIsTTY(false),
+	)
+
+	if code != ExitSuccess {
+		t.Fatalf("Execute exit code = %d, want %d; stderr=%s", code, ExitSuccess, stderr.String())
+	}
+
+	records := decodeLogRecords(t, stderr.String())
+	if len(records) != 2 {
+		t.Fatalf(
+			"log records captured on the configured stderr = %d, want 2 (Guard start + outcome); stderr=%q",
+			len(records),
+			stderr.String(),
+		)
+	}
+	if records[0]["message"] != "ax: about to run effect" {
+		t.Fatalf("records[0] message = %v, want %q", records[0]["message"], "ax: about to run effect")
+	}
+	if records[1]["message"] != "ax: effect succeeded" {
+		t.Fatalf("records[1] message = %v, want %q", records[1]["message"], "ax: effect succeeded")
+	}
+}
+
+// TestExecuteRebindsPreContextedSubcommand verifies that Execute's diagnostic
+// writer remains authoritative when an adopting CLI cached a context on the
+// selected Cobra subcommand before execution.
+func TestExecuteRebindsPreContextedSubcommand(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	root := &cobra.Command{Use: "app"}
+	sub := &cobra.Command{
+		Use: "sub",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			_, err := Guard(cmd.Context(), func(context.Context) error { return nil })
+			if err != nil {
+				return err
+			}
+			return WriteJSON(cmd.OutOrStdout(), struct {
+				OK bool `json:"ok"`
+			}{OK: true})
+		},
+	}
+	sub.SetContext(context.Background())
+	root.AddCommand(sub)
+	root.SetArgs([]string{"sub"})
+
+	code := Execute(
+		context.Background(),
+		root,
+		WithStdout(&stdout),
+		WithStderr(&stderr),
+		WithEnv(func(string) string { return "" }),
+		WithStdoutIsTTY(false),
+	)
+
+	if code != ExitSuccess {
+		t.Fatalf("Execute exit code = %d, want %d; stderr=%s", code, ExitSuccess, stderr.String())
+	}
+	records := decodeLogRecords(t, stderr.String())
+	if len(records) != 2 {
+		t.Fatalf("configured stderr audit records = %d, want 2; stderr=%q", len(records), stderr.String())
+	}
+}
+
 func decodeLogRecords(t *testing.T, logs string) []map[string]any {
 	t.Helper()
 

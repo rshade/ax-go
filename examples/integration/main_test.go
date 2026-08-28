@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"net"
 	"os"
 	"os/exec"
@@ -159,6 +158,79 @@ func TestRunConfirmationCommandPromptsInHumanMode(t *testing.T) {
 				t.Fatalf("confirmed = %v, want %v", got.Data.Confirmed, tt.wantConfirmed)
 			}
 		})
+	}
+}
+
+// TestConfirmCommandAuditLogging verifies the confirm command's no-op effect
+// produces NO audit lines on stderr, proving the WithAudit(false) opt-out works.
+func TestConfirmCommandAuditLogging(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+
+	_ = run(
+		context.Background(),
+		[]string{confirmCommandName, "--format=json", "--yes"},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		func(string) string { return "" },
+	)
+
+	// Verify no audit lines are present: neither "about to run" nor "effect succeeded"
+	// (only the integration_run log line from the root command).
+	if strings.Contains(stderr.String(), "ax: about to run effect") {
+		t.Fatalf("confirm command stderr contains unexpected audit start line: %q", stderr.String())
+	}
+	if strings.Contains(stderr.String(), "ax: effect succeeded") {
+		t.Fatalf("confirm command stderr contains unexpected audit success line: %q", stderr.String())
+	}
+	if strings.Contains(stderr.String(), `"ax_helper":"Guard"`) {
+		t.Fatalf("confirm command stderr contains Guard audit fields: %q", stderr.String())
+	}
+}
+
+// TestPatchConfigCommandAuditLogging verifies the patch-config command's
+// real effect produces audit lines on stderr (the default audit behavior).
+func TestPatchConfigCommandAuditLogging(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.hujson")
+	initial := []byte(`{
+	// integration config
+	"name": "Ada",
+	"count": 2,
+}`)
+	if err := os.WriteFile(path, initial, 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	var stdout, stderr bytes.Buffer
+
+	_ = run(
+		context.Background(),
+		[]string{
+			"patch-config",
+			"--format=json",
+			"--idempotency-key=test-key",
+			"--config=" + path,
+			`--patch=[{"op":"replace","path":"/count","value":5}]`,
+		},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		func(string) string { return "" },
+	)
+
+	// Verify audit lines are present: both "about to run" and "effect succeeded"
+	// (in addition to the integration_run log line from the root command). Both
+	// land on the run()-supplied stderr buffer because ax.Execute's configured
+	// stderr writer reaches ax.Guard/ax.Perform's internal audit logging.
+	if !strings.Contains(stderr.String(), "ax: about to run effect") {
+		t.Fatalf("patch-config command stderr missing audit start line; got: %q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), "ax: effect succeeded") {
+		t.Fatalf("patch-config command stderr missing audit success line; got: %q", stderr.String())
+	}
+	if !strings.Contains(stderr.String(), `"ax_helper":"Perform"`) {
+		t.Fatalf("patch-config command stderr missing Perform audit fields; got: %q", stderr.String())
 	}
 }
 
@@ -436,32 +508,6 @@ func TestRunPatchConfigCommand(t *testing.T) {
 	}
 }
 
-// captureProcessStderr swaps os.Stderr for a pipe while fn runs and returns
-// what was written. ax.NewLogger writes the dry-run suppression line to the
-// process os.Stderr, so this is how an end-to-end test observes it. It mutates
-// the global os.Stderr, so callers MUST NOT be parallel.
-func captureProcessStderr(t *testing.T, fn func()) string {
-	t.Helper()
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatalf("os.Pipe: %v", err)
-	}
-	orig := os.Stderr
-	os.Stderr = w //nolint:reassign // redirect process stderr to capture the canonical logger's suppression line
-	defer func() {
-		os.Stderr = orig //nolint:reassign // restore process stderr after capture
-	}()
-	fn()
-	if cerr := w.Close(); cerr != nil {
-		t.Fatalf("close pipe writer: %v", cerr)
-	}
-	out, err := io.ReadAll(r)
-	if err != nil {
-		t.Fatalf("read pipe: %v", err)
-	}
-	return string(out)
-}
-
 func TestRunPatchConfigCommandDryRunHasNoSideEffects(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.hujson")
@@ -477,38 +523,35 @@ func TestRunPatchConfigCommandDryRunHasNoSideEffects(t *testing.T) {
 	var stdout bytes.Buffer
 	var stderr bytes.Buffer
 
-	// ax.Perform writes the dry-run suppression line to the process os.Stderr via
-	// the canonical logger (not the Execute-configured stderr buffer), so capture
-	// os.Stderr to observe it end-to-end and to keep it out of test output.
-	var code int
-	processStderr := captureProcessStderr(t, func() {
-		code = run(
-			context.Background(),
-			[]string{
-				"patch-config",
-				"--format=json",
-				"--dry-run",
-				"--idempotency-key=test-key",
-				"--config=" + path,
-				`--patch=[{"op":"replace","path":"/count","value":5}]`,
-			},
-			strings.NewReader(""),
-			&stdout,
-			&stderr,
-			func(string) string { return "" },
-		)
-	})
+	code := run(
+		context.Background(),
+		[]string{
+			"patch-config",
+			"--format=json",
+			"--dry-run",
+			"--idempotency-key=test-key",
+			"--config=" + path,
+			`--patch=[{"op":"replace","path":"/count","value":5}]`,
+		},
+		strings.NewReader(""),
+		&stdout,
+		&stderr,
+		func(string) string { return "" },
+	)
 
 	if code != ax.ExitSuccess {
 		t.Fatalf("exit code = %d, want %d; stderr=%s", code, ax.ExitSuccess, stderr.String())
 	}
 
 	// SC-007: the suppressed commit emits exactly one diagnostic line to stderr.
-	if got := strings.Count(processStderr, "side effect suppressed"); got != 1 {
-		t.Fatalf("want exactly one suppression line on stderr, got %d: %q", got, processStderr)
+	// ax.Perform writes the dry-run suppression line through ax.Execute's
+	// configured stderr writer, so it lands on run()'s stderr buffer alongside
+	// the other command-level log lines.
+	if got := strings.Count(stderr.String(), "side effect suppressed"); got != 1 {
+		t.Fatalf("want exactly one suppression line on stderr, got %d: %q", got, stderr.String())
 	}
-	if !strings.Contains(processStderr, `"ax_helper":"Perform"`) {
-		t.Fatalf("suppression line missing ax_helper=Perform; got: %q", processStderr)
+	if !strings.Contains(stderr.String(), `"ax_helper":"Perform"`) {
+		t.Fatalf("suppression line missing ax_helper=Perform; got: %q", stderr.String())
 	}
 
 	result, err := os.ReadFile(path)

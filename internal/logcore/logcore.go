@@ -6,6 +6,8 @@ import (
 	"os"
 
 	"github.com/rs/zerolog"
+
+	"github.com/rshade/ax-go/internal/diagwriter"
 )
 
 // Labels are low-cardinality descriptors attached to every log line and eligible
@@ -84,6 +86,25 @@ func WithWriter(w io.Writer) Option {
 	}
 }
 
+// WithDiagnosticWriter returns a context carrying w as the default output
+// writer for any Logger constructed via New(ctx, ...) with no explicit
+// WithWriter option. It lets a runtime (Execute, the MCP dispatcher) route
+// logger output that a callee constructs internally — via a bare NewLogger(ctx)
+// call with no writer option — through the same writer already wired into
+// Cobra's SetErr and the rest of the diagnostic stream, without requiring
+// every internal caller to explicitly pass WithWriter.
+//
+// This is a thin re-export of internal/diagwriter.WithWriter. The mechanism
+// itself lives in that dependency-free package (rather than here) so that
+// internal/mcpserver can carry the same diagnostic writer through its own
+// context without pulling logcore's zerolog dependency into the mcp public
+// surface's import graph (see mcp/import_isolation_test.go's
+// TestMCPStaysThin). Existing callers of logcore.WithDiagnosticWriter keep
+// compiling unchanged.
+func WithDiagnosticWriter(ctx context.Context, w io.Writer) context.Context {
+	return diagwriter.WithWriter(ctx, w)
+}
+
 // WithLevel sets the minimum zerolog level. Events below it never construct, so
 // a filtered call costs nothing beyond the level comparison.
 func WithLevel(level zerolog.Level) Option {
@@ -103,6 +124,11 @@ func WithLabels(labels Labels) Option {
 // New returns a Logger backed by zerolog and wired for trace correlation. It
 // never returns nil.
 //
+// The default output writer is resolved before any Option runs: it is the
+// writer carried by ctx via WithDiagnosticWriter when present, or os.Stderr
+// otherwise. An explicit WithWriter Option in opts always overrides this
+// default, exactly as it overrides the os.Stderr fallback.
+//
 // The construction order is contractual. Every Option is applied before any sink
 // is sanctioned, so stream-label promotion follows the FINAL label set regardless
 // of the order the caller passed its options in. When additional sinks are
@@ -113,9 +139,13 @@ func WithLabels(labels Labels) Option {
 // is left alone and never rejected, keeping the sink seam generic for
 // destinations with no label concept.
 func New(ctx context.Context, opts ...Option) Logger {
+	defaultWriter := io.Writer(os.Stderr)
+	if w, ok := diagwriter.FromContext(ctx); ok && w != nil {
+		defaultWriter = w
+	}
 	cfg := Config{
 		Ctx:    ctx,
-		Writer: os.Stderr,
+		Writer: defaultWriter,
 		Level:  zerolog.InfoLevel,
 	}
 	for _, opt := range opts {

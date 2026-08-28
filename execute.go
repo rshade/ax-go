@@ -14,6 +14,7 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/rshade/ax-go/internal/cli"
+	"github.com/rshade/ax-go/internal/logcore"
 	internaltelemetry "github.com/rshade/ax-go/internal/telemetry"
 )
 
@@ -143,6 +144,12 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	root.SetOut(cfg.stdout)
 	root.SetErr(cfg.stderr)
 
+	// Route any Logger a callee constructs internally via a bare NewLogger(ctx)
+	// call (no explicit WithWriter) through the same mutex-wrapped stderr
+	// already wired into Cobra's SetErr and the rest of the diagnostic stream.
+	ctx = logcore.WithDiagnosticWriter(ctx, cfg.stderr)
+	rebindCommandContexts(ctx, root)
+
 	if executeErr := root.ExecuteContext(ctx); executeErr != nil {
 		span.SetStatus(codes.Error, executeErr.Error())
 		axErr := normalizeExecuteError(root.Context(), root.Name(), cfg.version, executeErr)
@@ -151,6 +158,20 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	}
 
 	return ExitSuccess
+}
+
+// rebindCommandContexts makes Execute's decorated context authoritative for
+// every command. Cobra does not replace a selected subcommand's non-nil cached
+// context during ExecuteContext.
+func rebindCommandContexts(ctx context.Context, root *cobra.Command) {
+	var walk func(*cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		cmd.SetContext(ctx)
+		for _, child := range cmd.Commands() {
+			walk(child)
+		}
+	}
+	walk(root)
 }
 
 func prepareCommand(root *cobra.Command, cfg executeConfig) {

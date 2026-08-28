@@ -326,6 +326,41 @@ func TestNewDefaults(t *testing.T) {
 	}
 }
 
+// TestNewUsesContextDiagnosticWriterAsDefault covers the WithDiagnosticWriter
+// contract: New with no WithWriter option writes to the writer carried by ctx
+// rather than os.Stderr, so a runtime (Execute, the MCP dispatcher) can route a
+// callee's bare NewLogger(ctx) output through its own diagnostic stream.
+func TestNewUsesContextDiagnosticWriterAsDefault(t *testing.T) {
+	var buf bytes.Buffer
+	ctx := WithDiagnosticWriter(context.Background(), &buf)
+
+	logger := New(ctx)
+	logger.Info(ctx).Msg("routed")
+
+	if !strings.Contains(buf.String(), "routed") {
+		t.Fatalf("context-carried writer got %q, want it to contain the emitted line", buf.String())
+	}
+}
+
+// TestWithWriterOverridesContextDiagnosticWriter covers the override half of the
+// WithDiagnosticWriter contract: an explicit WithWriter option always wins over
+// a context-carried default, exactly as it wins over the os.Stderr fallback.
+func TestWithWriterOverridesContextDiagnosticWriter(t *testing.T) {
+	var contextWriter bytes.Buffer
+	var explicitWriter bytes.Buffer
+	ctx := WithDiagnosticWriter(context.Background(), &contextWriter)
+
+	logger := New(ctx, WithWriter(&explicitWriter))
+	logger.Info(ctx).Msg("explicit wins")
+
+	if contextWriter.Len() != 0 {
+		t.Fatalf("context-carried writer got %q, want empty (explicit WithWriter must win)", contextWriter.String())
+	}
+	if !strings.Contains(explicitWriter.String(), "explicit wins") {
+		t.Fatalf("explicit writer got %q, want it to contain the emitted line", explicitWriter.String())
+	}
+}
+
 // TestNewSkipsNilOptions pins that a nil entry in the variadic option list does
 // not panic. New never returns an error, so nil options are skipped rather than
 // rejected the way config.applyOptions fails closed.

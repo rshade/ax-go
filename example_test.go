@@ -361,7 +361,8 @@ func ExampleGuard() {
 	}
 
 	// Real run: the effect executes.
-	executed, err := ax.Guard(context.Background(), effect)
+	quietCtx := ax.WithAudit(context.Background(), false)
+	executed, err := ax.Guard(quietCtx, effect)
 	fmt.Printf("executed=%v err=%v\n", executed, err)
 
 	// Dry-run: the effect is skipped.
@@ -372,6 +373,25 @@ func ExampleGuard() {
 	// writing report
 	// executed=true err=<nil>
 	// executed=false err=<nil>
+}
+
+// ExampleGuardWithAudit shows the described Guard variant and its per-call
+// audit opt-out. The effect still runs normally; only the two real-run audit
+// lines are suppressed by WithAudit(ctx, false).
+func ExampleGuardWithAudit() {
+	quietCtx := ax.WithAudit(context.Background(), false)
+	executed, err := ax.GuardWithAudit(
+		quietCtx,
+		"write deployment report",
+		func(context.Context) error {
+			fmt.Println("writing report")
+			return nil
+		},
+	)
+	fmt.Printf("executed=%v err=%v\n", executed, err)
+	// Output:
+	// writing report
+	// executed=true err=<nil>
 }
 
 // ExamplePerform shows the rehearse/commit pair: a real run performs commit,
@@ -388,7 +408,8 @@ func ExamplePerform() {
 	}
 
 	// Real run: commit executes, rehearse is ignored.
-	_ = ax.Perform(context.Background(), rehearse, commit)
+	quietCtx := ax.WithAudit(context.Background(), false)
+	_ = ax.Perform(quietCtx, rehearse, commit)
 
 	// Dry-run: rehearse executes, commit is skipped.
 	dryRun := ax.WithDryRun(context.Background(), true)
@@ -396,6 +417,28 @@ func ExamplePerform() {
 	// Output:
 	// committing
 	// validating only
+}
+
+// ExamplePerformWithAudit shows the described rehearse/commit variant. On a
+// real run the description is attached to the audit lines around commit.
+func ExamplePerformWithAudit() {
+	quietCtx := ax.WithAudit(context.Background(), false)
+	err := ax.PerformWithAudit(
+		quietCtx,
+		"apply deployment plan",
+		func(context.Context) error {
+			fmt.Println("validating only")
+			return nil
+		},
+		func(context.Context) error {
+			fmt.Println("committing")
+			return nil
+		},
+	)
+	fmt.Printf("err=%v\n", err)
+	// Output:
+	// committing
+	// err=<nil>
 }
 
 // ExampleExecute wraps a Cobra root command with the full AX lifecycle —
