@@ -376,9 +376,29 @@ failed patch operation uses the frozen `error_code` `config_patch_invalid`
   `if ax.DryRunFromContext(ctx) { ... } else { ... }`. `Guard` runs an effect
   unless dry-run is active (and reports whether it ran); `Perform` runs the real
   `commit`, or a read-only `rehearse` preview under dry-run that surfaces the same
-  validation errors without mutating. Each writes a single suppression line to
-  `stderr` (never `stdout`) when it skips. The envelope's `dry_run: true` still
-  flows automatically.
+  validation errors without mutating.
+
+  Every real, non-nil `Guard` or `Perform` invocation emits two structured audit
+  lines to `stderr` by default: `ax: about to run effect`, then either
+  `ax: effect succeeded` or `ax: effect failed`. The failure line carries the
+  callback error as a structured field. `GuardWithAudit` and
+  `PerformWithAudit` accept a human-meaningful description and carry it as the
+  `description` field on both records. Use these named variants for
+  consequential or destructive mutations where the generic empty description
+  is not enough. Descriptions are logged verbatim to `stderr` and must not
+  contain PII, secrets, tokens, or credentials. The logged error text receives
+  best-effort redaction (currently: embedded URLs in `*url.Error` are stripped),
+  but callers must still ensure returned errors do not contain secrets or
+  credentials.
+
+  `ax.WithAudit(ctx, false)` suppresses the two real-run audit lines for every
+  `Guard`/`Perform` invocation reached through that context — including calls made
+  inside the wrapped effect — following the same propagation `WithDryRun` already
+  uses. Derive the quiet context immediately at the call site you want to silence
+  to keep the scope narrow; re-enable auditing for a nested call with
+  `ax.WithAudit(ctx, true)`. It does not alter dry-run behavior: each helper still
+  emits exactly the existing single suppression line to `stderr` (never `stdout`)
+  when it skips, and the envelope's `dry_run: true` still flows automatically.
 
   ```go
   // Skip-only: writeReport runs for real, is suppressed under --dry-run.
@@ -391,7 +411,26 @@ failed patch operation uses the frozen `error_code` `config_patch_invalid`
       func(ctx context.Context) error { return validatePatch(ctx, path, doc) }, // dry-run
       func(ctx context.Context) error { return ax.PatchConfigFile(ctx, path, doc) }, // real
   )
+
+  // Rich audit trail: description is a structured field on both real-run lines.
+  wrote, err = ax.GuardWithAudit(ctx, "write deployment report", func(ctx context.Context) error {
+      return writeReport(ctx, path)
+  })
+
+  // Context-based escape hatch: preserve the prior silent real-run behavior.
+  quietCtx := ax.WithAudit(ctx, false)
+  err = ax.PerformWithAudit(quietCtx, "refresh local cache", nil,
+      func(ctx context.Context) error { return refreshCache(ctx) },
+  )
   ```
+
+  **Breaking-change migration note:** Guard and Perform now emit two structured
+  stderr log lines (`ax: about to run effect`, then
+  `ax: effect succeeded`/`ax: effect failed`) around every real (non-dry-run)
+  invocation by default. Dry-run behavior is unchanged. To restore the previous
+  silent behavior, wrap the context with `ax.WithAudit(ctx, false)` — this
+  suppresses the audit lines for every Guard/Perform invocation reached through
+  that context, following standard context-value propagation.
 
 - **`--format` flag / `AGENT_MODE` env var / TTY auto-detect** — selects machine
   vs. human output mode. The precedence is `--format` flag, then `AGENT_MODE`,

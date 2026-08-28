@@ -21,6 +21,7 @@ import (
 	"github.com/rshade/ax-go/contract"
 	"github.com/rshade/ax-go/id"
 	"github.com/rshade/ax-go/internal/cli"
+	"github.com/rshade/ax-go/internal/diagwriter"
 	internalschema "github.com/rshade/ax-go/internal/schema"
 	"github.com/rshade/ax-go/schema"
 )
@@ -394,13 +395,26 @@ func (d *dispatcher) execute(ctx context.Context, argv []string, assignments []f
 // Set/Replace (reached during reset/assignment) or the command body, is
 // recovered into an internal error so it never crashes the server (C-9, FR-010);
 // the partial output buffer is discarded on a panic.
+//
+// ctx is extended with the per-call errBuf as its diagwriter before
+// resetCommandTree runs, so a Logger a command body constructs internally via
+// a bare NewLogger(ctx) call (e.g. ax.Guard's audit lines) is routed to errBuf
+// and, from there, to the server's configured stderr via forwardStderr —
+// never the raw process stderr. The injection must happen before
+// resetCommandTree stamps every command's cached context via SetContext:
+// Cobra's ExecuteContext only propagates its ctx argument to a subcommand
+// whose cached context is still nil, so a command tree already stamped with a
+// diagwriter-less context would not observe a later injection even though
+// ExecuteContext is called with the correct ctx.
 func (d *dispatcher) runRecovered(
 	ctx context.Context,
 	argv []string,
 	assignments []flagAssignment,
 	outBuf *bytes.Buffer,
 ) (runErr error) {
+	var errBuf bytes.Buffer
 	defer func() {
+		d.forwardStderr(errBuf.Bytes())
 		if r := recover(); r != nil {
 			outBuf.Reset()
 			runErr = contract.NewError(ctx, "internal_error",
@@ -409,12 +423,13 @@ func (d *dispatcher) runRecovered(
 		}
 	}()
 
+	ctx = diagwriter.WithWriter(ctx, &errBuf)
+
 	resetCommandTree(ctx, d.root, d.sliceDefaults)
 	if err := applyFlagAssignments(assignments); err != nil {
 		return d.validationError(ctx, err.Error())
 	}
 
-	var errBuf bytes.Buffer
 	d.root.SetArgs(argv)
 	d.root.SetIn(bytes.NewReader(nil))
 	d.root.SetOut(outBuf)
@@ -422,7 +437,6 @@ func (d *dispatcher) runRecovered(
 
 	runErr = d.root.ExecuteContext(ctx)
 
-	d.forwardStderr(errBuf.Bytes())
 	d.root.SetArgs(nil)
 	return runErr
 }

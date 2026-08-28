@@ -12,6 +12,7 @@ import (
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 
+	ax "github.com/rshade/ax-go"
 	"github.com/rshade/ax-go/contract"
 )
 
@@ -50,6 +51,43 @@ func confirmationRoot(effect *int) *cobra.Command {
 		},
 	}
 	root.AddCommand(gated)
+	return root
+}
+
+// guardRoot builds a command tree whose "guarded" leaf invokes ax.Guard for
+// real (non-dry-run), so its default audit lines exercise the diagnostic-writer
+// context threaded through runRecovered.
+func guardRoot() *cobra.Command {
+	root := &cobra.Command{Use: "demo", RunE: noopRunE}
+	guarded := &cobra.Command{
+		Use:   "guarded",
+		Short: "runs ax.Guard for real",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if _, err := ax.Guard(cmd.Context(), func(context.Context) error { return nil }); err != nil {
+				return err
+			}
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: "guarded"}),
+			)
+		},
+	}
+	root.AddCommand(guarded)
+	return root
+}
+
+func panickingGuardRoot() *cobra.Command {
+	root := &cobra.Command{Use: "demo", RunE: noopRunE}
+	root.AddCommand(&cobra.Command{
+		Use:   "guarded-boom",
+		Short: "panics inside ax.Guard",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			_, err := ax.Guard(cmd.Context(), func(context.Context) error {
+				panic("guard boom")
+			})
+			return err
+		},
+	})
 	return root
 }
 
@@ -712,5 +750,57 @@ func TestDispatchStreamSeparation(t *testing.T) {
 	}
 	if !strings.Contains(stderr.String(), echoStderrMarker) {
 		t.Errorf("command stderr was not forwarded to the server stderr; got: %q", stderr.String())
+	}
+}
+
+// TestDispatchRoutesGuardAuditLinesToServerStderr asserts a served command's
+// real (non-dry-run) ax.Guard call has its default audit lines land on the
+// server's configured Stderr, exercising the diagwriter context threaded
+// through runRecovered rather than falling back to ax.Guard's os.Stderr
+// default.
+func TestDispatchRoutesGuardAuditLinesToServerStderr(t *testing.T) {
+	var stderr bytes.Buffer
+	root := guardRoot()
+	d := newDispatcher(context.Background(), root, Config{
+		Version:    testServerVersion,
+		ServerName: root.Name(),
+		Stderr:     &stderr,
+	})
+
+	res := mustCall(t, d, "demo-guarded", nil)
+	if res.IsError {
+		t.Fatalf("unexpected IsError result: %s", resultText(t, res))
+	}
+
+	got := stderr.String()
+	if !strings.Contains(got, "ax: about to run effect") {
+		t.Errorf("server stderr missing Guard start audit line; got: %q", got)
+	}
+	if !strings.Contains(got, "ax: effect succeeded") {
+		t.Errorf("server stderr missing Guard success audit line; got: %q", got)
+	}
+}
+
+// TestDispatchFlushesGuardAuditLinesOnPanic verifies that panic recovery does
+// not discard diagnostics already captured for the per-call stderr stream.
+func TestDispatchFlushesGuardAuditLinesOnPanic(t *testing.T) {
+	var stderr bytes.Buffer
+	root := panickingGuardRoot()
+	d := newDispatcher(context.Background(), root, Config{
+		Version:    testServerVersion,
+		ServerName: root.Name(),
+		Stderr:     &stderr,
+	})
+
+	res := mustCall(t, d, "demo-guarded-boom", nil)
+	if !res.IsError {
+		t.Fatalf("expected IsError for panicking Guard command")
+	}
+	got := stderr.String()
+	if !strings.Contains(got, "ax: about to run effect") {
+		t.Errorf("server stderr missing Guard start audit line; got: %q", got)
+	}
+	if !strings.Contains(got, "ax: effect did not return normally") {
+		t.Errorf("server stderr missing Guard abnormal-termination audit line; got: %q", got)
 	}
 }

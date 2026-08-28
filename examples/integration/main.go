@@ -226,7 +226,10 @@ func newConfirmCommand() *cobra.Command {
 					)
 				}
 			}
-			confirmed, err := ax.Guard(cmd.Context(), func(context.Context) error { return nil })
+			// Disable audit logging for this no-op decorator effect; the no-op is intentionally
+			// non-consequential and exists only to demonstrate the Guard/Confirm pairing.
+			auditDisabledCtx := ax.WithAudit(cmd.Context(), false)
+			confirmed, err := ax.Guard(auditDisabledCtx, func(context.Context) error { return nil })
 			if err != nil {
 				return err
 			}

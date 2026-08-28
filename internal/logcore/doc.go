@@ -19,8 +19,10 @@
 // second backend remains forbidden by Principle VI.
 //
 // logcore must never import root ax, and its dependency set is closed: stdlib,
-// github.com/rs/zerolog, the OpenTelemetry trace API (never the SDK), and
-// github.com/rshade/ax-go/contract for the zero-value ID constants. It contains
+// github.com/rs/zerolog, the OpenTelemetry trace API (never the SDK),
+// github.com/rshade/ax-go/contract for the zero-value ID constants, and
+// github.com/rshade/ax-go/internal/diagwriter for the context-carried default
+// writer a runtime (Execute, the MCP dispatcher) can route through. It contains
 // no Loki-specific identifier; the direct-push addon reaches it only through the
 // generic Sink and LabelSanctioner seams.
 package logcore

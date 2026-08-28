@@ -419,6 +419,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:AuditEnabledFromContext",
+          "signature": "func(context.Context) bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:BuildMCPSchema",
           "signature": "func(*github.com/spf13/cobra.Command) MCPSchema",
           "configurations": "all",
@@ -472,6 +478,12 @@
         {
           "id": "func:Guard",
           "signature": "func(context.Context, func(context.Context) error) (bool, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:GuardWithAudit",
+          "signature": "func(context.Context, string, func(context.Context) error) (bool, error)",
           "configurations": "all",
           "profiles": "all"
         },
@@ -572,6 +584,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:PerformWithAudit",
+          "signature": "func(context.Context, string, func(context.Context) error, func(context.Context) error) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:ResolveMode",
           "signature": "func(string, string, bool) (Mode, error)",
           "configurations": "all",
@@ -609,6 +627,12 @@
         },
         {
           "id": "func:WithApproval",
+          "signature": "func(context.Context, bool) context.Context",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithAudit",
           "signature": "func(context.Context, bool) context.Context",
           "configurations": "all",
           "profiles": "all"
