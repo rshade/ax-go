@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.5.0](https://github.com/rshade/ax-go/compare/v0.4.0...v0.5.0) (2026-08-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* **guard:** default-on structured audit logging for Guard/Perform ([#196](https://github.com/rshade/ax-go/issues/196))
+
+### Added
+
+* **axtest:** add full-lifecycle command test helper package ([#193](https://github.com/rshade/ax-go/issues/193)) ([8ce718d](https://github.com/rshade/ax-go/commit/8ce718d078d05c152bb5d47c08624f2532ea573d))
+* **confirm:** add --yes no-prompt invariant ([#180](https://github.com/rshade/ax-go/issues/180)) ([0656b45](https://github.com/rshade/ax-go/commit/0656b456607c130cb5784510844944d88f0f1f81)), closes [#121](https://github.com/rshade/ax-go/issues/121)
+* **guard:** default-on structured audit logging for Guard/Perform ([#196](https://github.com/rshade/ax-go/issues/196)) ([a00d065](https://github.com/rshade/ax-go/commit/a00d065c857264b3b5700a6f90f75bb40408396a)), closes [#179](https://github.com/rshade/ax-go/issues/179)
+
+
+### Fixed
+
+* **build:** bump Go toolchain to 1.26.7 and pin CI tool versions via … ([#181](https://github.com/rshade/ax-go/issues/181)) ([9131f52](https://github.com/rshade/ax-go/commit/9131f525c4c60f18ffde94a0e6146512b6702fbc))
+* **ci:** resolve OTel semconv drift, stale go.sum, and docs lockfile … ([#188](https://github.com/rshade/ax-go/issues/188)) ([7d3995f](https://github.com/rshade/ax-go/commit/7d3995f5057a87b572aa2cd69d2c2b8f3d49bb92))
+* **deps:** update github.com/tailscale/hujson digest to b80ff77 ([#152](https://github.com/rshade/ax-go/issues/152)) ([763ba39](https://github.com/rshade/ax-go/commit/763ba394866980f5d8b257a2499555095a8f148b))
+* **deps:** update golang.org/x/perf digest to 19be9d8 ([#184](https://github.com/rshade/ax-go/issues/184)) ([ff89d45](https://github.com/rshade/ax-go/commit/ff89d45f5e060f5dedb27b8aef92899a8b51ca35))
+* **deps:** update golang.org/x/perf digest to ebcb479 ([#172](https://github.com/rshade/ax-go/issues/172)) ([3f805a1](https://github.com/rshade/ax-go/commit/3f805a19ae87a602145f15a1ef157f55a5680868))
+* **deps:** update module github.com/modelcontextprotocol/go-sdk to v1.7.0 ([#155](https://github.com/rshade/ax-go/issues/155)) ([998bdd8](https://github.com/rshade/ax-go/commit/998bdd83b8eef2b448ea854174c759462f5f95ab))
+* **deps:** update module go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc to v0.70.0 ([#162](https://github.com/rshade/ax-go/issues/162)) ([306a300](https://github.com/rshade/ax-go/commit/306a30009269de3025d5f8cb90185c6694259ea8))
+* **deps:** update module google.golang.org/grpc to v1.83.0 ([#157](https://github.com/rshade/ax-go/issues/157)) ([021a3f6](https://github.com/rshade/ax-go/commit/021a3f6927d7b99dd2f2cc4808f25ada347e0858))
+* **deps:** update module google.golang.org/grpc to v1.83.1 ([#176](https://github.com/rshade/ax-go/issues/176)) ([79f1dfe](https://github.com/rshade/ax-go/commit/79f1dfed8e1ee6492930a04e9f2da1b0b2926bc3))
+* **deps:** update module google.golang.org/grpc to v1.83.2 ([#187](https://github.com/rshade/ax-go/issues/187)) ([369f1d3](https://github.com/rshade/ax-go/commit/369f1d341d0c3823f6cde3ad29e32cc145a258d0))
+* **deps:** update module google.golang.org/protobuf to v1.36.12 ([#169](https://github.com/rshade/ax-go/issues/169)) ([5e67941](https://github.com/rshade/ax-go/commit/5e67941d9270a2ee9ef3e30bf3d11711ddd62388))
+* **deps:** update opentelemetry-go monorepo to v1.45.0 ([#161](https://github.com/rshade/ax-go/issues/161)) ([1bbfce3](https://github.com/rshade/ax-go/commit/1bbfce3e4f87359738b891c0fb839eea1619289a))
+* **deps:** update opentelemetry-go monorepo to v1.46.0 ([#192](https://github.com/rshade/ax-go/issues/192)) ([538d70d](https://github.com/rshade/ax-go/commit/538d70da2f6bb65d319c96d051660d8e8655cd75))
+* **deps:** update opentelemetry-go-contrib monorepo to v0.71.0 ([#195](https://github.com/rshade/ax-go/issues/195)) ([5033edd](https://github.com/rshade/ax-go/commit/5033eddc5c74679dbd458b3c053f9dfa648333ee))
+* unblock v0.5.0 release CI and harden coverage gate ([#198](https://github.com/rshade/ax-go/issues/198)) ([dfa9b8e](https://github.com/rshade/ax-go/commit/dfa9b8e1933dd6498b6e7788b54ddf8b611ebcd0)), closes [#120](https://github.com/rshade/ax-go/issues/120) [#69](https://github.com/rshade/ax-go/issues/69)
+
 ## [0.4.0](https://github.com/rshade/ax-go/compare/v0.3.0...v0.4.0) (2026-07-24)
 
 
