@@ -1,6 +1,6 @@
 # Phase 1 Data Model: Certify and Internalize the Public Boundary Before v1.0
 
-**Feature**: `015-internalize-helpers` | **Date**: 2026-07-19
+**Feature**: `023-internalize-helpers` | **Date**: 2026-07-19
 
 ## Entity: Target Profile
 
@@ -44,7 +44,7 @@ One compiler-visible package declaration or selector exposed by root package
 
 ## Entity: Audit Record
 
-The permanent decision for one API Feature at the feature-015 audit point.
+The permanent decision for one API Feature at the feature-023 audit point.
 Records live in `public-surface-audit.json` and are never deleted.
 
 | Field | Type | Required | Meaning |
@@ -56,7 +56,7 @@ Records live in `public-surface-audit.json` and are never deleted.
 | `disposition` | enum | always | `keep-public`, `relocate-with-forwarder`, or `deprecate-in-place`. |
 | `internal_target` | string | leaks | Cohesive `internal/<role>` target; empty only for supported rows or compatibility-blocked in-place deprecation. |
 | `replacement` | string | leaks | Supported replacement selector, or an explicit no-replacement removal reason. |
-| `compatibility_strategy` | string | leaks | How name, type, identity, and semantics remain unchanged during feature 015. |
+| `compatibility_strategy` | string | leaks | How name, type, identity, and semantics remain unchanged during feature 023. |
 | `lifecycle` | enum | always | `live`, `deprecated`, `removable`, or `removed`. |
 | `first_published` | string | optional | Earliest verified tag exposing the feature. |
 | `deprecated_in` | string | after publication | Published `0.MINOR.0` tag carrying the notice. |
@@ -66,7 +66,7 @@ Records live in `public-surface-audit.json` and are never deleted.
 
 ### Classification/disposition rules
 
-| Classification | Allowed disposition | Feature-015 source state |
+| Classification | Allowed disposition | Feature-023 source state |
 |----------------|---------------------|--------------------------|
 | `supported` | `keep-public` | Present, unchanged, lifecycle `live`. |
 | `implementation-leak` | `relocate-with-forwarder` | Present as deprecated root forwarder; mechanics under `internal/`. |
@@ -78,12 +78,12 @@ Ambiguity resolves to `supported`. `unexport-in-place` is not a disposition.
 
 ```text
 live
-  └─ feature 015 adds a valid notice ─> deprecated
+  └─ feature 023 adds a valid notice ─> deprecated
        └─ a real 0.MINOR.0 publishes it ─> removable
             └─ follow-up breaking feature removes it ─> removed
 ```
 
-- Feature 015 may perform only `live → deprecated`.
+- Feature 023 may perform only `live → deprecated`.
 - `deprecated → removable` requires a non-empty, verified `deprecated_in`.
 - `removable → removed` occurs only in a follow-up Spec Kit feature.
 - A removed row remains in the audit and gains `removed_in`.
@@ -91,7 +91,7 @@ live
 ## Entity: Audit Document
 
 The permanent decision artifact at
-`specs/015-internalize-helpers/public-surface-audit.json`.
+`specs/023-internalize-helpers/public-surface-audit.json`.
 
 | Attribute | Rule |
 |-----------|------|

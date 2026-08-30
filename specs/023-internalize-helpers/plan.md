@@ -3,11 +3,11 @@
 **Branch**: `015-internalize-helpers` | **Date**: 2026-07-19 | **Spec**: [spec.md](spec.md)
 
 **Input**: Feature specification from
-`/specs/015-internalize-helpers/spec.md`
+`/specs/023-internalize-helpers/spec.md`
 
 ## Summary
 
-Deliver feature 015 as the non-breaking audit, enforcement, internalization,
+Deliver feature 023 as the non-breaking audit, enforcement, internalization,
 and deprecation phase of the pre-v1 boundary work:
 
 1. Generate a type-aware inventory of the complete compiler-visible root `ax`
@@ -40,7 +40,7 @@ is added.
 
 **Storage**:
 
-- `specs/015-internalize-helpers/public-surface-audit.json`: permanent
+- `specs/023-internalize-helpers/public-surface-audit.json`: permanent
   classification and lifecycle history; rows are never deleted.
 - `internal/cmd/surfacecheck/baseline.json`: current approved canonical API
   feature IDs and signatures; updated with reviewed live-surface changes.
@@ -84,7 +84,7 @@ reorganization must keep the existing benchmark budget green.
 **Constraints**:
 
 - Zero new module dependencies.
-- No exported removal, rename, re-type, or semantic change in feature 015.
+- No exported removal, rename, re-type, or semantic change in feature 023.
 - Existing `ax.Error` and `__schema` goldens remain byte-identical.
 - Clear non-public mechanics live under cohesive `internal/` packages;
   `internal/helpers` is forbidden.
@@ -121,7 +121,7 @@ The decision is recorded in `research.md` without creating or editing an ADR.
 | VIII. Observability & ID Discipline | N/A | No telemetry, logging, or identifier behavior changes. |
 | IX. Security & Resource Safety | PASS | File reads and subprocess output are bounded; subprocesses receive context cancellation; errors wrap with `%w`; no panic or network surface is introduced. |
 | X. Idiomatic Go & Dependency Minimalism | PASS | Complete type information comes from compiler export data using stdlib packages. Clear non-public mechanics move to role-specific `internal/` packages. |
-| XI. Stability & SemVer | PASS | Feature 015 makes no breaking Go or payload change. Deprecations ship through a non-breaking `feat:` minor. The follow-up removal is separately specified and uses the breaking-change process. |
+| XI. Stability & SemVer | PASS | Feature 023 makes no breaking Go or payload change. Deprecations ship through a non-breaking `feat:` minor. The follow-up removal is separately specified and uses the breaking-change process. |
 | XII. Deprecation Lifecycle | PASS | Every retirement candidate remains exported with a valid notice. Removal is forbidden until at least one published minor carried that notice and a follow-up feature verifies it. |
 
 **ADR absorption gate**: N/A. No governing ADR exists and no ADR is deleted.
@@ -172,14 +172,14 @@ No `NEEDS CLARIFICATION` items remain.
 4. **Notice release handoff**: land with a non-breaking `feat:` commit and
    record that an actual published `0.MINOR.0` is required before removal.
    Create/reference the follow-up Spec Kit feature; do not perform removal in
-   feature 015.
+   feature 023.
 
 ## Project Structure
 
 ### Documentation
 
 ```text
-specs/015-internalize-helpers/
+specs/023-internalize-helpers/
 ├── spec.md
 ├── plan.md
 ├── research.md

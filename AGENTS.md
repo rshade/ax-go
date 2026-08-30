@@ -518,11 +518,11 @@ artifacts:
 - `internal/cmd/surfacecheck/baseline.json`: the current approved canonical
   feature IDs, signatures, and the configurations and profiles each feature is
   present in (schema version 2; the version 1 root-only shape is described in
-  `specs/015-internalize-helpers/contracts/baseline-schema.md`).
-- `specs/015-internalize-helpers/public-surface-audit.json`: the permanent,
+  `specs/023-internalize-helpers/contracts/baseline-schema.md`).
+- `specs/023-internalize-helpers/public-surface-audit.json`: the permanent,
   never-delete decision record classifying every feature as `supported` or
   `implementation-leak` with a lifecycle state (schema in
-  `specs/015-internalize-helpers/contracts/audit-schema.md`). The audit is
+  `specs/023-internalize-helpers/contracts/audit-schema.md`). The audit is
   scoped to the **root package**, whose bare feature IDs it joins on; the
   other seven public packages are gated by the baseline alone.
 
@@ -579,7 +579,7 @@ surface nobody reviewed.
 
 - An intentional live-surface change updates `baseline.json` in the same
   reviewed PR; an intentional addition also appends a retained audit record
-  (see `specs/015-internalize-helpers/quickstart.md`). Bootstrap candidates
+  (see `specs/023-internalize-helpers/quickstart.md`). Bootstrap candidates
   come from `go run ./internal/cmd/surfacecheck -list` and `-audit-seed`;
   both modes are read-only and the seed is invalid until manually classified.
 - Deprecations retain the baseline entry and transition the audit row

@@ -469,7 +469,7 @@ byte-identical to one emitted before these fields existed.
 - **Allocation discipline:** track allocations via standard `testing.B`
   benchmarks rather than asserting numeric bars. The logger hot path is
   measured by `BenchmarkLogger*` (see
-  [spec 011](specs/011-hot-path-benchmarks/)): the enabled emit path, the
+  [spec 021](specs/021-hot-path-benchmarks/)): the enabled emit path, the
   filtered fast path, the no-trace-context path, typed fields, and labelled
   loggers all measure **0 allocs/op**. The single allocating path is emitting
   with an active trace context (**2 allocs/op**, ~48 B/op) from formatting the
@@ -527,7 +527,7 @@ strategy, and import layout live in
 [`specs/010-import-isolated-contracts/research.md`](specs/010-import-isolated-contracts/research.md).
 The structured-logging (zerolog) choice is now governed by Constitution
 Principles VI and VIII; its full decision record is absorbed into
-[`specs/011-hot-path-benchmarks/research.md`](specs/011-hot-path-benchmarks/research.md).
+[`specs/021-hot-path-benchmarks/research.md`](specs/021-hot-path-benchmarks/research.md).
 Remaining frozen ADR text and rationale live in [`docs/adr/`](docs/adr/).
 
 ## Repository Layout

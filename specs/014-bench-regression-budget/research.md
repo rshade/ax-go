@@ -64,7 +64,7 @@ operation, not a percentage).
 alloc/op)") — not a new decision, a confirmation. Gating `ns/op` only on
 significant deltas satisfies spec FR-003/SC-005 (noise alone must not fail
 CI); most of today's benchmarks report `0 allocs/op` (per
-`specs/011-hot-path-benchmarks/research.md`'s measured profile), so an
+`specs/021-hot-path-benchmarks/research.md`'s measured profile), so an
 absolute `+1` threshold is meaningful and simple, whereas a percentage
 threshold against a `0` baseline is undefined/infinite and would need a
 special case anyway.
@@ -130,7 +130,7 @@ variable GitHub runners and developer machines.
   worst case for the marshal path — then calls `WriteError(io.Discard, err)`
   inside `b.Loop()`.
 
-**Rationale**: Matches the idiom `specs/011-hot-path-benchmarks` already
+**Rationale**: Matches the idiom `specs/021-hot-path-benchmarks` already
 established (fixture construction outside the loop, `io.Discard` sink,
 `b.Loop()`). A "representative" tree/error is sized to reflect real CLI
 command trees and real error envelopes seen in this codebase, not a

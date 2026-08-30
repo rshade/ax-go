@@ -2,7 +2,7 @@
 
 **Branch**: `011-hot-path-benchmarks` | **Date**: 2026-06-26 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `/specs/011-hot-path-benchmarks/spec.md`
+**Input**: Feature specification from `/specs/021-hot-path-benchmarks/spec.md`
 
 ## Summary
 
@@ -96,7 +96,7 @@ new dependency, or scope creep. Verdict unchanged.
 ### Documentation (this feature)
 
 ```text
-specs/011-hot-path-benchmarks/
+specs/021-hot-path-benchmarks/
 ├── plan.md              # This file (/speckit-plan command output)
 ├── research.md          # Phase 0 output; holds "Decision Records Absorbed" for ADR-0009
 ├── data-model.md        # Phase 1 output (conceptual entities: benchmark variant, allocation profile)

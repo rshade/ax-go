@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"flag"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,8 +37,8 @@ func TestParseCoverage(t *testing.T) {
 	if foo.Stmts != 5 || foo.Covered != 3 {
 		t.Fatalf("foo: got Stmts=%d Covered=%d, want 5/3", foo.Stmts, foo.Covered)
 	}
-	if foo.Pct != 60.0 {
-		t.Fatalf("foo: got Pct=%.1f, want 60.0", foo.Pct)
+	if foo.Pct() != 60.0 {
+		t.Fatalf("foo: got Pct=%.1f, want 60.0", foo.Pct())
 	}
 
 	bar, ok := pkgs["github.com/example/bar"]
@@ -47,8 +48,8 @@ func TestParseCoverage(t *testing.T) {
 	if bar.Stmts != 5 || bar.Covered != 5 {
 		t.Fatalf("bar: got Stmts=%d Covered=%d, want 5/5", bar.Stmts, bar.Covered)
 	}
-	if bar.Pct != 100.0 {
-		t.Fatalf("bar: got Pct=%.1f, want 100.0", bar.Pct)
+	if bar.Pct() != 100.0 {
+		t.Fatalf("bar: got Pct=%.1f, want 100.0", bar.Pct())
 	}
 }
 
@@ -56,6 +57,29 @@ func TestParseCoverageMalformed(t *testing.T) {
 	const bad = "mode: atomic\nnot-a-valid-coverage-line\n"
 	if _, err := parseCoverage(strings.NewReader(bad)); err == nil {
 		t.Fatal("expected error on malformed coverage line, got nil")
+	}
+}
+
+// TestParseCoverageNegativeCounts guards against a corrupted or adversarially
+// crafted profile flipping meetsFloor's integer cross-multiplication: a
+// negative total (or covered) reverses the comparison inequality without
+// reversing the operator, which can silently pass a package that should fail.
+// Rejecting a negative count at parse time, before it ever reaches meetsFloor,
+// closes that off entirely.
+func TestParseCoverageNegativeCounts(t *testing.T) {
+	cases := []struct {
+		name string
+		line string
+	}{
+		{"negative statement count", "mode: atomic\ngithub.com/example/foo/a.go:1.1,2.2 -5 1\n"},
+		{"negative execution count", "mode: atomic\ngithub.com/example/foo/a.go:1.1,2.2 5 -1\n"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := parseCoverage(strings.NewReader(tc.line)); err == nil {
+				t.Fatal("expected error on negative count, got nil")
+			}
+		})
 	}
 }
 
@@ -76,7 +100,7 @@ func testConfig() floorConfig {
 }
 
 func pkg(path string, stmts, covered int) PackageCoverage {
-	return PackageCoverage{ImportPath: path, Stmts: stmts, Covered: covered, Pct: percent(covered, stmts)}
+	return PackageCoverage{ImportPath: path, Stmts: stmts, Covered: covered}
 }
 
 func TestCheckFloors_Pass(t *testing.T) {
@@ -327,6 +351,87 @@ func TestPercentZeroTotal(t *testing.T) {
 	}
 	if got := percent(5, 0); got != 0 {
 		t.Fatalf("percent(5, 0) = %v, want 0", got)
+	}
+}
+
+// TestMeetsFloor pins the integer-space floor comparison: a ratio exactly at
+// the floor passes even when the percentage is not exactly representable as a
+// float64 (969/1000*100 computes as 96.89999999999999), the boundary remains
+// "at floor passes" on both sides, and a zero total is fail-closed rather than
+// a vacuous pass — matching the pre-existing percent(0, 0)==0 semantics, where
+// only a non-positive floor is met by nothing to cover.
+func TestMeetsFloor(t *testing.T) {
+	cases := []struct {
+		name          string
+		covered, stmt int
+		floor         float64
+		want          bool
+	}{
+		{"exactly at unrepresentable floor", 969, 1000, 96.9, true},
+		{"one statement below floor", 968, 1000, 96.9, false},
+		{"one statement above floor", 970, 1000, 96.9, true},
+		{"exactly at representable floor", 800, 1000, 80.0, true},
+		{"zero total fails a positive floor", 0, 0, 96.9, false},
+		{"zero total meets a zero floor", 0, 0, 0, true},
+		{"half-statement floor rounds to nearest tenth", 965, 1000, 96.5, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := meetsFloor(tc.covered, tc.stmt, tc.floor); got != tc.want {
+				t.Fatalf("meetsFloor(%d, %d, %.1f) = %v, want %v", tc.covered, tc.stmt, tc.floor, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestCheckFloors_ExactFloorBoundary is the end-to-end regression test for the
+// integer-space comparison: a package whose covered/total ratio lands exactly
+// on a float-unrepresentable floor passes the gate.
+func TestCheckFloors_ExactFloorBoundary(t *testing.T) {
+	cfg := testConfig()
+	cfg.perPackage["github.com/example/bar"] = 96.9
+	pkgs := map[string]PackageCoverage{
+		"github.com/example/foo": pkg("github.com/example/foo", 1000, 500), // 50% >= 50%
+		"github.com/example/bar": pkg("github.com/example/bar", 1000, 969), // 96.9% == 96.9% floor
+	}
+	result := checkFloors(pkgs, cfg)
+	if !result.Pass {
+		t.Fatalf("expected a package exactly at its floor to pass, got %+v", result.Violations)
+	}
+}
+
+// TestCheckFloors_EmptyProfileFailsClosed is the end-to-end regression test
+// for the repo-wide zero-total case: a coverage profile with no data lines at
+// all (pkgs is empty) must not silently pass the repo-wide floor. Before this
+// fix, meetsFloor's total==0 branch unconditionally returned true, so a
+// degenerate or truncated coverage.out reported PASS at 0.0% coverage.
+func TestCheckFloors_EmptyProfileFailsClosed(t *testing.T) {
+	cfg := testConfig()
+	result := checkFloors(map[string]PackageCoverage{}, cfg)
+	if result.Pass {
+		t.Fatalf("expected an empty coverage profile to fail the repo-wide floor, got pass: %+v", result)
+	}
+	if len(result.Violations) != 1 || result.Violations[0].Scope != repoWideScope {
+		t.Fatalf("expected exactly one repo-wide violation, got %+v", result.Violations)
+	}
+}
+
+// TestFloorsAreWholeTenths guards meetsFloor's precondition that every floor
+// carries at most one decimal place. A floor with finer precision would be
+// silently quantized by the floorTenths scaling (e.g. 96.75 rounds to 96.8,
+// enforcing a stricter floor than the one documented) with no error raised.
+func TestFloorsAreWholeTenths(t *testing.T) {
+	cfg := defaultFloorConfig()
+	check := func(name string, f float64) {
+		t.Helper()
+		if math.Abs(f*floorTenths-math.Round(f*floorTenths)) > 1e-9 {
+			t.Errorf("floor %s = %v is not a whole tenth; meetsFloor would silently quantize it", name, f)
+		}
+	}
+	check("repo-wide", cfg.repoWide)
+	check("default", cfg.defaultFloor)
+	for path, f := range cfg.perPackage {
+		check(path, f)
 	}
 }
 

@@ -1,6 +1,6 @@
 # Phase 1 Data Model: Hot-Path Benchmarks with `-benchmem`
 
-**Feature**: `011-hot-path-benchmarks` | **Date**: 2026-06-26
+**Feature**: `021-hot-path-benchmarks` | **Date**: 2026-06-26
 
 This feature introduces **no runtime data types and no exported identifiers**.
 The "entities" below are conceptual — they describe the structure of the

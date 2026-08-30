@@ -1,6 +1,6 @@
 # Phase 0 Research: Certify and Internalize the Public Boundary Before v1.0
 
-**Feature**: `015-internalize-helpers` | **Date**: 2026-07-19
+**Feature**: `023-internalize-helpers` | **Date**: 2026-07-19
 
 This record resolves the public-surface model, audit lifecycle, release
 sequencing, gate contract, and governance questions. No
@@ -92,7 +92,7 @@ export from bypassing a Linux-host CI scan.
 
 **Decision**:
 
-- `specs/015-internalize-helpers/public-surface-audit.json` is the permanent
+- `specs/023-internalize-helpers/public-surface-audit.json` is the permanent
   dated decision history. Records are never deleted.
 - `internal/cmd/surfacecheck/baseline.json` is the current operational
   ID/signature projection used by CI.
@@ -119,7 +119,7 @@ array with incompatible historical/current comparison rules.
 
 ## D4: Deprecate, publish, then remove in a follow-up feature
 
-**Decision**: Feature 015 removes no exported symbol. It adds a Go-recognized
+**Decision**: Feature 023 removes no exported symbol. It adds a Go-recognized
 `// Deprecated:` paragraph with a replacement or removal reason to every
 approved retirement candidate and lands as a non-breaking `feat:` change so
 release-please produces a pre-v1 minor.
@@ -235,7 +235,7 @@ would add unnecessary surface.
 
 **Decision**: `apidiff-verdict` remains authoritative for the public-package
 allowlist: root `ax`, `config`, `contract`, `id`, `mcp`, and `schema`.
-Feature 015 inventories only root `ax`. Every current root export is governed
+Feature 023 inventories only root `ax`. Every current root export is governed
 public surface under Principle XI, even if the audit classifies it as an
 implementation leak slated for deprecation.
 

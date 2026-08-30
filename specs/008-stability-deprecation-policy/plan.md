@@ -59,7 +59,7 @@ feature's own `research.md`. Zero source files.
 (verified: `docs/adr/0013*`, `docs/adr/0014*` absent). The structured-logger decision is the
 *subject* of this feature's retroactive evaluation (User Story 3), **not** a governing ADR
 of this feature; it is not absorbed or retired here. Its later absorption is recorded in
-`../011-hot-path-benchmarks/research.md`. Therefore the ADR-absorption gate and the
+`../021-hot-path-benchmarks/research.md`. Therefore the ADR-absorption gate and the
 ADR-retirement final task do NOT apply here.
 
 ## Constitution Check

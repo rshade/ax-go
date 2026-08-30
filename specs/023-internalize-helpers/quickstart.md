@@ -1,6 +1,6 @@
 # Quickstart: Public-Surface Audit and Gate
 
-**Feature**: `015-internalize-helpers` | **Date**: 2026-07-19
+**Feature**: `023-internalize-helpers` | **Date**: 2026-07-19
 
 Run these commands from the module root.
 
@@ -51,7 +51,7 @@ It must not be committed until every record is reviewed.
 Commit the approved artifacts at:
 
 ```text
-specs/015-internalize-helpers/public-surface-audit.json
+specs/023-internalize-helpers/public-surface-audit.json
 internal/cmd/surfacecheck/baseline.json
 ```
 
@@ -115,16 +115,16 @@ For drift:
 
 - `added`: add a reviewed baseline entry and permanent audit row, or unexport
   before merge if it was accidental and never approved.
-- `missing`: restore the export in feature 015. Removal belongs to the follow-up
+- `missing`: restore the export in feature 023. Removal belongs to the follow-up
   feature after publication.
-- `signature-changed`: restore compatibility; feature 015 permits no re-type.
+- `signature-changed`: restore compatibility; feature 023 permits no re-type.
 - `profile-divergent`: make the surface target-invariant.
 - `audit-missing`: add and review the permanent decision row.
 - `deprecation-missing`: restore the required Go-recognized notice.
 
 ## Publication and later removal
 
-Feature 015 lands with a non-breaking `feat:` commit. A merge is not the notice
+Feature 023 lands with a non-breaking `feat:` commit. A merge is not the notice
 window: a real `0.MINOR.0` tag must publish the deprecation.
 
 Only a follow-up Spec Kit feature may remove a forwarder. It must verify the
@@ -135,7 +135,7 @@ use `feat!:` / `BREAKING CHANGE:` so release-please produces the next minor.
 ### Follow-up removal feature (tracking issue pending)
 
 The removal work is tracked as a follow-up Spec Kit feature (GitHub tracking
-issue to be created; link it here once filed). Feature 015's audit carries
+issue to be created; link it here once filed). Feature 023's audit carries
 zero `deprecated` rows, so the follow-up activates only once a deprecation
 exists. Its scope when activated:
 
@@ -165,6 +165,6 @@ Expected:
 
 - `gofmt -s -l .` prints nothing.
 - Existing `ax.Error` and `__schema` goldens are unchanged.
-- API diff reports no incompatible change for feature 015.
+- API diff reports no incompatible change for feature 023.
 - Coverage floors and performance budgets are not lowered.
 - No ADR or `CHANGELOG.md` file is created or edited.
