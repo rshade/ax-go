@@ -74,7 +74,6 @@ const (
 // against an incomplete set.
 func allowedPackages() []string {
 	return []string{
-		//nolint:goconst // must stay a literal: the surfacecheck guard parses this source
 		"github.com/rshade/ax-go",
 		"github.com/rshade/ax-go/axtest",
 		"github.com/rshade/ax-go/config",

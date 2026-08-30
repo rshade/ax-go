@@ -21,7 +21,7 @@ deleted by this feature.
 Structured-logger retirement was explicitly OUT OF SCOPE for this feature. This feature only
 *applies the new policy to* the historical change it records, and does not absorb or delete
 the logger decision. The later absorption and retirement are recorded in
-`../011-hot-path-benchmarks/research.md` per the §Governance feature workflow. A reviewer of
+`../021-hot-path-benchmarks/research.md` per the §Governance feature workflow. A reviewer of
 this feature should NOT expect a `docs/adr/` deletion in this PR (consistent with SC-004:
 zero new ADR files, and — here — zero ADR deletions).
 

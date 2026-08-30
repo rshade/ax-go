@@ -1,6 +1,6 @@
 # Quickstart: Hot-Path Benchmarks with `-benchmem`
 
-**Feature**: `011-hot-path-benchmarks` | **Date**: 2026-06-26
+**Feature**: `021-hot-path-benchmarks` | **Date**: 2026-06-26
 
 How to run the logger benchmark suite and read the allocation profile. This is
 the verification path for spec SC-001…SC-005.
@@ -74,5 +74,5 @@ go vet ./...
 golangci-lint run
 go test -race ./...   # the benchmark file must compile & its tests/benchmarks build under -race
 make doc-coverage     # unaffected (no new exported symbol), must stay clean
-markdownlint-cli2 "specs/011-hot-path-benchmarks/**/*.md"
+markdownlint-cli2 "specs/021-hot-path-benchmarks/**/*.md"
 ```

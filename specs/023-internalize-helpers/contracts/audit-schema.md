@@ -1,6 +1,6 @@
 # Contract: Permanent Public-Surface Audit
 
-**File**: `specs/015-internalize-helpers/public-surface-audit.json`  
+**File**: `specs/023-internalize-helpers/public-surface-audit.json`  
 **Schema version**: `1`
 
 The audit is the permanent decision history required by FR-001–FR-005. It is
@@ -50,7 +50,7 @@ Unknown fields and trailing JSON values are rejected.
 - `supported` pairs only with `keep-public` and lifecycle `live`.
 - `implementation-leak` pairs only with `relocate-with-forwarder` or
   `deprecate-in-place`.
-- Feature 015 permits leak lifecycle `deprecated`; `removable` and `removed`
+- Feature 023 permits leak lifecycle `deprecated`; `removable` and `removed`
   are follow-up states.
 - `relocate-with-forwarder` requires an `internal/<role>` target whose
   slash-separated segments are each a well-formed lowercase package name;
@@ -93,7 +93,7 @@ The gate validates these relationships on every run.
   before any internalization.
 - Intentional addition: add the live baseline entry and a new audit record in
   the same PR.
-- Feature-015 deprecation: retain the row, change lifecycle to `deprecated`,
+- Feature-023 deprecation: retain the row, change lifecycle to `deprecated`,
   record the strategy/target/replacement, and keep the feature live.
 - Publication: a later reviewed change may populate `deprecated_in` after the
   tag exists.

@@ -5,7 +5,7 @@ description: "Task list for feature: Hot-Path Benchmarks with -benchmem"
 
 # Tasks: Hot-Path Benchmarks with `-benchmem`
 
-**Input**: Design documents from `/specs/011-hot-path-benchmarks/`
+**Input**: Design documents from `/specs/021-hot-path-benchmarks/`
 
 **Prerequisites**: plan.md (required), spec.md (required), research.md,
 data-model.md, quickstart.md
@@ -149,7 +149,7 @@ governing ADR.
 
 - [X] T006 [P] Run `go test -run '^$' -bench '^BenchmarkLogger' -benchmem -count=5 ./...`
   and append a "Measured Allocation Profile" results table to
-  `specs/011-hot-path-benchmarks/research.md` recording `B/op` and `allocs/op`
+  `specs/021-hot-path-benchmarks/research.md` recording `B/op` and `allocs/op`
   per variant plus the conditions of measurement (FR-009, SC-004). (Different
   file from T007 → parallelizable.)
 - [X] T007 [P] Reconcile the "zero or near-zero allocation hot path" claim with
@@ -162,9 +162,9 @@ governing ADR.
   empty), `go vet ./...`, `golangci-lint run`, `go test -race ./...` (the new
   `logger_bench_test.go` must build and its benchmarks compile under `-race`),
   `make doc-coverage` (must stay clean — no new exported runtime symbol), and
-  `markdownlint-cli2 "specs/011-hot-path-benchmarks/**/*.md"`. (AGENTS.md
+  `markdownlint-cli2 "specs/021-hot-path-benchmarks/**/*.md"`. (AGENTS.md
   workflow steps 5-7; SC-005)
-- [X] T009 Validate `specs/011-hot-path-benchmarks/quickstart.md` end to end:
+- [X] T009 Validate `specs/021-hot-path-benchmarks/quickstart.md` end to end:
   run each documented command and confirm the output columns and the
   acceptance-verification map behave as written (SC-001…SC-005).
 - [X] T010 [FINAL] Retire ADR-0009 — ONLY now that

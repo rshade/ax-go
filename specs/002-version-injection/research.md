@@ -135,7 +135,7 @@ from inside `ax.Execute` — rejected: it would couple logger construction to
 Execute, the logger is constructed by the consumer with its own labels, and the
 constitution warns against widening the logger seam (Principle VI; the
 structured-logger decision is now absorbed in
-`../011-hot-path-benchmarks/research.md`). Documentation + example is the
+`../021-hot-path-benchmarks/research.md`). Documentation + example is the
 proportional fix.
 
 ### D7 — Public API shape, naming, and doc-coverage gating

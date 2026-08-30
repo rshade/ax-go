@@ -68,7 +68,7 @@ const baselineSchemaVersion = 2
 // (module root for all documented invocations).
 const (
 	defaultBaselinePath = "internal/cmd/surfacecheck/baseline.json"
-	defaultAuditPath    = "specs/015-internalize-helpers/public-surface-audit.json"
+	defaultAuditPath    = "specs/023-internalize-helpers/public-surface-audit.json"
 )
 
 // Stable error codes for the failure contract.
@@ -93,8 +93,6 @@ const allSentinel = "all"
 // MarshalJSON must take a value receiver because presenceSet is stored by
 // value inside baselineFeature, while UnmarshalJSON must take a pointer
 // receiver to write through to the caller.
-//
-//nolint:recvcheck // encoding/json requires value-receiver Marshal and pointer-receiver Unmarshal
 type presenceSet struct {
 	// All is true when the feature is present in every member of the universe.
 	All bool

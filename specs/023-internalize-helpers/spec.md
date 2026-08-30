@@ -15,7 +15,7 @@ before v1.0"
 
 - Q: May identifiers classified as leaked helpers be removed immediately? →
   A: No. Constitution Principle XII applies to every exported symbol. Feature
-  015 relocates non-public mechanics behind compatibility-preserving root
+  023 relocates non-public mechanics behind compatibility-preserving root
   forwarders, adds Go-recognized `// Deprecated:` migration notices, and ships
   those notices in a real `0.MINOR.0` release. A follow-up Spec Kit feature may
   remove a forwarder only after at least one published minor carried its notice.
@@ -156,7 +156,7 @@ minified `ax.Error` envelope to stderr.
 ### Functional Requirements
 
 - **FR-001**: The feature MUST commit
-  `specs/015-internalize-helpers/public-surface-audit.json`, retaining one
+  `specs/023-internalize-helpers/public-surface-audit.json`, retaining one
   decision record for every compiler-visible API feature of the root `ax`
   package at the audit point.
 - **FR-002**: The inventory MUST be type-aware and include exported package
@@ -180,7 +180,7 @@ minified `ax.Error` envelope to stderr.
   feature with unchanged name, type, and observable semantics and MUST gain a
   Go-recognized `// Deprecated:` paragraph. If safe forwarding cannot be
   proved, implementation relocation is deferred rather than breaking the API.
-- **FR-008**: Feature 015 MUST NOT remove, rename, re-type, or semantically
+- **FR-008**: Feature 023 MUST NOT remove, rename, re-type, or semantically
   change an exported identifier. It MUST ship deprecation notices in a
   non-breaking `feat:` release that becomes a published `0.MINOR.0`.
 - **FR-009**: Removal MUST occur only in a follow-up Spec Kit feature after at
@@ -228,7 +228,7 @@ minified `ax.Error` envelope to stderr.
   profiles have exactly one retained audit decision.
 - **SC-002**: 100% of approved implementation leaks have an internal target,
   compatibility strategy, migration note, and downstream evidence.
-- **SC-003**: Feature 015 removes zero exported symbols and introduces zero
+- **SC-003**: Feature 023 removes zero exported symbols and introduces zero
   incompatible `go-apidiff` findings.
 - **SC-004**: Every deprecated record maps to a present source declaration with
   a valid `Deprecated:` paragraph; repository call sites produce zero SA1019
@@ -253,7 +253,7 @@ minified `ax.Error` envelope to stderr.
   (`config`, `contract`, `id`, `mcp`, `schema`) remain public and apidiff-gated,
   but their identifiers are outside this root-only audit.
 - Classification is conservative. Ambiguity resolves to `supported`.
-- Feature 015 is the notice/internalization feature, not the removal feature.
+- Feature 023 is the notice/internalization feature, not the removal feature.
   Publication is an external release milestone and cannot be simulated inside
   one implementation PR.
 - No new module dependency is required; compiler export data and type traversal

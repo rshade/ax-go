@@ -46,7 +46,7 @@ the same job to keep timing comparable even as runner hardware varies.
 dev-tooling. New code: one new `internal/cmd/benchcheck` package, two new
 test-only benchmark files, no change to the public `ax` API surface.
 
-**Performance Goals**: This feature ASSERTS, unlike `specs/011-hot-path-benchmarks`
+**Performance Goals**: This feature ASSERTS, unlike `specs/021-hot-path-benchmarks`
 which only measured. Budget: >5% regression in ns/op (statistically
 significant per `benchstat`'s default U-test at α=0.05) OR >1 additional
 alloc/op fails CI. These are the exact numbers `ROADMAP.md` already commits

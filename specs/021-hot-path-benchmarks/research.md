@@ -1,6 +1,6 @@
 # Phase 0 Research: Hot-Path Benchmarks with `-benchmem`
 
-**Feature**: `011-hot-path-benchmarks` | **Date**: 2026-06-26
+**Feature**: `021-hot-path-benchmarks` | **Date**: 2026-06-26
 
 This document resolves the technical unknowns for the benchmark suite and
 absorbs the governing ADR (ADR-0009) so it can be retired as the feature's
@@ -231,7 +231,7 @@ implementation) can land without breaking consumer call sites.
   so the OTel hook and field typing are wired.
 - **Bench-test allocation on hot paths via `testing.B` and `-benchmem`; do not
   assert numeric performance bars without a benchmark.** ← This is the last
-  outstanding obligation of ADR-0009 and is precisely what feature `011`
+  outstanding obligation of ADR-0009 and is precisely what feature `021`
   delivers; the present feature discharges it and is therefore the correct
   feature to retire the ADR.
 

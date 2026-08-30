@@ -62,7 +62,7 @@ function.
 
 | Benchmark ID | Hot path | Status |
 |--------------|----------|--------|
-| `BenchmarkLoggerEmit/*`, `BenchmarkLoggerTracingHook/*`, `BenchmarkLoggerFieldShapes/*` | Logger emit path | Existing (`logger_bench_test.go`, feature 011) |
+| `BenchmarkLoggerEmit/*`, `BenchmarkLoggerTracingHook/*`, `BenchmarkLoggerFieldShapes/*` | Logger emit path | Existing (`logger_bench_test.go`, feature 021) |
 | `BenchmarkParseConfigBoundedRead`, `BenchmarkParseConfigDefaultCapRead` | Hujson/config parse path | Existing (`config_bench_test.go`) |
 | `BenchmarkBuildCommand` | `__schema` reflection path | **NEW** (`internal/schema/schema_bench_test.go`) |
 | `BenchmarkWriteError` | Error envelope marshal path | **NEW** (`contract/error_bench_test.go`) |

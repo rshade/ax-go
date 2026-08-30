@@ -39,7 +39,7 @@
 - **Package/symbol distinction**: the supported-package allowlist determines
   governance scope; it does not classify root identifiers. FR-004 classifies
   each compiler-visible root feature by intended contract and evidence.
-- **Deprecation correction**: feature 015 performs no public removal. It
+- **Deprecation correction**: feature 023 performs no public removal. It
   internalizes compatible mechanics behind deprecated root forwarders and
   requires a real published minor before a follow-up removal feature.
 - **Persistent evidence**: the permanent audit retains every decision while a

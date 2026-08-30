@@ -26,6 +26,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"math"
 	"os"
 	"sort"
 	"strconv"
@@ -44,6 +45,12 @@ const (
 	defaultPackageFloor = 25.0
 	// percentScale converts a covered/total ratio to a percentage.
 	percentScale = 100.0
+	// floorScale and floorTenths scale the floor comparison into integer space.
+	// Floors carry one decimal place, so covered/total*100 >= floor is checked
+	// as covered*floorScale >= round(floor*floorTenths)*total, which is exact
+	// where a float64 percentage comparison is not.
+	floorScale  = 1000
+	floorTenths = 10
 	// profileFieldCount is the number of whitespace-separated fields in a Go
 	// coverage profile data line: "file:block numStmt count".
 	profileFieldCount = 3
@@ -73,9 +80,12 @@ type PackageCoverage struct {
 	Stmts int
 	// Covered is the number of executed (covered) statements.
 	Covered int
-	// Pct is the coverage percentage (Covered/Stmts * 100); 0 when Stmts is 0.
-	Pct float64
 }
+
+// Pct returns the coverage percentage (Covered/Stmts * 100); 0 when Stmts is
+// 0. It is a method rather than a stored field so the derived value can never
+// drift out of sync with the counters it is computed from.
+func (p PackageCoverage) Pct() float64 { return percent(p.Covered, p.Stmts) }
 
 // Violation is a single coverage floor failure.
 type Violation struct {
@@ -86,9 +96,12 @@ type Violation struct {
 	Actual float64
 	// Floor is the required minimum coverage percentage.
 	Floor float64
-	// Delta is Actual-Floor, always negative for a violation.
-	Delta float64
 }
+
+// Delta returns Actual-Floor, always negative for a violation. It is a method
+// rather than a stored field so the shortfall can never disagree with the
+// Actual and Floor values it is derived from.
+func (v Violation) Delta() float64 { return v.Actual - v.Floor }
 
 // CheckResult is the complete outcome of one covercheck run.
 type CheckResult struct {
@@ -240,7 +253,6 @@ func parseCoverage(r io.Reader) (map[string]PackageCoverage, error) {
 		if count > 0 {
 			pc.Covered += numStmt
 		}
-		pc.Pct = percent(pc.Covered, pc.Stmts)
 		acc[importPath] = pc
 	}
 	if err := scanner.Err(); err != nil {
@@ -275,9 +287,15 @@ func parseProfileLine(line string) (string, int, int, error) {
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("parsing statement count in %q: %w", line, err)
 	}
+	if numStmt < 0 {
+		return "", 0, 0, fmt.Errorf("negative statement count in %q", line)
+	}
 	count, err := strconv.Atoi(fields[2])
 	if err != nil {
 		return "", 0, 0, fmt.Errorf("parsing execution count in %q: %w", line, err)
+	}
+	if count < 0 {
+		return "", 0, 0, fmt.Errorf("negative execution count in %q", line)
 	}
 	return file[:slash], numStmt, count, nil
 }
@@ -288,6 +306,28 @@ func percent(covered, total int) float64 {
 		return 0
 	}
 	return float64(covered) / float64(total) * percentScale
+}
+
+// meetsFloor reports whether covered/total meets the coverage floor, comparing
+// in integer space so the floor is an exact contract: a package exactly at its
+// floor passes. The float64 percentage covered/total*100 is generally not
+// exactly representable, so a float comparison can spuriously fail a genuine
+// boundary hit (e.g. 969/1000 computes as 96.89999999999999 < 96.9). Floors
+// carry one decimal place, so cross-multiplying removes the division entirely:
+// covered/total*100 >= floor  <=>  covered*floorScale >= round(floor*floorTenths)*total.
+// int64 arithmetic bounds the overflow surface on very large profiles.
+//
+// A total of 0 (only reachable for the repo-wide aggregate, when the coverage
+// profile carries no data lines at all) is fail-closed rather than a vacuous
+// pass: it meets the floor only when the floor itself is non-positive,
+// matching the pre-existing percent(0, 0)==0 compared against a positive
+// floor. The gate is documented as authoritative (AGENTS.md "Coverage
+// Policy"); a degenerate empty profile must not silently pass it.
+func meetsFloor(covered, total int, floor float64) bool {
+	if total == 0 {
+		return floor <= 0
+	}
+	return int64(covered)*floorScale >= int64(math.Round(floor*floorTenths))*int64(total)
 }
 
 // checkFloors partitions pkgs into excluded and checked sets, applies the
@@ -312,24 +352,21 @@ func checkFloors(pkgs map[string]PackageCoverage, cfg floorConfig) CheckResult {
 	var violations []Violation
 	for _, p := range checked {
 		floor := cfg.floorFor(p.ImportPath)
-		if p.Pct < floor {
+		if !meetsFloor(p.Covered, p.Stmts, floor) {
 			violations = append(violations, Violation{
 				Scope:  p.ImportPath,
-				Actual: p.Pct,
+				Actual: p.Pct(),
 				Floor:  floor,
-				Delta:  p.Pct - floor,
 			})
 		}
 	}
 
-	repoPct := percent(totalCovered, totalStmts)
-	repo := PackageCoverage{ImportPath: repoWideScope, Stmts: totalStmts, Covered: totalCovered, Pct: repoPct}
-	if repoPct < cfg.repoWide {
+	repo := PackageCoverage{ImportPath: repoWideScope, Stmts: totalStmts, Covered: totalCovered}
+	if !meetsFloor(totalCovered, totalStmts, cfg.repoWide) {
 		violations = append(violations, Violation{
 			Scope:  repoWideScope,
-			Actual: repoPct,
+			Actual: repo.Pct(),
 			Floor:  cfg.repoWide,
-			Delta:  repoPct - cfg.repoWide,
 		})
 	}
 
@@ -359,14 +396,14 @@ func formatPass(w io.Writer, r CheckResult, cfg floorConfig) {
 	}
 
 	fmt.Fprintln(w, "PASS  coverage floors met")
-	fmt.Fprintf(w, "  %-*s  %.1f%% >= %.1f%% floor\n", width, repoWideScope+":", r.RepoWide.Pct, cfg.repoWide)
+	fmt.Fprintf(w, "  %-*s  %.1f%% >= %.1f%% floor\n", width, repoWideScope+":", r.RepoWide.Pct(), cfg.repoWide)
 	for _, p := range r.Packages {
-		fmt.Fprintf(w, "  %-*s  %.1f%% >= %.1f%% floor\n", width, p.ImportPath+":", p.Pct, cfg.floorFor(p.ImportPath))
+		fmt.Fprintf(w, "  %-*s  %.1f%% >= %.1f%% floor\n", width, p.ImportPath+":", p.Pct(), cfg.floorFor(p.ImportPath))
 	}
 	if len(r.Excluded) > 0 {
 		fmt.Fprintln(w, "excluded (per-package floor not enforced):")
 		for _, p := range r.Excluded {
-			fmt.Fprintf(w, "  %-*s  %.1f%%\n", width, p.ImportPath, p.Pct)
+			fmt.Fprintf(w, "  %-*s  %.1f%%\n", width, p.ImportPath, p.Pct())
 		}
 	}
 }
@@ -383,6 +420,6 @@ func formatFail(w io.Writer, r CheckResult) {
 
 	fmt.Fprintf(w, "FAIL  %d coverage floor violation(s):\n", len(r.Violations))
 	for _, v := range r.Violations {
-		fmt.Fprintf(w, "  %-*s  %.1f%% < %.1f%% floor  (%.1fpp)\n", width, v.Scope+":", v.Actual, v.Floor, v.Delta)
+		fmt.Fprintf(w, "  %-*s  %.1f%% < %.1f%% floor  (%.1fpp)\n", width, v.Scope+":", v.Actual, v.Floor, v.Delta())
 	}
 }

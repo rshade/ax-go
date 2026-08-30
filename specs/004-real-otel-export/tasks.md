@@ -294,7 +294,7 @@ ratchet, docs, the full validation gate, and the governed ADR retirement.
   `docs/adr/0004-trace-id-format.md:61`, `docs/adr/0007-id-strategy.md:35`,
   `docs/adr/0008-cli-framework-cobra.md:70`, and
   the structured-logger decision now absorbed in
-  `../011-hot-path-benchmarks/research.md` to constitution §VIII or
+  `../021-hot-path-benchmarks/research.md` to constitution §VIII or
   `specs/004-real-otel-export/`. ADR-0004 is **retained** (research D10). No Go
   source file references ADR-0005 by number, so no doc-comment edits are needed.
   (Constitution §Governance; research "Retirement note")

@@ -51,7 +51,7 @@ All are repository validation failures: stdout is empty, stderr receives one
 
 - Intentional current-surface change updates this file in the same reviewed PR.
 - Intentional additions also add a permanent audit record.
-- Feature 015 deprecations do not remove baseline entries.
+- Feature 023 deprecations do not remove baseline entries.
 - A follow-up removal deletes the live entry only after the retained audit row
   has verified deprecation-release evidence and transitions to `removed`.
 - Default check mode never writes either artifact. Inventory mode prints a
