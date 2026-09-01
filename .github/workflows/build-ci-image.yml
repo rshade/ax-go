@@ -1,0 +1,45 @@
+name: Build CI Image
+
+# Builds and publishes the ci-ax-go job image to public GHCR.
+#
+# runs-on is GitHub-hosted ubuntu-latest DELIBERATELY, not the self-hosted
+# runner: public repos pay no hosted minutes, and publishing the image from
+# outside the self-hosted trust domain means the runner VM that executes
+# (potentially fork-authored) workflow code never holds credentials that
+# could push — or poison — the very image its jobs run in.
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/docker/ci-ax-go.Dockerfile
+      - mise.toml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-push:
+    name: Build and push ci-ax-go
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      # Token reaches docker via env + stdin, never interpolated into the
+      # command line.
+      - name: Log in to GHCR
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: printf '%s' "$GH_TOKEN" | docker login ghcr.io -u "$GITHUB_ACTOR" --password-stdin
+
+      - name: Build image
+        run: |
+          docker build -f .github/docker/ci-ax-go.Dockerfile \
+            -t "ghcr.io/rshade/ci-ax-go:latest" \
+            -t "ghcr.io/rshade/ci-ax-go:mise-$(sha256sum mise.toml | cut -c1-12)" \
+            .
+
+      - name: Push image
+        run: docker push --all-tags ghcr.io/rshade/ci-ax-go
