@@ -113,23 +113,25 @@ jobs:
 
   bench:
     name: Performance Regression Budget
+    # Deliberately hosted, not the self-hosted runner. This job benchmarks
+    # base vs head for ~12 minutes (its hosted-era runs were 11:54-12:05),
+    # so on the self-hosted runner it monopolizes a slot and queues every
+    # job behind it — and co-running jobs on shared cores skew timings,
+    # turning a regression *budget* into a coin flip. Hosted runners are
+    # free for this public repo, each run gets an otherwise-idle machine,
+    # and every historical baseline was measured on this runner class.
     if: github.event_name == 'pull_request'
-    runs-on: [self-hosted, linux, x64]
-    container:
-      image: ghcr.io/rshade/ci-ax-go:latest
-      volumes:
-        - /opt/ci-cache/go-build:/github/home/.cache/go-build
-        - /opt/ci-cache/go-mod:/github/home/go/pkg/mod
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      # The image bakes the mise.toml pins; this no-ops when image and repo
-      # agree, and downloads what a newer mise.toml added when they do not.
-      - name: Sync pinned toolchain
-        run: mise install
+      - name: Set up mise (Go)
+        uses: jdx/mise-action@v4
+        with:
+          install_args: go
 
       - name: Enforce performance regression budget
         env:
