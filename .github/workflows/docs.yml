@@ -13,6 +13,11 @@ permissions:
   pages: write
   id-token: write
 
+# Container jobs default run steps to `sh`; restore bash. See ci.yml.
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: pages
   cancel-in-progress: false
@@ -20,7 +25,11 @@ concurrency:
 jobs:
   build:
     name: Build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/npm:/github/home/.npm
     steps:
       - name: Checkout (with theme submodule)
         uses: actions/checkout@v7
@@ -30,13 +39,8 @@ jobs:
           # it; add a cross-repo PAT here (see specs/022-starlight-docs-site D8):
           # token: ${{ secrets.THEME_REPO_TOKEN }}
 
-      - name: Set up Node
-        uses: actions/setup-node@v7
-        with:
-          node-version: 24
-          cache: npm
-          cache-dependency-path: docs/package-lock.json
-
+      # Node comes from the image (mise.toml pins it); the npm cache
+      # persists as the /opt/ci-cache/npm host mount above.
       - name: Install dependencies
         run: npm ci
         working-directory: docs
@@ -53,7 +57,9 @@ jobs:
   deploy:
     name: Deploy
     needs: build
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

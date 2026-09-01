@@ -10,6 +10,16 @@ on:
 permissions:
   contents: read
 
+# Jobs run in the ci-ax-go container (public GHCR, built by
+# build-ci-image.yml) on the dedicated self-hosted runner. Container jobs
+# default run steps to `sh`, unlike hosted runners' bash — restore bash
+# (with -e and pipefail) so script semantics don't change. Go build/module
+# caches persist as host bind mounts under /opt/ci-cache; the container
+# rootfs is disposable.
+defaults:
+  run:
+    shell: bash
+
 env:
   # Bypass the Go proxy for rshade modules - fetch directly from GitHub.
   GOPRIVATE: github.com/rshade/*
@@ -17,17 +27,22 @@ env:
 jobs:
   test:
     name: Test
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/go-build:/github/home/.cache/go-build
+        - /opt/ci-cache/go-mod:/github/home/go/pkg/mod
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Set up mise (Go)
-        uses: jdx/mise-action@v4
-        with:
-          install_args: go
+      # The image bakes the mise.toml pins; this no-ops when image and repo
+      # agree, and downloads what a newer mise.toml added when they do not.
+      - name: Sync pinned toolchain
+        run: mise install
 
       - name: Run tests with race detector and coverage
         run: |
@@ -66,7 +81,12 @@ jobs:
   # construction.
   test-tags:
     name: Test (${{ matrix.tags }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/go-build:/github/home/.cache/go-build
+        - /opt/ci-cache/go-mod:/github/home/go/pkg/mod
     strategy:
       # fail-fast: false so one broken configuration doesn't mask the others -
       # knowing which specific tag combination broke is the point.
@@ -80,10 +100,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up mise (Go)
-        uses: jdx/mise-action@v4
-        with:
-          install_args: go
+      # The image bakes the mise.toml pins; this no-ops when image and repo
+      # agree, and downloads what a newer mise.toml added when they do not.
+      - name: Sync pinned toolchain
+        run: mise install
 
       - name: Run tests with race detector
         run: go test -race -tags='${{ matrix.tags }}' ./...
@@ -94,17 +114,22 @@ jobs:
   bench:
     name: Performance Regression Budget
     if: github.event_name == 'pull_request'
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/go-build:/github/home/.cache/go-build
+        - /opt/ci-cache/go-mod:/github/home/go/pkg/mod
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
-      - name: Set up mise (Go)
-        uses: jdx/mise-action@v4
-        with:
-          install_args: go
+      # The image bakes the mise.toml pins; this no-ops when image and repo
+      # agree, and downloads what a newer mise.toml added when they do not.
+      - name: Sync pinned toolchain
+        run: mise install
 
       - name: Enforce performance regression budget
         env:
@@ -113,15 +138,38 @@ jobs:
 
   lint:
     name: Lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/go-build:/github/home/.cache/go-build
+        - /opt/ci-cache/go-mod:/github/home/go/pkg/mod
+        - /opt/ci-cache/golangci-lint:/github/home/.cache/golangci-lint
+        - /opt/ci-cache/npm:/github/home/.npm
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up mise (Go, golangci-lint, actionlint)
-        uses: jdx/mise-action@v4
-        with:
-          install_args: go golangci-lint actionlint
+      - name: Sync pinned toolchain
+        run: mise install
+
+      # The golangci-lint cache persists as a host volume, whose facts are
+      # only valid for the linter version and config that computed them —
+      # stale cross-generation facts produce false positives, not misses.
+      # Wipe the volume's contents (never the directory: it is the bind
+      # mount point, and unlinking it fails with EBUSY) when mise.toml or
+      # .golangci.yml changes.
+      - name: Invalidate lint cache across tool or config generations
+        run: |
+          set -euo pipefail
+          cache=$HOME/.cache/golangci-lint
+          stamp=$cache/.config-stamp
+          want=$(cat mise.toml .golangci.yml | sha256sum | cut -c1-16)
+          if [ "$(cat "$stamp" 2>/dev/null || true)" != "$want" ]; then
+            mkdir -p "$cache"
+            find "$cache" -mindepth 1 -delete
+            printf '%s' "$want" > "$stamp"
+          fi
 
       - name: Run golangci-lint
         run: golangci-lint run --timeout=5m
@@ -142,7 +190,13 @@ jobs:
   # (those are tag-independent and must not run four times).
   lint-tags:
     name: Lint (${{ matrix.tags }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/go-build:/github/home/.cache/go-build
+        - /opt/ci-cache/go-mod:/github/home/go/pkg/mod
+        - /opt/ci-cache/golangci-lint:/github/home/.cache/golangci-lint
     strategy:
       fail-fast: false
       matrix:
@@ -154,10 +208,21 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up mise (Go, golangci-lint)
-        uses: jdx/mise-action@v4
-        with:
-          install_args: go golangci-lint
+      - name: Sync pinned toolchain
+        run: mise install
+
+      # Same stamp-file invalidation as the lint job above, same reasons.
+      - name: Invalidate lint cache across tool or config generations
+        run: |
+          set -euo pipefail
+          cache=$HOME/.cache/golangci-lint
+          stamp=$cache/.config-stamp
+          want=$(cat mise.toml .golangci.yml | sha256sum | cut -c1-16)
+          if [ "$(cat "$stamp" 2>/dev/null || true)" != "$want" ]; then
+            mkdir -p "$cache"
+            find "$cache" -mindepth 1 -delete
+            printf '%s' "$want" > "$stamp"
+          fi
 
       - name: Run golangci-lint
         run: golangci-lint run --timeout=5m --build-tags=${{ matrix.tags }}
@@ -167,7 +232,11 @@ jobs:
   # here instead of corrupting the generated release notes.
   commitlint:
     name: Commit Lint
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/npm:/github/home/.npm
     if: github.event_name == 'pull_request'
     steps:
       - name: Checkout code
@@ -187,30 +256,38 @@ jobs:
 
   security:
     name: Security Scan
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/go-build:/github/home/.cache/go-build
+        - /opt/ci-cache/go-mod:/github/home/go/pkg/mod
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up mise (Go, govulncheck)
-        uses: jdx/mise-action@v4
-        with:
-          install_args: 'go "go:golang.org/x/vuln/cmd/govulncheck"'
+      - name: Sync pinned toolchain
+        run: mise install
 
       - name: Run govulncheck
         run: govulncheck ./...
 
   validate:
     name: Validation
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/go-build:/github/home/.cache/go-build
+        - /opt/ci-cache/go-mod:/github/home/go/pkg/mod
     steps:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up mise (Go)
-        uses: jdx/mise-action@v4
-        with:
-          install_args: go
+      # The image bakes the mise.toml pins; this no-ops when image and repo
+      # agree, and downloads what a newer mise.toml added when they do not.
+      - name: Sync pinned toolchain
+        run: mise install
 
       - name: Check go.mod matches mise.toml's pinned Go version
         run: |
