@@ -25,11 +25,16 @@ recovery/remediation fields (#27) — alongside dedicated unit tests for
 `examples/integration` Common DNA audit (#15), `SECURITY.md` (#19), the
 coverage-floor escalation trio for `internal/cli`/`internal/mcp`/`internal/schema`
 (#63–#65), and the CI performance regression budget (#22, `benchstat` via
-`internal/cmd/benchcheck`). **#18 (`internal/` migration audit) is now the
-active WIP in Immediate Focus** — promoted 2026-07-19 through its closed
-epic-parent #20 (directory-layout decision). A wave of 20 new AX-surface issues
-(#119–#138) was filed 2026-07-19 (verified against live code before filing) and
-is now tracked across Near-Term and Future Vision below.
+`internal/cmd/benchcheck`). #18 (`internal/` migration audit) shipped
+2026-07-23, closing the epic opened by #20; the agent-safety envelope's first
+entry, `--yes` no-prompt invariant (#121), shipped 2026-08-26, alongside two
+more deferred refactors (#69, #120). The `axtest` full-lifecycle test helper
+(#178, 2026-08-26) and the Guard/Perform audit-logging variant (#179,
+2026-08-28) shipped the same week. **#119 (`WithFlushFunc` `ExecuteOption`)
+is now the active WIP in Immediate Focus** — promoted 2026-08-30 as the
+smallest entry point in the governance queue. A wave of 20 new AX-surface
+issues (#119–#138) was filed 2026-07-19 (verified against live code before
+filing) and is now tracked across Near-Term and Future Vision below.
 
 ## Vision
 
@@ -42,38 +47,25 @@ primitives, and short-lived-process-correct observability.
 
 Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
 
-- [ ] #18 Move remaining non-public helpers under `internal/` before v1.0 [L]
-  — keep drawing the public-API boundary while it's still cheap. Unblocked by
-  #17/#20 (directory-layout decision, closed 2026-06-29).
-  *Promoted by /roadmap sync on 2026-07-19 — epic-promotion-eligible slot
-  (epic-parent #20 closed); leading candidate now that #22 has shipped.*
+- [ ] #119 `WithFlushFunc` ExecuteOption to drain `ax.Flush` on Execute
+  shutdown [S] — deterministic telemetry flush on the Execute lifecycle.
+  *Promoted by /roadmap sync on 2026-08-30 — smallest entry point in the
+  governance queue (effort/small, no blockers) now that #18 has shipped.*
 
 ## Near-Term Vision (v0.3.0 — governance queue)
 
-**On deck — next promotion:** with #18 now the active WIP, the agent-safety
-envelope trio (#121/#122/#123) filed 2026-07-19 is the leading theme for the
-following slot; #121 (`--yes` no-prompt invariant) is the smallest entry point.
+**On deck — next promotion:** with #119 now the active WIP, #123 (structured
+warnings + `--strict` escalation) is the leading candidate for the following
+slot — a natural follow-on now that #121 (`--yes` no-prompt invariant) has
+shipped.
 
 ### Agent-safety envelope (new — 2026-07-19)
 
-- [ ] #121 `--yes` no-prompt invariant (`confirmation_required` envelope) [M] —
-  guarantee non-interactive runs never block on a prompt; surface a structured
-  `confirmation_required` signal instead of hanging.
 - [ ] #122 Dry-run-by-default with `--apply` and declared side-effect class [L]
   — invert the default so mutating commands are safe unless explicitly applied.
   Extends the shipped #13 `--dry-run` guards.
 - [ ] #123 Structured warnings on the success envelope + `--strict` escalation
   [M] — non-fatal warnings an agent can read, with opt-in promotion to failure.
-
-### Governance & library queue
-
-- [ ] #69 `covercheck` type-design hardening — derived fields as methods +
-  integer floor comparison [S] — two deferred refactors from spec/009; no
-  public-API impact.
-- [ ] #119 `WithFlushFunc` ExecuteOption to drain `ax.Flush` on Execute
-  shutdown [S] — deterministic telemetry flush on the Execute lifecycle.
-- [ ] #120 Reconcile SPECKIT plan pointers + dedupe spec dir numbering
-  (011/014) [S] — docs/spec housekeeping; no runtime impact.
 
 ## Future Vision (Long-Term)
 
@@ -160,16 +152,57 @@ a runtime contract.*
 
 ### v1.0 readiness & governance
 
-- [ ] #16 `__schema` non-deterministic-field enumeration [M] — declare a
-  `non_deterministic_fields` array per command so agents diff safely. Pairs
-  with #5.
 - [ ] #24 Supply chain: SBOM + signed releases [M] — CycloneDX SBOM and cosign
   keyless signing on release artifacts.
+
+### Recurring maintenance
+
+*Not issue-tracked — release-cadence upkeep, no `roadmap/*` label sync.*
+
+- Re-run the Go Proverbs audit at each `0.MINOR.0` release and refresh both
+  outputs: the Diátaxis explanation page
+  ([docs explanation: ax-go and the Go Proverbs](./docs/src/content/docs/explanation/go-proverbs-audit.md))
+  and the shareable artifact mirror it references. The audit's snapshot facts
+  (dependency count, `fmt.Errorf` totals, interface method counts, panic/unsafe
+  greps) drift with the code; the design commitments are the durable part.
+  Last run 2026-08-31 at `v0.5.0`.
 
 ## Completed Milestones
 
 ### 2026-Q3
 
+- [x] #69 `covercheck` type-design hardening — derived fields as methods +
+  integer floor comparison [S] — two deferred refactors from spec/009; no
+  public-API impact. Closed 2026-08-30.
+- [x] #120 Reconcile SPECKIT plan pointers + dedupe spec dir numbering
+  (011/014) [S] — docs/spec housekeeping; no runtime impact. Closed
+  2026-08-30.
+- [x] #179 Guard/Perform audit-logging variant [M] — built-in structured
+  "about to / did / failed" logging on the dry-run guards. Closed 2026-08-28.
+- [x] #178 `axtest` full-lifecycle test helper [M] — run a command through
+  the real `ax.Execute` lifecycle and decode the envelope in tests. Closed
+  2026-08-26.
+- [x] #121 `--yes` no-prompt invariant (`confirmation_required` envelope) [M]
+  — non-interactive runs never block on a prompt; a blocked machine-mode
+  confirmation fails fast with a structured `confirmation_required` signal.
+  Closed 2026-08-26.
+- [x] #144 Import-isolated `logging` package [L] — zerolog logging + trace
+  correlation without the root runtime tree; a logging-only consumer shrinks
+  −81.2% (12.0 MB → 2.26 MB), gated on every PR by `make size-check`. Shipped
+  via [`specs/017-import-isolated-logging`](specs/017-import-isolated-logging/).
+  Closed 2026-07-24.
+- [x] #143 Independent OTLP/gRPC opt-out build tags [L] — `ax_no_otlp` +
+  `ax_no_grpc` let root-facade consumers drop the gRPC/protobuf tree. Closed
+  2026-07-23.
+- [x] #18 Move remaining non-public helpers under `internal/` before v1.0 [L]
+  — completed the public-API boundary audit unblocked by #17/#20. Closed
+  2026-07-23.
+- [x] #145 Docs: import-isolated packages provide no live tracing [S] —
+  states the isolation trade-off explicitly in the package docs. Closed
+  2026-07-23.
+- [x] #16 `__schema` non-deterministic-field enumeration [M] — declares a
+  `non_deterministic_fields` array per command so agents diff safely. Closed
+  2026-07-22.
 - [x] #22 Performance regression budget: `benchstat` in CI [M] —
   `internal/cmd/benchcheck` compares hot-path benchmark deltas (logger hook,
   `__schema` reflection, error-envelope marshal, Hujson parse) against a
@@ -231,19 +264,6 @@ a runtime contract.*
 - [x] #26 go-apidiff in CI [M] — catch breaking public-API changes on PRs with a
   label-gated override; scoped to the public surface (`ax` + the `contract`,
   `config`, `schema`, `id` packages). Closed 2026-06-26.
-- [x] #144 Import-isolated `logging` package [L] — the zerolog logger, stream
-  separation, and trace correlation without the OTel SDK, exporters, gRPC,
-  protobuf, MCP SDK, Cobra, or `net/http`. A logging-only consumer drops from
-  12,013,833 to 2,261,257 bytes (−81.2%) and from 410 to 103 linked packages,
-  gated on every PR by `make size-check` against two committed probe programs.
-  Root `ax` keeps every symbol through identity-preserving aliases, so existing
-  adopters change nothing. Also remediates a standing Constitution Principle VIII
-  violation: the two `*lokiWriter` type assertions in `logger.go` are replaced by
-  the generic `Sink`/`LabelSanctioner` seam, so "never couple a log-shipping
-  backend into the core logger" is now enforced by `internal/logcore`'s C-13
-  source assertion rather than by convention alone. Shipped via
-  [`specs/017-import-isolated-logging`](specs/017-import-isolated-logging/).
-  Closed 2026-07-22.
 - [x] #78 Import-isolated public contract packages (`contract/`, `config/`,
   `schema/`, `id/`) [L] — narrow public packages for thin consumers, fully
   import-isolated from the root runtime facade, telemetry, and gRPC adapters.
