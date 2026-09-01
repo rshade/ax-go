@@ -14,6 +14,11 @@ on:
 permissions:
   contents: read
 
+# Container jobs default run steps to `sh`; restore bash. See ci.yml.
+defaults:
+  run:
+    shell: bash
+
 concurrency:
   group: apidiff-${{ github.event.pull_request.number }}
   cancel-in-progress: true
@@ -25,7 +30,12 @@ env:
 jobs:
   apidiff:
     name: Public API Diff
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/go-build:/github/home/.cache/go-build
+        - /opt/ci-cache/go-mod:/github/home/go/pkg/mod
     permissions:
       contents: read
       pull-requests: write
@@ -36,10 +46,8 @@ jobs:
           # Full history so the PR base commit is available to diff against.
           fetch-depth: 0
 
-      - name: Set up mise (Go)
-        uses: jdx/mise-action@v4
-        with:
-          install_args: go
+      - name: Sync pinned toolchain
+        run: mise install
 
       - name: Verify public package allowlist is current
         run: |

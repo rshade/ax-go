@@ -3,7 +3,7 @@ name: Cross-Compile Matrix
 # Verifies ax-go builds cleanly across the standard Go target matrix
 # (linux/darwin/windows x amd64/arm64). Isolated from ci.yml, mirroring
 # apidiff.yml's pattern of separating distinct CI concerns into their own
-# file. Runs on a single ubuntu-latest runner per combination: Go
+# file. Runs on a single self-hosted linux runner per combination: Go
 # cross-compiles pure-Go code via GOOS/GOARCH env vars and this module has
 # no cgo dependencies, so native macOS/Windows runners aren't needed.
 
@@ -17,6 +17,11 @@ on:
 permissions:
   contents: read
 
+# Container jobs default run steps to `sh`; restore bash. See ci.yml.
+defaults:
+  run:
+    shell: bash
+
 env:
   # Bypass the Go proxy for rshade modules - fetch directly from GitHub.
   GOPRIVATE: github.com/rshade/*
@@ -24,7 +29,12 @@ env:
 jobs:
   crosscompile:
     name: Cross-compile (${{ matrix.goos }}/${{ matrix.goarch }}, ${{ matrix.tags }})
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
+      volumes:
+        - /opt/ci-cache/go-build:/github/home/.cache/go-build
+        - /opt/ci-cache/go-mod:/github/home/go/pkg/mod
     strategy:
       # fail-fast: false so one broken combination doesn't cancel the
       # others - the point of the matrix is visibility into which
@@ -48,10 +58,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
-      - name: Set up mise (Go)
-        uses: jdx/mise-action@v4
-        with:
-          install_args: go
+      - name: Sync pinned toolchain
+        run: mise install
 
       # "default" is the sentinel for the no-tags build. GOFLAGS carries the
       # optional tag argument without shell word splitting; an empty value

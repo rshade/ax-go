@@ -7,10 +7,17 @@ on:
 permissions:
   pull-requests: write
 
+# Container jobs default run steps to `sh`; restore bash. See ci.yml.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   post-checklist:
     if: "github.event.label.name == 'autorelease: pending'"
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
+    container:
+      image: ghcr.io/rshade/ci-ax-go:latest
     steps:
       - name: Find existing checklist comment
         uses: peter-evans/find-comment@v4
