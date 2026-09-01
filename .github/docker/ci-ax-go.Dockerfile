@@ -11,6 +11,7 @@ FROM ubuntu:26.04
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates curl git make build-essential jq unzip zip zstd xz-utils \
+    gnupg \
     && rm -rf /var/lib/apt/lists/*
 
 ENV MISE_VERSION=v2026.8.15
