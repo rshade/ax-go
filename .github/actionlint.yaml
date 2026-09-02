@@ -1,0 +1,7 @@
+self-hosted-runner:
+  # Labels the dedicated runner VMs register with. `perf` selects the
+  # pinned benchmark runner (see the bench job's comment in ci.yml);
+  # `proxmox` is the fleet-wide label all pool runners carry.
+  labels:
+    - perf
+    - proxmox

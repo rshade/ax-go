@@ -83,6 +83,11 @@ bench:
 	@echo "Running benchmarks with -cpu=$(BENCH_CPU)..."
 	go test $(BENCH_FLAGS) ./...
 
+# Set BENCH_BASELINE_CACHE to a directory to reuse baseline measurements
+# across runs, keyed by resolved base commit + Go version + compare flags.
+# Benchmark numbers are only comparable when measured on the same machine,
+# so point this at machine-local storage (CI mounts the perf runner's own
+# disk); never share a baseline cache across hosts.
 .PHONY: bench-check
 bench-check:
 	@echo "Checking performance regression budget against $(BENCH_BASE_REF) with -cpu=$(BENCH_CPU)..."
@@ -100,15 +105,30 @@ bench-check:
 		echo "bench-check: baseline ref '$$base_ref' not found; fetch main or set BENCH_BASE_REF=<ref>" >&2; \
 		exit 2; \
 	fi; \
-	if ! git worktree add --detach --quiet "$$base_worktree" "$$base_ref"; then \
-		echo "bench-check: could not create baseline worktree for '$$base_ref'" >&2; \
-		exit 2; \
+	resolved=$$(git rev-parse "$$base_ref^{commit}"); \
+	cache_file=""; \
+	if [ -n "$(BENCH_BASELINE_CACHE)" ]; then \
+		mkdir -p "$(BENCH_BASELINE_CACHE)"; \
+		flags_key=$$(printf '%s' '$(BENCH_COMPARE_FLAGS)' | sha256sum | cut -c1-8); \
+		cache_file="$(BENCH_BASELINE_CACHE)/$$resolved-$$(go env GOVERSION)-$$flags_key.txt"; \
 	fi; \
-	echo "bench-check: capturing baseline from $$base_ref"; \
-	if ! (cd "$$base_worktree" && go test $(BENCH_COMPARE_FLAGS) ./...) > "$$base_out"; then \
-		echo "bench-check: baseline benchmark run failed (see output below); performance budget was not checked" >&2; \
-		cat "$$base_out" >&2; \
-		exit 1; \
+	if [ -n "$$cache_file" ] && [ -s "$$cache_file" ]; then \
+		echo "bench-check: using cached baseline for $$resolved"; \
+		cp "$$cache_file" "$$base_out"; \
+	else \
+		if ! git worktree add --detach --quiet "$$base_worktree" "$$base_ref"; then \
+			echo "bench-check: could not create baseline worktree for '$$base_ref'" >&2; \
+			exit 2; \
+		fi; \
+		echo "bench-check: capturing baseline from $$base_ref"; \
+		if ! (cd "$$base_worktree" && go test $(BENCH_COMPARE_FLAGS) ./...) > "$$base_out"; then \
+			echo "bench-check: baseline benchmark run failed (see output below); performance budget was not checked" >&2; \
+			cat "$$base_out" >&2; \
+			exit 1; \
+		fi; \
+		if [ -n "$$cache_file" ]; then \
+			cp "$$base_out" "$$cache_file"; \
+		fi; \
 	fi; \
 	echo "bench-check: capturing current worktree"; \
 	if ! go test $(BENCH_COMPARE_FLAGS) ./... > "$$current_out"; then \
