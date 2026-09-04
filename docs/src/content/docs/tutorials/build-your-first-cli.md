@@ -33,7 +33,7 @@ of itself — without you writing any of that plumbing.
 
 ## Prerequisites
 
-- **Go 1.26 or newer** installed (`go version` to check).
+- **Go 1.27 or newer** installed (`go version` to check).
 - A terminal.
 - Basic familiarity with Cobra commands is helpful but not required — you will
   copy the small amount you need.
