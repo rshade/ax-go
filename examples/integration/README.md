@@ -19,9 +19,11 @@ only need shared machine contracts can instead use the isolated contract package
 ## Related examples
 
 This example is deliberately the **maximal** one: it exercises every Core AX
-Mandate through the root facade, including Loki direct push and `ax.Flush`, and
-that coverage is what `AUDIT.md` maps. Two much smaller programs exist alongside
-it for a different purpose:
+Mandate through the root facade, including Loki direct push and Execute-owned
+`ax.Flush` registration through `ax.WithFlushFunc`, and that coverage is what
+`AUDIT.md` maps. The logger remains late-bound inside `RunE`; `ax.Execute`
+supplies the bounded shutdown context and keeps flush errors diagnostic-only.
+Two much smaller programs exist alongside it for a different purpose:
 
 | Example | Imports | Purpose |
 | --- | --- | --- |

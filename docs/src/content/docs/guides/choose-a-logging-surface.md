@@ -94,6 +94,20 @@ alone: the only destination that buffers anything is the Loki sink, and it is
 unreachable from here. Calling it unconditionally in your shutdown path is safe,
 and keeps working unchanged if you later migrate to the root facade.
 
+For a root-facade CLI whose lifecycle runs through `ax.Execute`, register the
+drain once at that boundary:
+
+```go
+ax.Execute(ctx, root, ax.WithFlushFunc(func(shutdownCtx context.Context) error {
+	return ax.Flush(shutdownCtx, logger)
+}))
+```
+
+`Execute` supplies a fresh bounded context and reports a flush failure as a
+sanitized stderr diagnostic without changing the command exit code. Direct
+`logging.Flush`/`ax.Flush` calls below remain the right demonstration of the
+surfaces' shared type identity and for programs with another lifecycle owner.
+
 ## Mixing both is fine
 
 The two surfaces name **one** logger. `ax.Logger` and `logging.Logger` are the

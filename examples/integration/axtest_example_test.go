@@ -17,10 +17,11 @@ import (
 // reaches the typed payload with no hand-declared wrapper struct.
 func TestConfirmCommandThroughAxtest(t *testing.T) {
 	ctx := context.Background()
+	blockedRoot, _ := newRootCommand(strings.NewReader(""), "test", ax.NewEntityID)
 
 	blocked := axtest.Run(
 		ctx, t,
-		newRootCommand(strings.NewReader(""), "test", ax.NewEntityID),
+		blockedRoot,
 		[]string{"confirm", "--format=json"},
 	)
 	if blocked.ExitCode != ax.ExitValidation {
@@ -30,9 +31,10 @@ func TestConfirmCommandThroughAxtest(t *testing.T) {
 		)
 	}
 
+	approvedRoot, _ := newRootCommand(strings.NewReader(""), "test", ax.NewEntityID)
 	data, exitCode := axtest.RunAndDecode[confirmationPayload](
 		ctx, t,
-		newRootCommand(strings.NewReader(""), "test", ax.NewEntityID),
+		approvedRoot,
 		[]string{"confirm", "--format=json", "--yes"},
 	)
 	if exitCode != ax.ExitSuccess {

@@ -333,9 +333,11 @@ func ExampleWithLokiFromEnv() {
 	// Output:
 }
 
-// ExampleFlush shows the shutdown pattern: Flush drains any buffered Loki log
-// entries before the process exits. When no Loki sink is active (AX_LOKI_URL
-// unset), Flush is a no-op that returns nil immediately.
+// ExampleFlush shows the direct shutdown primitive: Flush drains any buffered
+// Loki log entries before the process exits. When Execute owns the CLI
+// lifecycle, register this call with WithFlushFunc instead of hand-writing the
+// timeout/defer. Direct Flush remains useful for other lifecycle owners. When no
+// Loki sink is active (AX_LOKI_URL unset), it returns nil immediately.
 func ExampleFlush() {
 	os.Unsetenv("AX_LOKI_URL") // ensure no-op for this example
 	var buf bytes.Buffer
@@ -444,15 +446,20 @@ func ExamplePerformWithAudit() {
 // ExampleExecute wraps a Cobra root command with the full AX lifecycle —
 // telemetry, mode resolution, and idempotency-key injection — and maps the
 // result to a deterministic exit code instead of exiting the process. The
-// command reads the resolved values back out of its context. With an explicit
-// --idempotency-key and a buffered, non-TTY stdout the run is fully
-// deterministic: the payload is the only stdout output and stderr stays empty.
+// command reads the resolved values back out of its context and creates its
+// logger after Execute has decorated that context. WithFlushFunc then drains
+// the late-bound logger during shutdown. With an explicit --idempotency-key and
+// a buffered, non-TTY stdout the run is fully deterministic: the payload is the
+// only stdout output and stderr stays empty.
 func ExampleExecute() {
 	var stdout, stderr bytes.Buffer
+	var logger ax.Logger
+	flushed := false
 
 	root := &cobra.Command{
 		Use: "app",
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			logger = ax.NewLogger(cmd.Context(), ax.WithLoggerWriter(cmd.ErrOrStderr()))
 			mode, _ := ax.ModeFromContext(cmd.Context())
 			key, _ := ax.IdempotencyKeyFromContext(cmd.Context())
 			return ax.WriteJSON(cmd.OutOrStdout(), struct {
@@ -475,14 +482,20 @@ func ExampleExecute() {
 		ax.WithStderr(&stderr),
 		ax.WithEnv(func(string) string { return "" }),
 		ax.WithStdoutIsTTY(false),
+		ax.WithFlushFunc(func(shutdownCtx context.Context) error {
+			flushed = true
+			return ax.Flush(shutdownCtx, logger)
+		}),
 	)
 
 	fmt.Println("exit:", code)
 	fmt.Print(stdout.String())
+	fmt.Println("flushed:", flushed)
 	fmt.Println("stderr bytes:", stderr.Len())
 	// Output:
 	// exit: 0
 	// {"mode":"json","dry_run":true,"key":"abc"}
+	// flushed: true
 	// stderr bytes: 0
 }
 

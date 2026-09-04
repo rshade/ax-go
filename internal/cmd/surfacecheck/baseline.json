@@ -680,6 +680,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:WithFlushFunc",
+          "signature": "func(func(context.Context) error) ExecuteOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:WithHTTPTimeout",
           "signature": "func(time.Duration) HTTPClientOption",
           "configurations": "all",

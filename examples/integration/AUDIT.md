@@ -87,4 +87,7 @@ mandates would break the `make size-check` comparison they exist to serve.
 Log shipping (`ax.WithLokiFromEnv`, `ax.Flush`) stays exclusively a root-facade
 capability and is audited here only, because the isolated surface cannot reach
 it — the Loki sink needs `net/http`, which is precisely what that surface
-excludes.
+excludes. The root command returns a late-bound flush closure and
+`runWithEntityID` registers it with `ax.WithFlushFunc`, proving `ax.Execute`
+owns the bounded drain on success and error paths without a command-local
+timeout/defer.
