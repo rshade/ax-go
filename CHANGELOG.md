@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.6.0](https://github.com/rshade/ax-go/compare/v0.5.0...v0.6.0) (2026-09-04)
+
+
+### Added
+
+* **execute:** add WithFlushFunc shutdown callback to Execute ([#213](https://github.com/rshade/ax-go/issues/213)) ([a59a50a](https://github.com/rshade/ax-go/commit/a59a50ac22e7b476f18cd21ee2b9515eb9a764c5)), closes [#119](https://github.com/rshade/ax-go/issues/119)
+
+
+### Fixed
+
+* **build:** bump go.mod to 1.27.1 to match mise.toml ([#216](https://github.com/rshade/ax-go/issues/216)) ([617f83f](https://github.com/rshade/ax-go/commit/617f83f81c993c1afe277279d01b53ffc73f2f95))
+* **deps:** update dependency @astrojs/starlight to ^0.42.0 ([#208](https://github.com/rshade/ax-go/issues/208)) ([1b783eb](https://github.com/rshade/ax-go/commit/1b783eb36aa4b4126075e02d9d7b7fcc3cac7e3b))
+* **deps:** update dependency starlight-links-validator to ^0.26.0 ([#209](https://github.com/rshade/ax-go/issues/209)) ([2629551](https://github.com/rshade/ax-go/commit/26295513bd9a371c710ae60861e2848c93ed728d))
+
+
+### Documentation
+
+* add Go Proverbs audit page and sync roadmap through v0.5.0 ([#217](https://github.com/rshade/ax-go/issues/217)) ([c5a5bd6](https://github.com/rshade/ax-go/commit/c5a5bd6a4a9ca52dec29c5185508ce5b54c1b4e9))
+
 ## [0.5.0](https://github.com/rshade/ax-go/compare/v0.4.0...v0.5.0) (2026-08-30)
 
 
