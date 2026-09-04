@@ -486,8 +486,9 @@ func (lw *lokiWriter) diagf(format string, args ...any) {
 // malformed, the option is a no-op and a warning is written to the logger's
 // configured writer. Push is non-blocking; failures are reported as bounded
 // diagnostics on the logger's configured writer (fail-open, FR-005) and never
-// affect the CLI exit code. The caller must invoke ax.Flush to drain buffered
-// entries at shutdown.
+// affect the CLI exit code. A caller using Execute should register ax.Flush
+// through WithFlushFunc; other lifecycle owners must invoke ax.Flush directly
+// to drain buffered entries at shutdown.
 //
 // Push diagnostics (connection failures, non-2xx responses) resolve the
 // configured writer lazily, so LoggerOption order between WithLokiFromEnv and

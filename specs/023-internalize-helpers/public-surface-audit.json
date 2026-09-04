@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "audited_at": "2026-08-28",
+  "audited_at": "2026-09-01",
   "records": [
     {
       "id": "const:ConfirmationApproved",
@@ -2123,6 +2123,25 @@
       "internal_target": "",
       "replacement": "",
       "compatibility_strategy": "Keep the public selector unchanged.",
+      "lifecycle": "live",
+      "first_published": "",
+      "deprecated_in": "",
+      "removed_in": "",
+      "downstream_checked_at": "",
+      "downstream_evidence": []
+    },
+    {
+      "id": "func:WithFlushFunc",
+      "kind": "func",
+      "owner": "",
+      "name": "WithFlushFunc",
+      "signature": "func(func(context.Context) error) ExecuteOption",
+      "classification": "supported",
+      "rationale": "Documented Execute shutdown callback contract.",
+      "disposition": "keep-public",
+      "internal_target": "",
+      "replacement": "",
+      "compatibility_strategy": "Keep the additive Execute option stable.",
       "lifecycle": "live",
       "first_published": "",
       "deprecated_in": "",

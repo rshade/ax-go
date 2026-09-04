@@ -29,6 +29,14 @@ type executeConfig struct {
 	stdoutIsTTY     *bool
 	version         string
 	shutdownTimeout time.Duration
+	flushFunc       func(context.Context) error
+	// shutdownTelemetry stays per-execution so tests can prove its deadline is
+	// created after flush without mutable package-level hooks.
+	shutdownTelemetry func(context.Context, *Telemetry) error
+}
+
+func defaultExecuteTelemetryShutdown(ctx context.Context, telemetry *Telemetry) error {
+	return telemetry.Shutdown(ctx)
 }
 
 // WithStdin sets the input stream for Cobra.
@@ -75,10 +83,31 @@ func WithVersion(version string) ExecuteOption {
 	}
 }
 
-// WithTelemetryShutdownTimeout sets the OTel shutdown timeout.
+// WithTelemetryShutdownTimeout sets the duration used for the independent
+// buffered-output flush and OTel shutdown timeout windows. A non-positive
+// timeout is normalized to the default budget, matching how StartTelemetry
+// resolves its own shutdown budget; a zero window would otherwise hand both
+// shutdown paths an already-expired context and silently skip the drain.
 func WithTelemetryShutdownTimeout(timeout time.Duration) ExecuteOption {
 	return func(cfg *executeConfig) {
 		cfg.shutdownTimeout = timeout
+	}
+}
+
+// WithFlushFunc registers flush to run once during Execute shutdown after
+// command execution and before telemetry shutdown. Flush receives a fresh
+// context bounded by the duration configured with
+// WithTelemetryShutdownTimeout. Its timeout window is independent of the
+// telemetry shutdown window.
+//
+// If flush returns an error, Execute writes a control-character-sanitized
+// diagnostic to its configured stderr without changing stdout or the command
+// exit code. Sanitization is not redaction; flush errors must not contain PII,
+// secrets, tokens, or credentials. A nil flush disables the hook. If supplied
+// more than once, the last WithFlushFunc option wins.
+func WithFlushFunc(flush func(context.Context) error) ExecuteOption {
+	return func(cfg *executeConfig) {
+		cfg.flushFunc = flush
 	}
 }
 
@@ -94,13 +123,20 @@ func WithTelemetryShutdownTimeout(timeout time.Duration) ExecuteOption {
 // When the command returns an *Error, Execute normalizes a copy of it (filling
 // in trace ID, tool, and version) before writing the envelope to stderr; the
 // caller's *Error value is never mutated.
+//
+// When WithFlushFunc registers a callback, Execute invokes it once with a fresh,
+// bounded context after the root command span ends and before telemetry
+// shutdown. Flush and telemetry receive independent timeout windows. A flush
+// failure is a sanitized stderr diagnostic only and never changes the command's
+// stdout or deterministic exit code.
 func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) int {
 	cfg := executeConfig{
-		stdin:           os.Stdin,
-		stdout:          os.Stdout,
-		stderr:          os.Stderr,
-		env:             os.Getenv,
-		shutdownTimeout: defaultTelemetryShutdownTimeout,
+		stdin:             os.Stdin,
+		stdout:            os.Stdout,
+		stderr:            os.Stderr,
+		env:               os.Getenv,
+		shutdownTimeout:   defaultTelemetryShutdownTimeout,
+		shutdownTelemetry: defaultExecuteTelemetryShutdown,
 	}
 	for _, opt := range opts {
 		opt(&cfg)
@@ -113,6 +149,12 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	}
 	if cfg.version == "" {
 		cfg.version = ResolveVersion("")
+	}
+	// Normalize once, before StartTelemetry and both shutdown defers read it, so
+	// a non-positive option value cannot hand the flush and telemetry windows an
+	// already-expired context.
+	if cfg.shutdownTimeout <= 0 {
+		cfg.shutdownTimeout = defaultTelemetryShutdownTimeout
 	}
 	// Serialize all writes to stderr. OTel exporters, zerolog hooks, and the
 	// shutdown diagnostic may write concurrently; a mutex writer prevents
@@ -130,9 +172,20 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	defer func() {
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), cfg.shutdownTimeout)
 		defer cancel()
-		if shutdownErr := telemetry.Shutdown(shutdownCtx); shutdownErr != nil {
+		if shutdownErr := cfg.shutdownTelemetry(shutdownCtx, telemetry); shutdownErr != nil {
 			fmt.Fprintf(cfg.stderr, "ax: otel shutdown failed: %s\n",
 				internaltelemetry.SanitizeDiagnostic(shutdownErr.Error()))
+		}
+	}()
+	defer func() {
+		if cfg.flushFunc == nil {
+			return
+		}
+		flushCtx, cancel := context.WithTimeout(context.Background(), cfg.shutdownTimeout)
+		defer cancel()
+		if flushErr := cfg.flushFunc(flushCtx); flushErr != nil {
+			fmt.Fprintf(cfg.stderr, "ax: flush failed: %s\n",
+				internaltelemetry.SanitizeDiagnostic(flushErr.Error()))
 		}
 	}()
 

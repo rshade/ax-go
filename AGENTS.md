@@ -189,6 +189,35 @@ conflicts with the constitution, the constitution wins.
    gate across all build configurations and platforms. See **Build
    Configurations** below.
 
+### Mandatory Spec Kit Workflow
+
+For every feature governed by Spec Kit, especially a public API or
+machine-contract change, complete the stages in this order:
+
+1. Run `speckit-specify`.
+2. Review the specification for unresolved material questions. If any
+   requirement, edge case, public contract, security behavior, failure
+   behavior, or acceptance criterion is ambiguous, run `speckit-clarify` and
+   encode the answers in `spec.md` before proceeding. If no material questions
+   remain, record that clarification was not required.
+3. Run `speckit-plan`.
+4. Run `speckit-tasks`.
+5. Run `speckit-analyze`. This stage is mandatory and MUST NOT be skipped.
+6. Remediate every valid analysis finding, including every requirement/task
+   coverage gap. Do not begin implementation while any critical or high
+   finding or coverage gap remains unresolved.
+7. Rerun `speckit-analyze` after remediation and continue only when the
+   analysis is clean. If `spec.md`, `plan.md`, or `tasks.md` changes after a
+   clean analysis, rerun `speckit-analyze` before implementation.
+8. Run `speckit-implement`.
+9. Run every repository validation gate required by this file.
+
+Do not treat completion of one Spec Kit skill as completion of an end-to-end
+feature request. Continue through the required stages unless the user
+explicitly requested only one artifact or stage. `speckit-clarify` is
+conditional on material ambiguity; `speckit-analyze` is always required after
+task generation and before implementation.
+
 Go, golangci-lint, actionlint, and govulncheck are pinned once in
 [`mise.toml`](mise.toml) — the single source of truth CI reads via
 `jdx/mise-action`. Run `make ensure` (requires [mise](https://mise.jdx.dev/))
@@ -808,5 +837,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/020-guard-audit-logging/plan.md
+at specs/024-execute-flush-hook/plan.md
 <!-- SPECKIT END -->

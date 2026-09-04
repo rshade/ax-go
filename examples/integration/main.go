@@ -8,7 +8,7 @@ import (
 	"io"
 	"os"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/spf13/cobra"
 
@@ -27,7 +27,6 @@ const crashCommandName = "crash"
 const patchConfigCommandName = "patch-config"
 const streamCommandName = "stream"
 const confirmCommandName = "confirm"
-const lokiFlushBudget = 3 * time.Second
 const fetchRetryAfterSeconds = 5
 
 // errSimulatedCrash is the sentinel cause wrapped by the crash command. It is a
@@ -98,7 +97,7 @@ func runWithEntityID(
 	resolved string,
 	newEntityID func() (string, error),
 ) int {
-	root := newRootCommand(stdin, resolved, newEntityID)
+	root, flush := newRootCommand(stdin, resolved, newEntityID)
 	root.SetArgs(args)
 
 	return ax.Execute(
@@ -109,6 +108,7 @@ func runWithEntityID(
 		ax.WithStderr(stderr),
 		ax.WithEnv(env),
 		ax.WithVersion(resolved),
+		ax.WithFlushFunc(flush),
 	)
 }
 
@@ -116,9 +116,11 @@ func newRootCommand(
 	stdin io.Reader,
 	resolved string,
 	newEntityID func() (string, error),
-) *cobra.Command {
+) (*cobra.Command, func(context.Context) error) {
 	var name string
 	var configPath string
+	var loggerMu sync.RWMutex
+	var logger ax.Logger
 
 	root := &cobra.Command{
 		Use:   appName,
@@ -136,7 +138,7 @@ func newRootCommand(
   ax-integration confirm --format=json --yes
   ax-integration __schema`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			logger := ax.NewLogger(
+			currentLogger := ax.NewLogger(
 				cmd.Context(),
 				ax.WithLoggerWriter(cmd.ErrOrStderr()),
 				ax.WithLoggerLabels(ax.Labels{
@@ -145,11 +147,9 @@ func newRootCommand(
 				}),
 				ax.WithLokiFromEnv(),
 			)
-			defer func() {
-				flushCtx, cancel := context.WithTimeout(context.Background(), lokiFlushBudget)
-				defer cancel()
-				_ = ax.Flush(flushCtx, logger)
-			}()
+			loggerMu.Lock()
+			logger = currentLogger
+			loggerMu.Unlock()
 
 			mode, _ := ax.ModeFromContext(cmd.Context())
 			entityID, err := newEntityID()
@@ -162,7 +162,7 @@ func newRootCommand(
 				return err
 			}
 
-			logger.Info(cmd.Context()).
+			currentLogger.Info(cmd.Context()).
 				Str("event", "integration_run").
 				Str("name", name).
 				Msg("integration example ran")
@@ -196,7 +196,12 @@ func newRootCommand(
 	// command tree as a live MCP server with no per-tool work (feature 011).
 	root.AddCommand(mcp.NewCommand(root, mcp.WithVersion(resolved)))
 
-	return root
+	return root, func(ctx context.Context) error {
+		loggerMu.RLock()
+		currentLogger := logger
+		loggerMu.RUnlock()
+		return ax.Flush(ctx, currentLogger)
+	}
 }
 
 func newConfirmCommand() *cobra.Command {

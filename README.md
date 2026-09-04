@@ -491,7 +491,8 @@ byte-identical to one emitted before these fields existed.
   observability IDs with resource/entity IDs.
 - **CLI framework:** built on Cobra ([ADR-0008](docs/adr/0008-cli-framework-cobra.md)).
   `ax.Execute()` wraps Cobra execution for mode resolution, schema wiring,
-  error-envelope output, and OTel flush-on-exit.
+  error-envelope output, optional `WithFlushFunc` buffered-output draining, and
+  OTel flush-on-exit.
 - **Structured logging:** `ax.NewLogger(ctx)` returns an `ax.Logger` backed by
   zerolog with trace correlation wired in (Constitution Principle VIII; the
   single-backend guardrail is Principle VI).
@@ -504,9 +505,15 @@ byte-identical to one emitted before these fields existed.
   human-readable span data to `stderr` for local debugging. Both destinations
   can be enabled together, all telemetry stays off `stdout`, and exporter
   failures degrade to a `stderr` diagnostic without changing the command's
-  `stdout` payload or exit code. Export attempts and shutdown are bounded by the
-  telemetry shutdown budget (default `2s`, configurable with
-  `ax.WithTelemetryShutdownTimeout`).
+  `stdout` payload or exit code. A callback registered with
+  `ax.WithFlushFunc` runs after the root span ends and before telemetry
+  shutdown; a callback error is a sanitized `stderr` diagnostic and never
+  changes the command exit code. The callback and telemetry each receive an
+  independent window using the shutdown duration (default `2s`, configurable
+  with `ax.WithTelemetryShutdownTimeout`), so a slow log drain cannot consume
+  telemetry's budget. Sanitization prevents control-character line forging but
+  is not redaction, so callback errors must not contain PII, secrets, tokens, or
+  credentials.
 - **Idiomatic Go:** package name is `ax`. Keep abstractions narrow and tied to
   accepted ADRs.
 
@@ -568,18 +575,42 @@ as a writable `var`, then use `ax.ResolveVersion`:
 ```go
 var version string // set by -ldflags "-X main.version=..."
 
-func run(ctx context.Context, root *cobra.Command) int {
+func run(ctx context.Context) int {
     resolved := ax.ResolveVersion(version)
+    var logger ax.Logger
 
-    logger := ax.NewLogger(ctx, ax.WithLoggerLabels(ax.Labels{
-        Application: "mytool",
-        Version:     resolved,
-    }))
-    _ = logger
+    root := &cobra.Command{
+        Use: "mytool",
+        RunE: func(cmd *cobra.Command, _ []string) error {
+            logger = ax.NewLogger(
+                cmd.Context(),
+                ax.WithLoggerWriter(cmd.ErrOrStderr()),
+                ax.WithLoggerLabels(ax.Labels{
+                    Application: "mytool",
+                    Version:     resolved,
+                }),
+                ax.WithLokiFromEnv(),
+            )
+            return nil // run the command and write its payload here
+        },
+    }
 
-    return ax.Execute(ctx, root, ax.WithVersion(resolved))
+    return ax.Execute(
+        ctx,
+        root,
+        ax.WithVersion(resolved),
+        ax.WithFlushFunc(func(shutdownCtx context.Context) error {
+            return ax.Flush(shutdownCtx, logger)
+        }),
+    )
 }
 ```
+
+The logger stays late-bound so its writer and trace context come from the
+decorated Cobra command. If parsing or pre-run setup fails before construction,
+the callback remains safe because `ax.Flush(ctx, nil)` is a no-op. Direct calls
+to `ax.Flush` remain appropriate when a lifecycle other than `ax.Execute` owns
+shutdown.
 
 `ResolveVersion` returns a non-placeholder injected value when present,
 otherwise it falls back to the running binary's Go build metadata

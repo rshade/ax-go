@@ -76,8 +76,10 @@ func NewLogger(ctx context.Context, opts ...LoggerOption) Logger {
 //     was cancelled
 //
 // Callers may invoke Flush multiple times; later writes remain deliverable by a
-// later Flush call. Callers should invoke Flush in their shutdown path, before
-// os.Exit or cobra.Command cleanup, to ensure in-flight log lines reach Loki.
+// later Flush call. A CLI whose lifecycle is owned by Execute should register a
+// closure around Flush with WithFlushFunc; Execute supplies the bounded shutdown
+// context and reports failures without changing the command exit code. Other
+// lifecycle owners should invoke Flush directly before process termination.
 func Flush(ctx context.Context, l Logger) error {
 	return logcore.Flush(ctx, l)
 }

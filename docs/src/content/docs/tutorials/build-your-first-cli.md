@@ -82,6 +82,7 @@ type greeting struct {
 func main() {
 	var name string
 	var times int
+	var logger ax.Logger
 
 	root := &cobra.Command{
 		Use:   "greeter",
@@ -106,8 +107,17 @@ func main() {
 
 	// ax.Execute wraps Cobra: it resolves the output mode, adds the
 	// --format/--dry-run/--idempotency-key flags, injects the __schema
-	// command, and returns a deterministic exit code.
-	os.Exit(ax.Execute(context.Background(), root, ax.WithVersion("0.1.0")))
+	// command, owns bounded buffered-output and telemetry shutdown, and returns
+	// a deterministic exit code. The logger is assigned later inside RunE;
+	// Flush is nil-safe if parsing fails before that happens.
+	os.Exit(ax.Execute(
+		context.Background(),
+		root,
+		ax.WithVersion("0.1.0"),
+		ax.WithFlushFunc(func(shutdownCtx context.Context) error {
+			return ax.Flush(shutdownCtx, logger)
+		}),
+	))
 }
 ```
 
@@ -168,15 +178,22 @@ To make the split visible, add a log line to your command. Insert this just
 before the `payload :=` line in `RunE`:
 
 ```go
-logger := ax.NewLogger(
+logger = ax.NewLogger(
 	cmd.Context(),
 	ax.WithLoggerWriter(cmd.ErrOrStderr()),
 	ax.WithLoggerLabels(ax.Labels{Application: "greeter", Version: "0.1.0"}),
 )
-defer func() { _ = ax.Flush(context.Background(), logger) }()
 
 logger.Info(cmd.Context()).Str("event", "greeted").Str("name", name).Msg("handled greet")
 ```
+
+The `WithFlushFunc` you registered in Step 2 now drains this late-bound logger
+after every normal command return path. `Execute` supplies a fresh bounded
+shutdown context, so you do not need a command-local timeout or defer. If a
+future sink reports a flush error, ax-go writes one control-character-sanitized
+diagnostic to `stderr`; it never changes the payload or command exit code.
+Sanitization is not redaction, so a callback must not return an error containing
+PII, secrets, tokens, or credentials.
 
 Run the split again:
 

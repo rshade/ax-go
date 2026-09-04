@@ -684,7 +684,7 @@ func TestRunSchemaCommand(t *testing.T) {
 // invoke one to get its machine payload. It is the runnable reference instance
 // for feature 011.
 func TestMCPServerSmoke(t *testing.T) {
-	root := newRootCommand(strings.NewReader(""), "v9.9.9-smoke", ax.NewEntityID)
+	root, _ := newRootCommand(strings.NewReader(""), "v9.9.9-smoke", ax.NewEntityID)
 
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
