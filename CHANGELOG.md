@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.7.0](https://github.com/rshade/ax-go/compare/v0.6.0...v0.7.0) (2026-09-08)
+
+
+### Added
+
+* **trace:** export ax.MetadataFromContext with live trace IDs ([#220](https://github.com/rshade/ax-go/issues/220)) ([8a88ecf](https://github.com/rshade/ax-go/commit/8a88ecfa8e318b177ee2b162f502f8e655b100de))
+
+
+### Fixed
+
+* **execute:** wrap persistent hooks on every command, not just the root ([494729a](https://github.com/rshade/ax-go/commit/494729a52490e93bc7997d50ff6b9918ceb2675b)), closes [#218](https://github.com/rshade/ax-go/issues/218)
+* **execute:** wrap persistent hooks on every command, not just the root ([#222](https://github.com/rshade/ax-go/issues/222)) ([494729a](https://github.com/rshade/ax-go/commit/494729a52490e93bc7997d50ff6b9918ceb2675b))
+
+
+### Documentation
+
+* **roadmap:** sync ROADMAP.md and labels with GitHub state ([d411639](https://github.com/rshade/ax-go/commit/d41163972f086f61c376bb319a995e9573e7d264))
+* **roadmap:** sync ROADMAP.md and labels with GitHub state ([#223](https://github.com/rshade/ax-go/issues/223)) ([d411639](https://github.com/rshade/ax-go/commit/d41163972f086f61c376bb319a995e9573e7d264))
+
 ## [0.6.0](https://github.com/rshade/ax-go/compare/v0.5.0...v0.6.0) (2026-09-08)
 
 
