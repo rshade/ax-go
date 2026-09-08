@@ -253,15 +253,58 @@ func ensureSchemaCommand(root *cobra.Command, version string) {
 	root.AddCommand(NewSchemaCommand(root, WithSchemaVersion(version)))
 }
 
-func wrapPersistentPreRun(root *cobra.Command, cfg executeConfig) {
-	previousE := root.PersistentPreRunE
-	previous := root.PersistentPreRun
+// persistentHookWrappedAnnotation marks a command whose persistent pre-run
+// hook has already been wrapped with agent-safety context setup, so a
+// second Execute call against the same long-lived command tree (for
+// example, one served by overlapping MCP tool calls) does not re-wrap or
+// double-invoke anything.
+const persistentHookWrappedAnnotation = "github.com/rshade/ax-go/execute/persistent-hook-wrapped"
 
-	root.PersistentPreRunE = func(cmd *cobra.Command, args []string) error {
-		format := cli.LookupFlagString(cmd, cli.FlagFormat)
-		dryRun := cli.LookupFlagBool(cmd, cli.FlagDryRun)
-		approval := cli.LookupFlagBool(cmd, cli.FlagYes)
-		idempotencyKey := cli.LookupFlagString(cmd, cli.FlagIdempotencyKey)
+// wrapPersistentPreRun installs agent-safety context setup (resolved mode,
+// dry-run state, approval, idempotency key) ahead of every persistent
+// pre-run hook Cobra can reach for any command in the tree. Cobra dispatches
+// only the nearest ancestor's persistent hook for an invoked command, not
+// every ancestor's, so a subcommand or group that declares its own hook
+// would otherwise completely shadow this setup for everything beneath it.
+// root is always wrapped as the universal fallback for commands with no
+// closer hook; every other command is wrapped only if it already declares
+// its own persistent hook, since Cobra never reaches an unwrapped, hookless
+// command's ancestors once it finds a closer one that does have a hook.
+func wrapPersistentPreRun(root *cobra.Command, cfg executeConfig) {
+	wrapCommandPersistentPreRun(root, cfg)
+
+	var walk func(*cobra.Command)
+	walk = func(cmd *cobra.Command) {
+		for _, child := range cmd.Commands() {
+			if child.PersistentPreRun != nil || child.PersistentPreRunE != nil {
+				wrapCommandPersistentPreRun(child, cfg)
+			}
+			walk(child)
+		}
+	}
+	walk(root)
+}
+
+// wrapCommandPersistentPreRun wraps cmd's own persistent pre-run hook (if
+// any) with agent-safety context setup, idempotently: a command already
+// wrapped by a prior call is left untouched. The installed hook receives
+// whichever command Cobra actually invoked, not necessarily cmd itself —
+// Cobra always passes the invoked command to whichever ancestor's hook it
+// dispatches — so flag lookups and context mutations below apply to the
+// real invocation regardless of which command in the tree owns this hook.
+func wrapCommandPersistentPreRun(cmd *cobra.Command, cfg executeConfig) {
+	if cmd.Annotations[persistentHookWrappedAnnotation] == "true" {
+		return
+	}
+
+	previousE := cmd.PersistentPreRunE
+	previous := cmd.PersistentPreRun
+
+	cmd.PersistentPreRunE = func(invoked *cobra.Command, args []string) error {
+		format := cli.LookupFlagString(invoked, cli.FlagFormat)
+		dryRun := cli.LookupFlagBool(invoked, cli.FlagDryRun)
+		approval := cli.LookupFlagBool(invoked, cli.FlagYes)
+		idempotencyKey := cli.LookupFlagString(invoked, cli.FlagIdempotencyKey)
 		if idempotencyKey == "" {
 			idempotencyKey = NewIdempotencyKey()
 		}
@@ -273,27 +316,32 @@ func wrapPersistentPreRun(root *cobra.Command, cfg executeConfig) {
 
 		mode, err := ResolveMode(format, cfg.env("AGENT_MODE"), stdoutIsTTY)
 		if err != nil {
-			return NewError(cmd.Context(), "validation_error", err.Error(), WithErrorExitCode(ExitValidation))
+			return NewError(invoked.Context(), "validation_error", err.Error(), WithErrorExitCode(ExitValidation))
 		}
 
-		ctx := cmd.Context()
+		ctx := invoked.Context()
 		ctx = WithMode(ctx, mode)
 		ctx = WithDryRun(ctx, dryRun)
 		ctx = WithApproval(ctx, approval)
 		ctx = WithIdempotencyKey(ctx, idempotencyKey)
-		cmd.SetContext(ctx)
-		trace.SpanFromContext(ctx).SetName(cmd.CommandPath())
+		invoked.SetContext(ctx)
+		trace.SpanFromContext(ctx).SetName(invoked.CommandPath())
 
 		if previousE != nil {
-			if preRunErr := previousE(cmd, args); preRunErr != nil {
+			if preRunErr := previousE(invoked, args); preRunErr != nil {
 				return preRunErr
 			}
 		}
 		if previous != nil {
-			previous(cmd, args)
+			previous(invoked, args)
 		}
 		return nil
 	}
+
+	if cmd.Annotations == nil {
+		cmd.Annotations = map[string]string{}
+	}
+	cmd.Annotations[persistentHookWrappedAnnotation] = "true"
 }
 
 // normalizeExecuteError fills empty envelope fields (trace ID, tool, version,

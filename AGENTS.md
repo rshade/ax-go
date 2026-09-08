@@ -837,5 +837,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/025-metadata-from-context/plan.md
+at specs/026-persistent-hook-context/plan.md
 <!-- SPECKIT END -->

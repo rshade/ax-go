@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -1353,5 +1354,519 @@ func TestExecuteSchemaCommandWritesStdout(t *testing.T) {
 	}
 	if got.Tool != "app" {
 		t.Fatalf("Tool = %q, want app", got.Tool)
+	}
+}
+
+// hookShapeCapture records what a leaf command observed on its context and
+// how the agent-safety primitives behaved, for the persistent-hook-shape
+// regression tests (issue #218 / specs/026-persistent-hook-context).
+type hookShapeCapture struct {
+	mode           Mode
+	dryRun         bool
+	approval       bool
+	idempotencyKey string
+	confirmOutcome ConfirmationOutcome
+	guardExecuted  bool
+	sideEffectRan  bool
+}
+
+// newHookShapeTree wires group and leaf into a fresh root (root -> group ->
+// leaf) and installs leaf's RunE to capture agent-safety context and drive
+// Confirm/Guard, exactly as a real command would. Callers pre-configure
+// group's and/or leaf's own PersistentPreRun/PersistentPreRunE fields
+// before calling this, to exercise a specific hook shape; this helper never
+// touches those fields itself.
+func newHookShapeTree(group, leaf *cobra.Command, captured *hookShapeCapture) *cobra.Command {
+	leaf.RunE = func(cmd *cobra.Command, _ []string) error {
+		mode, _ := ModeFromContext(cmd.Context())
+		captured.mode = mode
+		captured.dryRun = DryRunFromContext(cmd.Context())
+		captured.approval = ApprovalFromContext(cmd.Context())
+		key, _ := IdempotencyKeyFromContext(cmd.Context())
+		captured.idempotencyKey = key
+
+		outcome, err := Confirm(cmd.Context(), "apply the change")
+		if err != nil {
+			return err
+		}
+		captured.confirmOutcome = outcome
+
+		executed, err := Guard(cmd.Context(), func(context.Context) error {
+			captured.sideEffectRan = true
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		captured.guardExecuted = executed
+
+		return WriteJSON(cmd.OutOrStdout(), struct {
+			OK bool `json:"ok"`
+		}{OK: true})
+	}
+
+	group.AddCommand(leaf)
+	root := &cobra.Command{Use: "app"}
+	root.AddCommand(group)
+	root.SetArgs([]string{"group", "leaf", "--format=json", "--dry-run", "--yes"})
+	return root
+}
+
+// TestExecutePersistentHookShapesGetAgentSafetyContext is the regression
+// test for issue #218: ax.Execute wrapped only root's persistent hook, so
+// any subcommand or group that declared its own PersistentPreRun/E
+// completely shadowed ax's agent-safety context setup for everything
+// beneath it. Every shape here must produce identical agent-safety context,
+// Guard suppression, and Confirm approval as the no-hook baseline
+// (TestExecuteApprovalAndDryRunAreOrthogonal's "approved dry-run" case).
+func TestExecutePersistentHookShapesGetAgentSafetyContext(t *testing.T) {
+	tests := []struct {
+		name      string
+		buildTree func(calls map[string]int, captured *hookShapeCapture) *cobra.Command
+		wantCalls map[string]int
+	}{
+		{
+			name: "child PersistentPreRun",
+			buildTree: func(calls map[string]int, captured *hookShapeCapture) *cobra.Command {
+				group := &cobra.Command{
+					Use: "group",
+					PersistentPreRun: func(*cobra.Command, []string) {
+						calls["group"]++
+					},
+				}
+				return newHookShapeTree(group, &cobra.Command{Use: "leaf"}, captured)
+			},
+			wantCalls: map[string]int{"group": 1},
+		},
+		{
+			name: "child PersistentPreRunE",
+			buildTree: func(calls map[string]int, captured *hookShapeCapture) *cobra.Command {
+				group := &cobra.Command{
+					Use: "group",
+					PersistentPreRunE: func(*cobra.Command, []string) error {
+						calls["group"]++
+						return nil
+					},
+				}
+				return newHookShapeTree(group, &cobra.Command{Use: "leaf"}, captured)
+			},
+			wantCalls: map[string]int{"group": 1},
+		},
+		{
+			name: "both PersistentPreRun and PersistentPreRunE on the same command",
+			buildTree: func(calls map[string]int, captured *hookShapeCapture) *cobra.Command {
+				group := &cobra.Command{
+					Use: "group",
+					PersistentPreRun: func(*cobra.Command, []string) {
+						calls["group_non_e"]++
+					},
+					PersistentPreRunE: func(*cobra.Command, []string) error {
+						calls["group_e"]++
+						return nil
+					},
+				}
+				return newHookShapeTree(group, &cobra.Command{Use: "leaf"}, captured)
+			},
+			wantCalls: map[string]int{"group_non_e": 1, "group_e": 1},
+		},
+		{
+			name: "grandchild-only hook",
+			buildTree: func(calls map[string]int, captured *hookShapeCapture) *cobra.Command {
+				group := &cobra.Command{Use: "group"}
+				leaf := &cobra.Command{
+					Use: "leaf",
+					PersistentPreRunE: func(*cobra.Command, []string) error {
+						calls["leaf"]++
+						return nil
+					},
+				}
+				return newHookShapeTree(group, leaf, captured)
+			},
+			wantCalls: map[string]int{"leaf": 1},
+		},
+		{
+			name: "parent (root) and child (group) both declare",
+			buildTree: func(calls map[string]int, captured *hookShapeCapture) *cobra.Command {
+				group := &cobra.Command{
+					Use: "group",
+					PersistentPreRunE: func(*cobra.Command, []string) error {
+						calls["group"]++
+						return nil
+					},
+				}
+				root := newHookShapeTree(group, &cobra.Command{Use: "leaf"}, captured)
+				root.PersistentPreRunE = func(*cobra.Command, []string) error {
+					calls["root"]++
+					return nil
+				}
+				return root
+			},
+			// Cobra dispatches only the nearest ancestor's hook: group is
+			// nearer than root for the invoked leaf, so root's own hook must
+			// never fire for this invocation even though it is also wrapped.
+			wantCalls: map[string]int{"group": 1, "root": 0},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			calls := map[string]int{}
+			var captured hookShapeCapture
+
+			root := tt.buildTree(calls, &captured)
+
+			code := Execute(
+				context.Background(),
+				root,
+				WithStdout(&stdout),
+				WithStderr(&stderr),
+				WithEnv(func(string) string { return "" }),
+				WithStdoutIsTTY(false),
+			)
+			if code != ExitSuccess {
+				t.Fatalf("Execute exit code = %d, want %d; stderr=%s", code, ExitSuccess, stderr.String())
+			}
+
+			for name, want := range tt.wantCalls {
+				if got := calls[name]; got != want {
+					t.Errorf("hook %q fired %d times, want %d", name, got, want)
+				}
+			}
+
+			if captured.mode != ModeJSON {
+				t.Errorf("ModeFromContext = %v, want %v", captured.mode, ModeJSON)
+			}
+			if !captured.dryRun {
+				t.Error("DryRunFromContext = false, want true (--dry-run was set)")
+			}
+			if !captured.approval {
+				t.Error("ApprovalFromContext = false, want true (--yes was set)")
+			}
+			if captured.idempotencyKey == "" {
+				t.Error("IdempotencyKeyFromContext is empty, want an auto-generated key")
+			}
+			if captured.confirmOutcome != ConfirmationApproved {
+				t.Errorf(
+					"Confirm outcome = %v, want %v (approved under --yes)",
+					captured.confirmOutcome, ConfirmationApproved,
+				)
+			}
+			if captured.guardExecuted {
+				t.Error("Guard reported executed=true under --dry-run, want false")
+			}
+			if captured.sideEffectRan {
+				t.Error("Guard-wrapped side effect ran under --dry-run, want suppressed")
+			}
+		})
+	}
+}
+
+// TestExecuteWrapsPersistentHooksIdempotentlyAcrossRepeatedCalls is the
+// regression test for FR-006: a command tree already wrapped by one
+// Execute call must not be re-wrapped, or have its own persistent hooks
+// invoked more than once per call, by a later Execute call against the
+// same tree object (the long-lived MCP server case).
+func TestExecuteWrapsPersistentHooksIdempotentlyAcrossRepeatedCalls(t *testing.T) {
+	groupHookCalls := 0
+	group := &cobra.Command{
+		Use: "group",
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			groupHookCalls++
+			return nil
+		},
+	}
+	leaf := &cobra.Command{
+		Use: "leaf",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return WriteJSON(cmd.OutOrStdout(), struct {
+				OK bool `json:"ok"`
+			}{OK: true})
+		},
+	}
+	group.AddCommand(leaf)
+	root := &cobra.Command{Use: "app"}
+	root.AddCommand(group)
+	root.SetArgs([]string{"group", "leaf"})
+
+	runOnce := func() int {
+		var stdout, stderr bytes.Buffer
+		return Execute(
+			context.Background(),
+			root,
+			WithStdout(&stdout),
+			WithStderr(&stderr),
+			WithEnv(func(string) string { return "" }),
+			WithStdoutIsTTY(false),
+		)
+	}
+
+	if code := runOnce(); code != ExitSuccess {
+		t.Fatalf("first Execute exit code = %d, want %d", code, ExitSuccess)
+	}
+	if group.Annotations[persistentHookWrappedAnnotation] != "true" {
+		t.Fatal("group not marked wrapped after the first Execute call")
+	}
+	wrappedAfterFirst := reflect.ValueOf(group.PersistentPreRunE).Pointer()
+
+	if code := runOnce(); code != ExitSuccess {
+		t.Fatalf("second Execute exit code = %d, want %d", code, ExitSuccess)
+	}
+	wrappedAfterSecond := reflect.ValueOf(group.PersistentPreRunE).Pointer()
+
+	if wrappedAfterFirst != wrappedAfterSecond {
+		t.Error(
+			"group's wrapped PersistentPreRunE identity changed on the second Execute call; want idempotent, no re-wrap",
+		)
+	}
+	if groupHookCalls != 2 {
+		t.Errorf(
+			"group's own hook fired %d times across 2 Execute calls, want 2 (exactly once per call)",
+			groupHookCalls,
+		)
+	}
+}
+
+// TestExecutePersistentHookErrorPropagationAcrossShapes is the regression
+// test for User Story 2: an adopter's own error-returning persistent hook
+// must keep failing the command with that exact error, exactly once, no
+// matter where in the tree it is declared — and, per FR-002, must see
+// correct agent-safety context (here, dry-run state) before it decides to
+// error, not just after a successful setup. Capturing DryRunFromContext
+// inside the erroring hook itself is what makes this fix-dependent: a
+// version of this test that only checked the error and call count would
+// pass even against the pre-fix code, since Cobra's own error propagation
+// and hook dispatch are unrelated to ax's context wrapping — only the
+// context value the hook observes depends on the fix. Only the
+// error-returning (PersistentPreRunE) form can propagate an error, so this
+// covers every hook shape from TestExecutePersistentHookShapesGetAgentSafetyContext
+// that uses that form; the plain PersistentPreRun shape has no error path
+// to test here (already covered for the success path by that other test).
+func TestExecutePersistentHookErrorPropagationAcrossShapes(t *testing.T) {
+	wantErr := errors.New("upstream unreachable")
+
+	tests := []struct {
+		name      string
+		buildTree func(calls map[string]int, sawDryRun *bool) *cobra.Command
+		wantCalls map[string]int
+	}{
+		{
+			name: "child PersistentPreRunE errors",
+			buildTree: func(calls map[string]int, sawDryRun *bool) *cobra.Command {
+				group := &cobra.Command{
+					Use: "group",
+					PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+						calls["group"]++
+						*sawDryRun = DryRunFromContext(cmd.Context())
+						return wantErr
+					},
+				}
+				group.AddCommand(&cobra.Command{Use: "leaf", RunE: func(*cobra.Command, []string) error {
+					t.Fatal("leaf RunE called after PersistentPreRunE failed")
+					return nil
+				}})
+				root := &cobra.Command{Use: "app"}
+				root.AddCommand(group)
+				root.SetArgs([]string{"group", "leaf", "--dry-run"})
+				return root
+			},
+			wantCalls: map[string]int{"group": 1},
+		},
+		{
+			name: "both declared: E errors, non-E must not fire",
+			buildTree: func(calls map[string]int, sawDryRun *bool) *cobra.Command {
+				group := &cobra.Command{
+					Use: "group",
+					PersistentPreRun: func(*cobra.Command, []string) {
+						calls["group_non_e"]++
+					},
+					PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+						calls["group_e"]++
+						*sawDryRun = DryRunFromContext(cmd.Context())
+						return wantErr
+					},
+				}
+				group.AddCommand(&cobra.Command{Use: "leaf", RunE: func(*cobra.Command, []string) error {
+					t.Fatal("leaf RunE called after PersistentPreRunE failed")
+					return nil
+				}})
+				root := &cobra.Command{Use: "app"}
+				root.AddCommand(group)
+				root.SetArgs([]string{"group", "leaf", "--dry-run"})
+				return root
+			},
+			wantCalls: map[string]int{"group_e": 1, "group_non_e": 0},
+		},
+		{
+			name: "grandchild-only hook errors",
+			buildTree: func(calls map[string]int, sawDryRun *bool) *cobra.Command {
+				group := &cobra.Command{Use: "group"}
+				leaf := &cobra.Command{
+					Use: "leaf",
+					PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+						calls["leaf"]++
+						*sawDryRun = DryRunFromContext(cmd.Context())
+						return wantErr
+					},
+					RunE: func(*cobra.Command, []string) error {
+						t.Fatal("leaf RunE called after PersistentPreRunE failed")
+						return nil
+					},
+				}
+				group.AddCommand(leaf)
+				root := &cobra.Command{Use: "app"}
+				root.AddCommand(group)
+				root.SetArgs([]string{"group", "leaf", "--dry-run"})
+				return root
+			},
+			wantCalls: map[string]int{"leaf": 1},
+		},
+		{
+			name: "parent (root) and child (group) both declare: group errors, root must not fire",
+			buildTree: func(calls map[string]int, sawDryRun *bool) *cobra.Command {
+				group := &cobra.Command{
+					Use: "group",
+					PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
+						calls["group"]++
+						*sawDryRun = DryRunFromContext(cmd.Context())
+						return wantErr
+					},
+				}
+				group.AddCommand(&cobra.Command{Use: "leaf", RunE: func(*cobra.Command, []string) error {
+					t.Fatal("leaf RunE called after PersistentPreRunE failed")
+					return nil
+				}})
+				root := &cobra.Command{
+					Use: "app",
+					PersistentPreRunE: func(*cobra.Command, []string) error {
+						calls["root"]++
+						return nil
+					},
+				}
+				root.AddCommand(group)
+				root.SetArgs([]string{"group", "leaf", "--dry-run"})
+				return root
+			},
+			wantCalls: map[string]int{"group": 1, "root": 0},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var stdout, stderr bytes.Buffer
+			calls := map[string]int{}
+			var sawDryRun bool
+			root := tt.buildTree(calls, &sawDryRun)
+
+			code := Execute(
+				context.Background(),
+				root,
+				WithStdout(&stdout),
+				WithStderr(&stderr),
+				WithEnv(func(string) string { return "" }),
+				WithStdoutIsTTY(false),
+			)
+
+			if code == ExitSuccess {
+				t.Fatalf("Execute exit code = %d, want a failure code; stderr=%s", code, stderr.String())
+			}
+			if stdout.Len() != 0 {
+				t.Errorf("stdout = %q, want empty on hook failure", stdout.String())
+			}
+			var axErr Error
+			if err := json.Unmarshal(stderr.Bytes(), &axErr); err != nil {
+				t.Fatalf("stderr was not an ax.Error envelope: %v; stderr=%s", err, stderr.String())
+			}
+			if !strings.Contains(axErr.Message, wantErr.Error()) {
+				t.Errorf("error message = %q, want it to contain %q", axErr.Message, wantErr.Error())
+			}
+			if !sawDryRun {
+				t.Error(
+					"the erroring hook observed DryRunFromContext = false, want true (--dry-run was set); ax's context setup must run before the adopter's own hook even when that hook is about to fail",
+				)
+			}
+
+			for name, want := range tt.wantCalls {
+				if got := calls[name]; got != want {
+					t.Errorf("hook %q fired %d times, want %d", name, got, want)
+				}
+			}
+		})
+	}
+}
+
+// TestExecutePersistentHookCombinedDryRunYesEnvelopeMeta is the regression
+// test for User Story 3: the specific --dry-run --yes combination — the
+// most careful invocation an operator or agent can make — must be safe and
+// carry correct envelope metadata even under a subcommand's own persistent
+// hook, matching the no-hook case
+// (TestExecuteApprovalAndDryRunAreOrthogonal's "approved dry-run" case).
+// TestExecutePersistentHookShapesGetAgentSafetyContext already exercises
+// --dry-run --yes together via the *FromContext accessors across all five
+// hook shapes; this test additionally spot-checks the actual success
+// envelope's meta.dry_run/meta.idempotency_key fields (research.md D5:
+// envelope correctness is guaranteed by construction from the same context
+// keys, so one explicit end-to-end check here is a check on that
+// composition, not a second independent proof obligation per shape).
+func TestExecutePersistentHookCombinedDryRunYesEnvelopeMeta(t *testing.T) {
+	var stdout, stderr bytes.Buffer
+	sideEffectRan := false
+
+	group := &cobra.Command{
+		Use: "group",
+		PersistentPreRunE: func(*cobra.Command, []string) error {
+			return nil
+		},
+	}
+	leaf := &cobra.Command{
+		Use: "leaf",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			if _, err := Guard(cmd.Context(), func(context.Context) error {
+				sideEffectRan = true
+				return nil
+			}); err != nil {
+				return err
+			}
+			return WriteJSON(cmd.OutOrStdout(), NewEnvelope(cmd.Context(), struct {
+				Applied bool `json:"applied"`
+			}{Applied: sideEffectRan}))
+		},
+	}
+	group.AddCommand(leaf)
+	root := &cobra.Command{Use: "app"}
+	root.AddCommand(group)
+	root.SetArgs([]string{"group", "leaf", "--format=json", "--dry-run", "--yes"})
+
+	code := Execute(
+		context.Background(),
+		root,
+		WithStdout(&stdout),
+		WithStderr(&stderr),
+		WithEnv(func(string) string { return "" }),
+		WithStdoutIsTTY(false),
+	)
+	if code != ExitSuccess {
+		t.Fatalf("Execute exit code = %d, want %d; stderr=%s", code, ExitSuccess, stderr.String())
+	}
+	if sideEffectRan {
+		t.Error("Guard-wrapped side effect ran under --dry-run --yes through a subcommand hook, want suppressed")
+	}
+
+	var env Envelope[struct {
+		Applied bool `json:"applied"`
+	}]
+	if err := json.Unmarshal(stdout.Bytes(), &env); err != nil {
+		t.Fatalf("stdout was not an envelope: %v; stdout=%s", err, stdout.String())
+	}
+	if env.Data.Applied {
+		t.Error("envelope data.applied = true, want false (dry-run suppressed the side effect)")
+	}
+	if !env.Meta.DryRun {
+		t.Error("envelope meta.dry_run = false, want true, even under a subcommand's own persistent hook")
+	}
+	if env.Meta.IdempotencyKey == "" {
+		t.Error(
+			"envelope meta.idempotency_key is empty, want an auto-generated key, even under a subcommand's own persistent hook",
+		)
 	}
 }
