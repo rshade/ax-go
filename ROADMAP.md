@@ -30,11 +30,19 @@ coverage-floor escalation trio for `internal/cli`/`internal/mcp`/`internal/schem
 entry, `--yes` no-prompt invariant (#121), shipped 2026-08-26, alongside two
 more deferred refactors (#69, #120). The `axtest` full-lifecycle test helper
 (#178, 2026-08-26) and the Guard/Perform audit-logging variant (#179,
-2026-08-28) shipped the same week. **#119 (`WithFlushFunc` `ExecuteOption`)
-is now the active WIP in Immediate Focus** — promoted 2026-08-30 as the
-smallest entry point in the governance queue. A wave of 20 new AX-surface
-issues (#119–#138) was filed 2026-07-19 (verified against live code before
-filing) and is now tracked across Near-Term and Future Vision below.
+2026-08-28) shipped the same week. `WithFlushFunc` `ExecuteOption` (#119) and
+the live-resolving `ax.MetadataFromContext` accessor (#212) both shipped
+2026-09-04/08. A wave of 20 new AX-surface issues (#119–#138) was filed
+2026-07-19 (verified against live code before filing) and is now tracked
+across Near-Term and Future Vision below.
+
+**2026-09-08 sync**: a P0 correctness bug (#218 — agent-safety context lost
+when a subcommand declares its own persistent hook) surfaced the moment
+Immediate Focus emptied out. The operator chose a one-time exception to the
+single-WIP Promotion Gate (`target_focus_depth: 1` unchanged in CONTEXT.md)
+and promoted three items together: #218, #123, and #122. #218 shipped the
+same day; #123 and #122 remain in flight. Future syncs return to single-WIP
+discipline.
 
 ## Vision
 
@@ -45,27 +53,30 @@ primitives, and short-lived-process-correct observability.
 
 ## Immediate Focus (v0.3.0 — v1.0 readiness & governance)
 
-Single-WIP per the Promotion Gate (`target_focus_depth: 1`).
+Single-WIP per the Promotion Gate (`target_focus_depth: 1`). **Exception:**
+two items remain in flight together from the 2026-09-08 one-time promotion
+— see the sync note above; #218, the third, has already shipped.
 
-- [ ] #119 `WithFlushFunc` ExecuteOption to drain `ax.Flush` on Execute
-  shutdown [S] — deterministic telemetry flush on the Execute lifecycle.
-  *Promoted by /roadmap sync on 2026-08-30 — smallest entry point in the
-  governance queue (effort/small, no blockers) now that #18 has shipped.*
+- [ ] #123 Structured warnings on the success envelope + `--strict` escalation
+  [M] — non-fatal warnings an agent can read, with opt-in promotion to
+  failure. *Promoted by /roadmap sync on 2026-09-08 — one-time single-WIP
+  exception; natural follow-on now that #121 (`--yes` no-prompt invariant)
+  has shipped.*
+- [ ] #122 Dry-run-by-default with `--apply` and declared side-effect class
+  [L] — invert the default so mutating commands are safe unless explicitly
+  applied. Extends the shipped #13 `--dry-run` guards. *Promoted by /roadmap
+  sync on 2026-09-08 — one-time single-WIP exception.*
 
 ## Near-Term Vision (v0.3.0 — governance queue)
 
-**On deck — next promotion:** with #119 now the active WIP, #123 (structured
-warnings + `--strict` escalation) is the leading candidate for the following
-slot — a natural follow-on now that #121 (`--yes` no-prompt invariant) has
-shipped.
-
-### Agent-safety envelope (new — 2026-07-19)
-
-- [ ] #122 Dry-run-by-default with `--apply` and declared side-effect class [L]
-  — invert the default so mutating commands are safe unless explicitly applied.
-  Extends the shipped #13 `--dry-run` guards.
-- [ ] #123 Structured warnings on the success envelope + `--strict` escalation
-  [M] — non-fatal warnings an agent can read, with opt-in promotion to failure.
+No items currently queued in `roadmap/next` — the two that were here
+(#122, #123) were promoted to Immediate Focus in the 2026-09-08 one-time
+exception.
+**On deck for the next single-WIP promotion:** #137 (declare per-command MCP
+elicitation points) is epic-eligible now that its parent #121 has shipped,
+but its `roadmap-meta trigger-pending: issue-121-shipped` field is stale —
+worth clearing before treating it as ready. See Recommendations below for
+the fuller candidate list.
 
 ## Future Vision (Long-Term)
 
@@ -171,6 +182,20 @@ a runtime contract.*
 
 ### 2026-Q3
 
+- [x] #218 `ax.Execute` wraps persistent hooks on every command, not just
+  root [L] — closes a P0 agent-safety gap: `ax.Guard` executed real side
+  effects under `--dry-run` for any subcommand with its own persistent
+  hook. Shipped via
+  [`specs/026-persistent-hook-context`](specs/026-persistent-hook-context/).
+  Closed 2026-09-08.
+- [x] #212 `ax.MetadataFromContext` with live-resolving trace/span IDs [S] —
+  closes the gap where `contract.MetadataFromContext` returns zero IDs under
+  `Execute`. Shipped via
+  [`specs/025-metadata-from-context`](specs/025-metadata-from-context/).
+  Closed 2026-09-08.
+- [x] #119 `WithFlushFunc` ExecuteOption to drain `ax.Flush` on Execute
+  shutdown [S] — deterministic telemetry flush on the Execute lifecycle.
+  Closed 2026-09-04.
 - [x] #69 `covercheck` type-design hardening — derived fields as methods +
   integer floor comparison [S] — two deferred refactors from spec/009; no
   public-API impact. Closed 2026-08-30.
