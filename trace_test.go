@@ -25,11 +25,19 @@ func TestSpanIDFromContextWithNoSpanReturnsZeroSpanID(t *testing.T) {
 	}
 }
 
-func TestTraceIDFromContextWithActiveSpanIsNonZero(t *testing.T) {
+// testTracerName is the tracer name used by tests that need a live span.
+const testTracerName = "github.com/rshade/ax-go/test"
+
+// newTestTelemetryContext starts telemetry for tests that need a live span's
+// trace/span IDs, registering shutdown cleanup, and returns the resulting
+// context. Callers start their own span via otel.Tracer(testTracerName) so a
+// test can decorate ctx (e.g. with contract.WithMetadata) before doing so.
+func newTestTelemetryContext(t *testing.T, serviceName string) context.Context {
+	t.Helper()
 	ctx, tel, err := StartTelemetry(
 		context.Background(),
 		WithTelemetryEnv(func(string) string { return "" }),
-		WithTelemetryServiceName("trace-id-test"),
+		WithTelemetryServiceName(serviceName),
 	)
 	if err != nil {
 		t.Fatalf("StartTelemetry: %v", err)
@@ -39,8 +47,12 @@ func TestTraceIDFromContextWithActiveSpanIsNonZero(t *testing.T) {
 			t.Fatalf("Telemetry.Shutdown: %v", err)
 		}
 	})
+	return ctx
+}
 
-	ctx, span := otel.Tracer("github.com/rshade/ax-go/test").Start(ctx, "trace-id-op")
+func TestTraceIDFromContextWithActiveSpanIsNonZero(t *testing.T) {
+	ctx := newTestTelemetryContext(t, "trace-id-test")
+	ctx, span := otel.Tracer(testTracerName).Start(ctx, "trace-id-op")
 	defer span.End()
 
 	got := TraceIDFromContext(ctx)
@@ -50,21 +62,8 @@ func TestTraceIDFromContextWithActiveSpanIsNonZero(t *testing.T) {
 }
 
 func TestSpanIDFromContextWithActiveSpanIsNonZero(t *testing.T) {
-	ctx, tel, err := StartTelemetry(
-		context.Background(),
-		WithTelemetryEnv(func(string) string { return "" }),
-		WithTelemetryServiceName("span-id-test"),
-	)
-	if err != nil {
-		t.Fatalf("StartTelemetry: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := tel.Shutdown(context.Background()); err != nil {
-			t.Fatalf("Telemetry.Shutdown: %v", err)
-		}
-	})
-
-	ctx, span := otel.Tracer("github.com/rshade/ax-go/test").Start(ctx, "span-id-op")
+	ctx := newTestTelemetryContext(t, "span-id-test")
+	ctx, span := otel.Tracer(testTracerName).Start(ctx, "span-id-op")
 	defer span.End()
 
 	got := SpanIDFromContext(ctx)
@@ -203,26 +202,13 @@ func TestMetadataFromContextLiveSpanSupersedesExplicitMetadata(t *testing.T) {
 	const explicitTraceID = "explicit-trace-id"
 	const explicitSpanID = "explicit-span-id"
 
-	ctx, tel, err := StartTelemetry(
-		context.Background(),
-		WithTelemetryEnv(func(string) string { return "" }),
-		WithTelemetryServiceName("metadata-precedence-test"),
-	)
-	if err != nil {
-		t.Fatalf("StartTelemetry: %v", err)
-	}
-	t.Cleanup(func() {
-		if err := tel.Shutdown(context.Background()); err != nil {
-			t.Fatalf("Telemetry.Shutdown: %v", err)
-		}
-	})
-
+	ctx := newTestTelemetryContext(t, "metadata-precedence-test")
 	ctx = contract.WithMetadata(ctx, contract.Metadata{
 		TraceID: explicitTraceID,
 		SpanID:  explicitSpanID,
 	})
 
-	ctx, span := otel.Tracer("github.com/rshade/ax-go/test").Start(ctx, "precedence-op")
+	ctx, span := otel.Tracer(testTracerName).Start(ctx, "precedence-op")
 	defer span.End()
 
 	got := MetadataFromContext(ctx)

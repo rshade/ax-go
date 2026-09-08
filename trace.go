@@ -17,20 +17,14 @@ const (
 
 // TraceIDFromContext returns the active W3C trace ID or ZeroTraceID.
 func TraceIDFromContext(ctx context.Context) string {
-	sc := trace.SpanContextFromContext(ctx)
-	if sc.HasTraceID() {
-		return sc.TraceID().String()
-	}
-	return ZeroTraceID
+	traceID, _ := traceIDs(ctx)
+	return traceID
 }
 
 // SpanIDFromContext returns the active W3C span ID or ZeroSpanID.
 func SpanIDFromContext(ctx context.Context) string {
-	sc := trace.SpanContextFromContext(ctx)
-	if sc.HasSpanID() {
-		return sc.SpanID().String()
-	}
-	return ZeroSpanID
+	_, spanID := traceIDs(ctx)
+	return spanID
 }
 
 // traceIDs returns the trace and span IDs from a single span-context lookup,
