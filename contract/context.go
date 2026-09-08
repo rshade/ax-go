@@ -65,6 +65,13 @@ func WithMetadata(ctx context.Context, metadata Metadata) context.Context {
 
 // MetadataFromContext returns explicit metadata from ctx merged with dry-run
 // and idempotency-key context helpers.
+//
+// This does not resolve an active OpenTelemetry span context: this package is
+// import-isolated from the OpenTelemetry SDK and provides no live tracing, so
+// the TraceID and SpanID fields reflect only metadata a caller already stored
+// with WithMetadata, defaulting to ZeroTraceID/ZeroSpanID otherwise. Live
+// tracing comes from the root ax package: use ax.MetadataFromContext instead
+// when calling from root ax code.
 func MetadataFromContext(ctx context.Context) Metadata {
 	if ctx == nil {
 		ctx = context.Background()

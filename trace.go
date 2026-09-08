@@ -63,6 +63,20 @@ func traceIDs(ctx context.Context) (string, string) {
 	return traceID, spanID
 }
 
+// MetadataFromContext returns the envelope metadata ax would emit for ctx:
+// the live OpenTelemetry trace and span IDs (ZeroTraceID and ZeroSpanID when
+// no span is active) merged with the dry-run state and idempotency key that
+// Execute stores. A trace or span ID a caller stored explicitly through
+// contract.WithMetadata is superseded by the live span, exactly as NewEnvelope
+// and NewError already behave.
+//
+// contract.MetadataFromContext cannot see the active span — this package is
+// import-isolated from the OpenTelemetry SDK — and returns zero IDs for a
+// root-ax context. Use this function instead when calling from root ax code.
+func MetadataFromContext(ctx context.Context) Metadata {
+	return contract.MetadataFromContext(withTraceMetadata(ctx))
+}
+
 func withTraceMetadata(ctx context.Context) context.Context {
 	if ctx == nil {
 		ctx = context.Background()

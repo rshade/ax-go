@@ -284,6 +284,11 @@ locators, and unregistered commands emit an explicit empty list. The same list
 is available as `nonDeterministicFields` in `__schema --as=mcp`; it is the
 authoritative mask for deterministic output comparisons.
 
+Read that same `meta` block directly with `ax.MetadataFromContext(ctx)` — for
+a custom payload shape, an NDJSON line, or a log field — without constructing
+an `ax.Envelope` or `ax.Error` first. It resolves the same live trace/span IDs
+`ax.NewEnvelope` and `ax.NewError` already embed.
+
 ### Running as an MCP server
 
 The same command tree that powers `__schema --as=mcp` can run as a **live MCP
