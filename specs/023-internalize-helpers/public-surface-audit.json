@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "audited_at": "2026-09-01",
+  "audited_at": "2026-09-07",
   "records": [
     {
       "id": "const:ConfirmationApproved",
@@ -1553,6 +1553,25 @@
       "internal_target": "",
       "replacement": "",
       "compatibility_strategy": "Keep the public selector unchanged.",
+      "lifecycle": "live",
+      "first_published": "",
+      "deprecated_in": "",
+      "removed_in": "",
+      "downstream_checked_at": "",
+      "downstream_evidence": []
+    },
+    {
+      "id": "func:MetadataFromContext",
+      "kind": "func",
+      "owner": "",
+      "name": "MetadataFromContext",
+      "signature": "func(context.Context) Metadata",
+      "classification": "supported",
+      "rationale": "Live-resolving envelope-metadata read path; contract.MetadataFromContext cannot see the active span (issue #212).",
+      "disposition": "keep-public",
+      "internal_target": "",
+      "replacement": "",
+      "compatibility_strategy": "Keep the additive root-package function stable.",
       "lifecycle": "live",
       "first_published": "",
       "deprecated_in": "",

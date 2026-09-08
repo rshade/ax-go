@@ -500,6 +500,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:MetadataFromContext",
+          "signature": "func(context.Context) Metadata",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:ModeFromContext",
           "signature": "func(context.Context) (Mode, bool)",
           "configurations": "all",

@@ -159,6 +159,18 @@ func ExampleEnvelope() {
 	// Output: {"data":"hello","meta":{"trace_id":"00000000000000000000000000000000"}}
 }
 
+// ExampleMetadataFromContext shows reading envelope metadata directly from a
+// context, without constructing an envelope or error. With no active span,
+// dry-run state, or idempotency key on ctx, every field is its zero value;
+// inside a command run through ax.Execute, TraceID and SpanID resolve to the
+// live span's IDs instead.
+func ExampleMetadataFromContext() {
+	meta := ax.MetadataFromContext(context.Background())
+	fmt.Printf("trace_id=%s span_id=%s dry_run=%t idempotency_key=%q\n",
+		meta.TraceID, meta.SpanID, meta.DryRun, meta.IdempotencyKey)
+	// Output: trace_id=00000000000000000000000000000000 span_id=0000000000000000 dry_run=false idempotency_key=""
+}
+
 // ExampleMode shows agent-mode resolution: with no --format flag, no AGENT_MODE,
 // and a non-TTY stdout, ax resolves to machine-readable JSON.
 func ExampleMode() {

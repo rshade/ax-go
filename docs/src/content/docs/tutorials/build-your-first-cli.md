@@ -149,7 +149,10 @@ You will see a single line of JSON on `stdout`:
 
 That is the envelope. `data` is your payload; `meta` is the standard metadata
 ax-go added for you. The `idempotency_key` was auto-generated because you did
-not pass one — you will use that in Step 7.
+not pass one — you will use that in Step 7. If you ever need that same `meta`
+block without building an envelope — for a custom payload shape or a log
+field, say — call `ax.MetadataFromContext(cmd.Context())` directly; it
+resolves the same live `trace_id`/`span_id` `ax.NewEnvelope` just did.
 
 :::tip[Human vs. machine output]
 Drop `--format=json` and run `go run . --name Ada`. In an interactive terminal

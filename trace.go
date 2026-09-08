@@ -17,20 +17,14 @@ const (
 
 // TraceIDFromContext returns the active W3C trace ID or ZeroTraceID.
 func TraceIDFromContext(ctx context.Context) string {
-	sc := trace.SpanContextFromContext(ctx)
-	if sc.HasTraceID() {
-		return sc.TraceID().String()
-	}
-	return ZeroTraceID
+	traceID, _ := traceIDs(ctx)
+	return traceID
 }
 
 // SpanIDFromContext returns the active W3C span ID or ZeroSpanID.
 func SpanIDFromContext(ctx context.Context) string {
-	sc := trace.SpanContextFromContext(ctx)
-	if sc.HasSpanID() {
-		return sc.SpanID().String()
-	}
-	return ZeroSpanID
+	_, spanID := traceIDs(ctx)
+	return spanID
 }
 
 // traceIDs returns the trace and span IDs from a single span-context lookup,
@@ -61,6 +55,20 @@ func traceIDs(ctx context.Context) (string, string) {
 		spanID = sc.SpanID().String()
 	}
 	return traceID, spanID
+}
+
+// MetadataFromContext returns the envelope metadata ax would emit for ctx:
+// the live OpenTelemetry trace and span IDs (ZeroTraceID and ZeroSpanID when
+// no span is active) merged with the dry-run state and idempotency key that
+// Execute stores. A trace or span ID a caller stored explicitly through
+// contract.WithMetadata is superseded by the live span, exactly as NewEnvelope
+// and NewError already behave.
+//
+// contract.MetadataFromContext cannot see the active span — this package is
+// import-isolated from the OpenTelemetry SDK — and returns zero IDs for a
+// root-ax context. Use this function instead when calling from root ax code.
+func MetadataFromContext(ctx context.Context) Metadata {
+	return contract.MetadataFromContext(withTraceMetadata(ctx))
 }
 
 func withTraceMetadata(ctx context.Context) context.Context {
