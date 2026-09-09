@@ -58,8 +58,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v7
 
+      # Only the Go toolchain: the job-level GOOS/GOARCH would make mise's
+      # `go install` of go:-backend tools (e.g. deadcode) fail with "cannot
+      # install cross-compiled binaries when GOBIN is set", and this job
+      # never runs them.
       - name: Sync pinned toolchain
-        run: mise install
+        run: mise install go
 
       # "default" is the sentinel for the no-tags build. GOFLAGS carries the
       # optional tag argument without shell word splitting; an empty value
