@@ -235,6 +235,10 @@ To check whether a proposed change respects these boundaries, ask:
    *with those tags passed*? A green default run does not cover them. Does
    `make surface-check` still pass, and if the exported surface moved
    intentionally, was the regenerated baseline reviewed line by line?
+9. **Internal reachability:** Does `make dead-check` pass? It intersects
+   `deadcode -test` reports across all four tag configurations on the host
+   platform. Test-only callers count; this does not prove production usage
+   or cover exported public API.
 
 ## Roadmap Sync Behavior
 

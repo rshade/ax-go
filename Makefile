@@ -1,4 +1,4 @@
-# Go, golangci-lint, actionlint, and govulncheck versions are pinned once in
+# Go, golangci-lint, actionlint, govulncheck, and deadcode versions are pinned once in
 # mise.toml (see the ensure-mise-tools target); these vars only override where
 # the resulting binaries are found. GOLANGCI_LINT_VERSION is read back out of
 # mise.toml rather than duplicated here, so the `lint` target's version guard
@@ -33,7 +33,7 @@ BUILD_TAG_MATRIX?=none ax_no_grpc ax_no_otlp ax_no_grpc,ax_no_otlp
 all: build
 
 .PHONY: ci
-ci: test validate lint doc-coverage surface-check size-check bench-check
+ci: test validate lint doc-coverage surface-check size-check dead-check bench-check
 
 .PHONY: build
 build:
@@ -160,6 +160,11 @@ size-check:
 	@echo "Checking the import-isolated logging binary size and reduction ratio..."
 	go run ./internal/cmd/sizecheck
 
+# Reachability includes tests and intersects all four tag configurations.
+.PHONY: dead-check
+dead-check:
+	@go run ./internal/cmd/deadcheck
+
 .PHONY: doc-coverage
 doc-coverage:
 	@echo "Checking ExampleXxx coverage on the primary API..."
@@ -233,14 +238,14 @@ security:
 ensure: ensure-mise-tools ensure-markdownlint
 	@echo "All dev tools are ready."
 
-# Go, golangci-lint, actionlint, and govulncheck are all pinned in mise.toml;
+# Go, golangci-lint, actionlint, govulncheck, and deadcode are all pinned in mise.toml;
 # `mise install` puts every one of them on PATH via shims at the exact
 # version CI uses (.github/workflows/*.yml via jdx/mise-action). Bumping a
 # version is a one-line mise.toml edit instead of a hunt across the Makefile
 # and every workflow file.
 .PHONY: ensure-mise-tools
 ensure-mise-tools:
-	@echo "==> Go, golangci-lint, actionlint, govulncheck (pinned in mise.toml)"
+	@echo "==> Go, golangci-lint, actionlint, govulncheck, deadcode (pinned in mise.toml)"
 	@command -v mise >/dev/null 2>&1 || \
 		(echo "    mise not found. Install: https://mise.jdx.dev/installing-mise.html"; exit 1)
 	mise install
@@ -262,7 +267,7 @@ clean:
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  ci            - Run test, validate, lint, doc-coverage, surface-check, size-check, bench-check"
+	@echo "  ci            - Run test, validate, lint, doc-coverage, surface-check, size-check, dead-check, bench-check"
 	@echo "  build         - Compile the library (go build ./...)"
 	@echo "  build-example - Compile the integration example with version injection"
 	@echo "  build-example-minimal - Compile the example with -tags=ax_no_grpc,ax_no_otlp"
@@ -275,6 +280,7 @@ help:
 	@echo "  surface-check - Diff the public surface across configurations and platforms against baseline and audit"
 	@echo "  surface-update - Regenerate the exported-surface baseline for review"
 	@echo "  size-check    - Enforce the isolated logging binary ceiling and reduction ratio"
+	@echo "  dead-check    - Gate unreachable unexported/internal functions across build tags (tests included)"
 	@echo "  lint          - Run golangci-lint per build-tag combination, markdownlint, actionlint"
 	@echo "  lint-actions  - Run actionlint on GitHub workflows"
 	@echo "  validate      - Check gofmt, go mod tidy, and go vet across the build-tag matrix"

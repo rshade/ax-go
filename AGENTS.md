@@ -189,6 +189,34 @@ conflicts with the constitution, the constitution wins.
    gate across all build configurations and platforms. See **Build
    Configurations** below.
 
+### Internal Reachability Gate
+
+Run `make dead-check` before handing work back. It is included in `make ci`
+and the CI `validate` job. `internal/cmd/deadcheck` invokes the `deadcode`
+binary pinned in `mise.toml`; install it with `make ensure`.
+
+The gate intersects `deadcode -test` reports across default, `ax_no_grpc`,
+`ax_no_otlp`, and both tags on the host GOOS/GOARCH. Only unexported functions
+or functions in this module's `internal/` packages are eligible. A symbol
+absent from any report, whether reachable or excluded from that build, is not
+reported. Generated functions and marker interface methods retain deadcode's
+default exclusions. All four configurations always run.
+
+Tests count as roots alongside main packages. This catches helpers unused by
+both production and tests; it does **not** prove production usage, inspect
+other platforms, or cover exported public API. `surfacecheck` and
+`apidiff-verdict` remain the exported-surface gates. There is no baseline or
+allowlist to regenerate. Triage findings before deleting code; any future
+exception must be a reviewed Go policy change with a documented rationale.
+
+A pass emits one minified JSON object on stdout and nothing on stderr.
+Failures emit one `ax.Error` envelope on stderr and nothing on stdout;
+`context.cause` contains diagnostic locations and symbols. Exit codes are
+`2` for findings, invalid output, or tool/build failures, `3` for analysis
+timeouts, `4` for permission errors, and `1` for internal failures (including
+canceled analysis). Tool output is bounded at 16 MiB per stream and each configuration
+has a five-minute analysis timeout.
+
 ### Mandatory Spec Kit Workflow
 
 For every feature governed by Spec Kit, especially a public API or

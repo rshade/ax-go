@@ -350,3 +350,7 @@ jobs:
       # the isolated surface gained weight the root facade did not.
       - name: Check the isolated logging binary size and reduction ratio
         run: make size-check
+
+      # deadcheck owns the four-tag intersection and includes test roots.
+      - name: Check unexported and internal function reachability
+        run: make dead-check
