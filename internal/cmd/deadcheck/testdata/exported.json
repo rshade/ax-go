@@ -1,0 +1,5 @@
+[
+ {"Name":"ax","Path":"github.com/rshade/ax-go","Funcs":[{"Name":"ParseMode","Position":{"File":"mode.go","Line":24,"Col":6},"Generated":false,"Marker":false}]},
+ {"Name":"contract","Path":"github.com/rshade/ax-go/contract","Funcs":[{"Name":"SpanIDFromContext","Position":{"File":"contract/context.go","Line":111,"Col":6},"Generated":false,"Marker":false}]},
+ {"Name":"mcp","Path":"github.com/rshade/ax-go/mcp","Funcs":[{"Name":"WithAllowNonLoopback","Position":{"File":"mcp/options.go","Line":71,"Col":6},"Generated":false,"Marker":false}]}
+]

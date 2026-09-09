@@ -1,0 +1,4 @@
+[
+ {"Name":"cli","Path":"github.com/rshade/ax-go/internal/cli","Funcs":[{"Name":"Unused","Position":{"File":"internal/cli/unused.go","Line":12,"Col":6},"Generated":false,"Marker":false}]},
+ {"Name":"ax","Path":"github.com/rshade/ax-go","Funcs":[{"Name":"unused","Position":{"File":"mode.go","Line":99,"Col":6},"Generated":false,"Marker":false}]}
+]
