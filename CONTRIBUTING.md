@@ -66,7 +66,7 @@ To change the checklist content, edit the `body:` field in
 
 ## Quality gates
 
-Go, golangci-lint, actionlint, and govulncheck are pinned once in
+Go, golangci-lint, actionlint, govulncheck, and deadcode are pinned once in
 [`mise.toml`](mise.toml). Install [mise](https://mise.jdx.dev/), then run
 `make ensure` to fetch every pinned tool at the version CI uses.
 
@@ -79,6 +79,7 @@ go vet ./...
 golangci-lint run
 make doc-coverage
 make cover-check
+make dead-check
 ```
 
 All commands must exit cleanly. See [`AGENTS.md`](AGENTS.md) for the full

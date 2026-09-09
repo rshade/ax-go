@@ -521,6 +521,12 @@ byte-identical to one emitted before these fields existed.
   credentials.
 - **Idiomatic Go:** package name is `ax`. Keep abstractions narrow and tied to
   accepted ADRs.
+- **Internal reachability:** `make dead-check` (also in `make ci` and CI
+  validation) runs the mise-pinned `deadcode -test` across all four build-tag
+  configurations. It fails for unexported or internal functions reported dead
+  in every configuration. Tests count as callers, so this does not establish
+  production usage; exported public API remains the surface gates' concern.
+  Run `make ensure` to install the pinned tool.
 
 ## Architecture Decisions (ADRs)
 
