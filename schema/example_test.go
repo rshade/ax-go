@@ -30,6 +30,7 @@ func ExampleBuildMCPSchema() {
 	root := &cobra.Command{
 		Use:   "app",
 		Short: "test app",
+		RunE:  func(*cobra.Command, []string) error { return nil },
 	}
 	root.Flags().String("config", "", "config file")
 

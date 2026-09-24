@@ -10,8 +10,14 @@ import (
 	axschema "github.com/rshade/ax-go/schema"
 )
 
+// newNonDeterministicCommand returns a runnable command; a non-runnable one is
+// never projected as a tool.
 func newNonDeterministicCommand(use string) *cobra.Command {
-	return &cobra.Command{Use: use, Short: use + " short description"}
+	return &cobra.Command{
+		Use:   use,
+		Short: use + " short description",
+		RunE:  func(*cobra.Command, []string) error { return nil },
+	}
 }
 
 func TestBuildEmptyRootHasExplicitNonDeterministicFields(t *testing.T) {

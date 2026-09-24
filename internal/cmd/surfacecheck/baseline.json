@@ -1694,6 +1694,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:Exclude",
+          "signature": "func(*github.com/spf13/cobra.Command)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:NewCommand",
           "signature": "func(*github.com/spf13/cobra.Command, ...Option) *github.com/spf13/cobra.Command",
           "configurations": "all",

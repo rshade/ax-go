@@ -14,6 +14,7 @@ import (
 
 	ax "github.com/rshade/ax-go"
 	"github.com/rshade/ax-go/contract"
+	internalmcp "github.com/rshade/ax-go/internal/mcp"
 )
 
 const echoStderrMarker = "echo-command-diagnostic"
@@ -802,5 +803,35 @@ func TestDispatchFlushesGuardAuditLinesOnPanic(t *testing.T) {
 	}
 	if !strings.Contains(got, "ax: effect did not return normally") {
 		t.Errorf("server stderr missing Guard abnormal-termination audit line; got: %q", got)
+	}
+}
+
+// TestDispatchExcludedCommandIsUnknownTool asserts a command carrying the
+// exclusion annotation is never registered: calling its derived name hits the
+// dispatcher's unknown-tool validation guard and its RunE never runs.
+func TestDispatchExcludedCommandIsUnknownTool(t *testing.T) {
+	var calls int
+	root := &cobra.Command{Use: "demo", RunE: noopRunE}
+	serve := &cobra.Command{Use: "serve", RunE: func(*cobra.Command, []string) error {
+		calls++
+		return nil
+	}}
+	internalmcp.MarkExcluded(serve)
+	root.AddCommand(serve)
+
+	d := newTestDispatcher(root)
+	res := mustCall(t, d, "demo-serve", nil)
+	if !res.IsError {
+		t.Fatalf("expected IsError, got success: %s", resultText(t, res))
+	}
+	envelope := decodeErrorEnvelope(t, resultText(t, res))
+	if envelope.ErrorCode != "validation_error" {
+		t.Errorf("error_code = %q, want %q", envelope.ErrorCode, "validation_error")
+	}
+	if want := `unknown tool "demo-serve"`; !strings.Contains(envelope.Message, want) {
+		t.Errorf("message = %q, want it to contain %q", envelope.Message, want)
+	}
+	if calls != 0 {
+		t.Errorf("excluded RunE ran %d times, want 0", calls)
 	}
 }

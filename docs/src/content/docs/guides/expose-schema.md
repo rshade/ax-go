@@ -93,8 +93,9 @@ Run it over stdio (the default transport):
 yourcli mcp-server
 ```
 
-Every non-hidden command becomes a callable MCP tool — except `__schema` and
-`mcp-server` themselves, which are reserved. To serve over HTTP instead:
+Every visible, runnable command becomes a callable MCP tool. The rules are
+covered in [Excluding commands](#excluding-commands) below. To serve over HTTP
+instead:
 
 ```bash
 yourcli mcp-server --transport=http --addr=127.0.0.1:8080
@@ -107,6 +108,40 @@ without it, startup fails with a validation error (exit `2`). A placeholder
 version (`dev`, `unknown`, or empty) is rejected the same way — inject a real
 one.
 :::
+
+## Excluding commands
+
+`__schema --as=mcp` and `mcp-server` share one walk of your command tree, so
+they always list the same tools. That walk applies these rules:
+
+| Command | Effect on the tool list |
+| --- | --- |
+| `Hidden: true` | Dropped with its whole subtree |
+| Reserved: `__schema`, `mcp-server`, `completion`, `help` | Dropped with its whole subtree |
+| Pure group with no `Run` or `RunE` | Dropped on its own; children stay tools |
+| Marked with `mcp.Exclude` | Dropped on its own; children stay tools |
+
+A group command only prints usage, which is prose rather than a machine
+payload, so it never becomes a tool. A command named `help` is reserved even
+when you define it yourself; rename it if you want it callable.
+
+Use `mcp.Exclude` for a command an agent should not call, such as an
+interactive TUI root or a long-running server that would block every later
+tool call:
+
+```go
+import "github.com/rshade/ax-go/mcp"
+
+mcp.Exclude(root)  // the TUI root; its subcommands stay tools
+mcp.Exclude(serve) // a blocking server command
+```
+
+An excluded command still appears in `--help` and in `__schema --as=ax`.
+Calling its tool name returns the same unknown-tool error as any name the
+server never registered, and the command does not run. Exclusion is a Cobra
+annotation (`github.com/rshade/ax-go/mcp/exclude` set to `true`); any other
+value is ignored. To hide a command from humans too, set `Hidden: true`
+instead.
 
 ## Keep the schema stable in CI
 

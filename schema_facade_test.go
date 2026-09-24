@@ -9,7 +9,12 @@ import (
 )
 
 func TestRootSchemaFacadeUsesIsolatedTypes(t *testing.T) {
-	root := &cobra.Command{Use: "app", Short: "test app", Example: "app run"}
+	root := &cobra.Command{
+		Use:     "app",
+		Short:   "test app",
+		Example: "app run",
+		RunE:    func(*cobra.Command, []string) error { return nil },
+	}
 	var option isolatedschema.Option = WithSchemaVersion("v0.1.0")
 	var got isolatedschema.Schema = BuildSchema(root, option)
 	if got.Tool != "app" {

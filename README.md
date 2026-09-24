@@ -318,8 +318,14 @@ mycli mcp-server --transport=http --addr=127.0.0.1:8080     # loopback HTTP
 mycli mcp-server --transport=http --addr=0.0.0.0:8080 --allow-non-loopback
 ```
 
-- **Discovery**: every non-hidden command becomes a tool (reusing
-  `schema.BuildMCPSchema`); `__schema` and `mcp-server` are excluded.
+- **Discovery**: every visible, runnable command becomes a tool (reusing
+  `schema.BuildMCPSchema`, so `__schema --as=mcp` and `mcp-server` always
+  agree). A hidden command and the reserved `__schema`, `mcp-server`,
+  `completion`, and `help` commands drop out with their whole subtree; a pure
+  group command (no `Run`/`RunE`) drops out on its own and its children stay
+  tools. Call `mcp.Exclude(cmd)` to keep one command, such as a TUI root or a
+  long-running `serve`, out of MCP while leaving its children callable and the
+  command itself in `--help`.
 - **Execution**: `tools/call` runs the command in machine/JSON mode and returns
   its verbatim `stdout` payload; a non-zero exit returns the `ax.Error` envelope
   with `IsError` set, and the server keeps serving.

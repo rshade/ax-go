@@ -24,15 +24,26 @@ const (
 
 // Reserved command names never exposed as MCP tools on either the static
 // (--as=mcp) or live (mcp-server) path: __schema and mcp-server are ax-go
-// infrastructure, and Cobra's completion tree is shell ergonomics an MCP
-// client cannot use. schemaCommandName and serverCommandName mirror
-// internal/mcpserver's names (it re-exports serverCommandName as
-// ServerCommandName); internal/mcp cannot import internal/mcpserver without an
-// import cycle, so the literals are duplicated here and must stay in sync.
+// infrastructure, and Cobra's completion and help commands are shell
+// ergonomics that return prose, not a machine payload. schemaCommandName and
+// serverCommandName mirror internal/mcpserver's names (it re-exports
+// serverCommandName as ServerCommandName); internal/mcp cannot import
+// internal/mcpserver without an import cycle, so the literals are duplicated
+// here and must stay in sync.
 const (
 	schemaCommandName     = "__schema"
 	serverCommandName     = "mcp-server"
 	completionCommandName = "completion"
+	helpCommandName       = "help"
+)
+
+// ExcludeAnnotationKey is the Cobra annotation that removes a single command
+// from the MCP tool set on both the static and live paths. Only the exact
+// canonical value excludeAnnotationValue excludes; any other value is ignored
+// so a typo can never silently drop a tool.
+const (
+	ExcludeAnnotationKey   = "github.com/rshade/ax-go/mcp/exclude"
+	excludeAnnotationValue = "true"
 )
 
 // Schema is the internal MCP-compatible adapter shape.
@@ -48,9 +59,8 @@ type Tool struct {
 	NonDeterministicFields []string
 }
 
-// Build adapts a Cobra command tree to MCP-compatible tool metadata. Hidden
-// subtrees are pruned wholesale and the reserved __schema, mcp-server, and
-// completion commands are excluded, so the static --as=mcp adapter and the live
+// Build adapts a Cobra command tree to MCP-compatible tool metadata using the
+// WalkCallableCommands rules, so the static --as=mcp adapter and the live
 // mcp-server advertise the same tool set.
 func Build(root *cobra.Command) Schema {
 	var tools []Tool
@@ -81,23 +91,46 @@ func ToolName(cmd *cobra.Command) string {
 
 // WalkCallableCommands visits cmd and every descendant that may surface as an
 // MCP tool. A hidden command prunes its whole subtree (matching
-// internal/schema.BuildCommand's documented pruning), and reserved
-// infrastructure commands (__schema, mcp-server, completion) are skipped.
+// internal/schema.BuildCommand's documented pruning), as does a reserved
+// command (__schema, mcp-server, completion, help). A command that is not
+// runnable (a pure group with neither Run nor RunE) or that carries the
+// exclusion annotation is skipped on its own, and its children are still
+// walked.
 func WalkCallableCommands(cmd *cobra.Command, visit func(*cobra.Command)) {
 	if cmd.Hidden || isReservedCommand(cmd.Name()) {
 		return
 	}
-	visit(cmd)
+	if cmd.Runnable() && !IsExcluded(cmd) {
+		visit(cmd)
+	}
 	for _, child := range cmd.Commands() {
 		WalkCallableCommands(child, visit)
 	}
 }
 
-// isReservedCommand reports whether name is a reserved infrastructure command
-// that must never surface as an MCP tool on either the static or live path.
+// IsExcluded reports whether cmd carries ExcludeAnnotationKey with its
+// canonical value. A nil command is never excluded.
+func IsExcluded(cmd *cobra.Command) bool {
+	return cmd != nil && cmd.Annotations[ExcludeAnnotationKey] == excludeAnnotationValue
+}
+
+// MarkExcluded sets ExcludeAnnotationKey on cmd, allocating its annotation map
+// if needed and leaving other annotations intact. It is a no-op on nil.
+func MarkExcluded(cmd *cobra.Command) {
+	if cmd == nil {
+		return
+	}
+	if cmd.Annotations == nil {
+		cmd.Annotations = make(map[string]string)
+	}
+	cmd.Annotations[ExcludeAnnotationKey] = excludeAnnotationValue
+}
+
+// isReservedCommand reports whether name is a reserved command that must never
+// surface as an MCP tool on either the static or live path.
 func isReservedCommand(name string) bool {
 	switch name {
-	case schemaCommandName, serverCommandName, completionCommandName:
+	case schemaCommandName, serverCommandName, completionCommandName, helpCommandName:
 		return true
 	default:
 		return false
