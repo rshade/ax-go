@@ -119,7 +119,8 @@ go run ./examples/integration crash --format=json    # exit 1 — internal (bare
 envelope with exit code 1.
 
 Run this CLI as a live MCP server (it mounts `mcp.NewCommand`, so every
-non-hidden command becomes an MCP tool with no per-tool work):
+visible, runnable command becomes an MCP tool with no per-tool work; Cobra's
+`help` command is reserved and never listed):
 
 ```sh
 go run ./examples/integration mcp-server                          # stdio

@@ -135,8 +135,9 @@ func newMCPServer(dispatch *dispatcher, cfg Config) *sdk.Server {
 // discoverTools projects root's command tree into the callable MCP tool set and
 // the name→command target map dispatch uses to resolve calls. The walk shares
 // internal/mcp's traversal with the static __schema --as=mcp adapter — hidden
-// subtrees pruned wholesale, the reserved __schema, mcp-server, and completion
-// commands excluded (D8, FR-004/005/006, INV-3) — so the live and static tool
+// subtrees and the reserved __schema, mcp-server, completion, and help
+// commands pruned wholesale, non-runnable and mcp.Exclude-marked commands
+// skipped node-only (D8, FR-004/005/006, INV-3) — so the live and static tool
 // sets cannot diverge. Commands that require positional arguments are excluded
 // on top (see requiresPositionalArgs).
 func discoverTools(root *cobra.Command) ([]schema.MCPTool, map[string]*cobra.Command) {

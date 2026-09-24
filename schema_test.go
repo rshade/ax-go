@@ -100,12 +100,14 @@ func newSchemaTestCommand() *cobra.Command {
 		Use:     "app",
 		Short:   "test app",
 		Example: "app run --name demo",
+		RunE:    func(*cobra.Command, []string) error { return nil },
 	}
 	root.PersistentFlags().String("config", "", "config file")
 	run := &cobra.Command{
 		Use:     "run",
 		Short:   "run something",
 		Example: "app run --name demo",
+		RunE:    func(*cobra.Command, []string) error { return nil },
 	}
 	run.Flags().String("name", "", "name to use")
 	root.AddCommand(run)

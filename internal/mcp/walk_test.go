@@ -111,3 +111,128 @@ func TestBuildIsDeterministic(t *testing.T) {
 		t.Errorf("tool order differs across runs: %v vs %v", firstNames, secondNames)
 	}
 }
+
+// TestWalkCallableCommandsSkipRules pins the node-only and subtree skip rules:
+// a non-runnable or excluded command is skipped without pruning its children,
+// while a hidden or reserved command (help included) prunes its whole subtree.
+func TestWalkCallableCommandsSkipRules(t *testing.T) {
+	tests := []struct {
+		name  string
+		build func() *cobra.Command
+		want  []string
+	}{
+		{
+			name: "non-runnable group skipped, runnable child kept",
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo", RunE: noopRunE}
+				group := &cobra.Command{Use: "group"}
+				group.AddCommand(&cobra.Command{Use: "child", RunE: noopRunE})
+				root.AddCommand(group)
+				return root
+			},
+			want: []string{"demo", "demo group child"},
+		},
+		{
+			name: "non-runnable root skipped, descendants kept",
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo"}
+				root.AddCommand(&cobra.Command{Use: "alpha", RunE: noopRunE})
+				group := &cobra.Command{Use: "group"}
+				group.AddCommand(&cobra.Command{Use: "child", Run: func(*cobra.Command, []string) {}})
+				root.AddCommand(group)
+				return root
+			},
+			want: []string{"demo alpha", "demo group child"},
+		},
+		{
+			name: "cobra default help command skipped",
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo", RunE: noopRunE}
+				root.AddCommand(&cobra.Command{Use: "work", RunE: noopRunE})
+				root.InitDefaultHelpCmd()
+				return root
+			},
+			want: []string{"demo", "demo work"},
+		},
+		{
+			name: "adopter-defined help subtree pruned",
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo", RunE: noopRunE}
+				help := &cobra.Command{Use: "help", RunE: noopRunE}
+				help.AddCommand(&cobra.Command{Use: "topics", RunE: noopRunE})
+				root.AddCommand(help)
+				return root
+			},
+			want: []string{"demo"},
+		},
+		{
+			name: "excluded runnable root skipped, children kept",
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo", RunE: noopRunE}
+				MarkExcluded(root)
+				root.AddCommand(&cobra.Command{Use: "alpha", RunE: noopRunE})
+				root.AddCommand(&cobra.Command{Use: "beta", RunE: noopRunE})
+				return root
+			},
+			want: []string{"demo alpha", "demo beta"},
+		},
+		{
+			name: "excluded leaf skipped",
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo", RunE: noopRunE}
+				serve := &cobra.Command{Use: "serve", RunE: noopRunE}
+				MarkExcluded(serve)
+				root.AddCommand(serve)
+				root.AddCommand(&cobra.Command{Use: "work", RunE: noopRunE})
+				return root
+			},
+			want: []string{"demo", "demo work"},
+		},
+		{
+			name: "excluded parent with excluded and plain children",
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo", RunE: noopRunE}
+				parent := &cobra.Command{Use: "parent", RunE: noopRunE}
+				MarkExcluded(parent)
+				skipped := &cobra.Command{Use: "skipped", RunE: noopRunE}
+				MarkExcluded(skipped)
+				parent.AddCommand(skipped)
+				parent.AddCommand(&cobra.Command{Use: "kept", RunE: noopRunE})
+				root.AddCommand(parent)
+				return root
+			},
+			want: []string{"demo", "demo parent kept"},
+		},
+		{
+			name: "hidden and excluded behaves like hidden",
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo", RunE: noopRunE}
+				admin := &cobra.Command{Use: "admin", Hidden: true, RunE: noopRunE}
+				MarkExcluded(admin)
+				admin.AddCommand(&cobra.Command{Use: "reset", RunE: noopRunE})
+				root.AddCommand(admin)
+				return root
+			},
+			want: []string{"demo"},
+		},
+		{
+			name: "only runnable commands excluded yields nothing",
+			build: func() *cobra.Command {
+				root := &cobra.Command{Use: "demo"}
+				leaf := &cobra.Command{Use: "leaf", RunE: noopRunE}
+				MarkExcluded(leaf)
+				root.AddCommand(leaf)
+				return root
+			},
+			want: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := walkPaths(tt.build()); !slices.Equal(got, tt.want) {
+				t.Errorf("visited %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

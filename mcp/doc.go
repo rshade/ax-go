@@ -7,10 +7,19 @@
 // CLI mounts to expose itself (for example, "mycli mcp-server"). Tools are
 // discovered through the same internal/mcp projection (WalkCallableCommands
 // and BuildTool) that backs the static "__schema --as=mcp" adapter, so the
-// live tool set stays in lock-step with the static schema. A tools/call
-// dispatches back into the command tree, returning the command's verbatim
-// stdout payload on success and the ax.Error envelope on failure, while the
-// server keeps serving.
+// live tool set stays in lock-step with the static schema.
+//
+// That walk applies three skip rules. A hidden command drops out with its
+// whole subtree, as do the reserved __schema, mcp-server, completion, and help
+// commands. A command that is not runnable (a pure group with neither Run nor
+// RunE) drops out on its own, and its children are still walked. A command
+// marked with Exclude also drops out on its own. Every rule lives on the
+// command tree, never in server options, so the static and live surfaces
+// cannot drift. Excluded commands remain in --help and "__schema --as=ax".
+//
+// A tools/call dispatches back into the command tree, returning the command's
+// verbatim stdout payload on success and the ax.Error envelope on failure,
+// while the server keeps serving.
 //
 // The server runs over stdio (the default) or a streamable HTTP transport that
 // binds loopback by default and fails closed against accidental public exposure

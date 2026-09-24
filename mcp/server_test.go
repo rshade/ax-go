@@ -55,18 +55,19 @@ func newDemoRoot() *cobra.Command {
 // public Serve over real loopback HTTP is the in-process way to exercise the
 // public entry point end-to-end; StdioTransport binds the process's own
 // stdin/stdout and cannot be driven from within a test.
-func serveTestHTTP(t *testing.T, root *cobra.Command, opts ...mcp.Option) *sdk.ClientSession {
+func serveTestHTTP(t *testing.T, root *cobra.Command) *sdk.ClientSession {
 	t.Helper()
 
 	addr := freeLoopbackAddr(t)
 	ctx, cancel := context.WithCancel(context.Background())
 	serveErr := make(chan error, 1)
-	allOpts := append([]mcp.Option{
-		mcp.WithTransport(mcp.TransportHTTP),
-		mcp.WithHTTPAddr(addr),
-		mcp.WithVersion(testVersion),
-	}, opts...)
-	go func() { serveErr <- mcp.Serve(ctx, root, allOpts...) }()
+	go func() {
+		serveErr <- mcp.Serve(ctx, root,
+			mcp.WithTransport(mcp.TransportHTTP),
+			mcp.WithHTTPAddr(addr),
+			mcp.WithVersion(testVersion),
+		)
+	}()
 
 	waitForListener(t, addr)
 
