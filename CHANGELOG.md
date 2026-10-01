@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.7.1](https://github.com/rshade/ax-go/compare/v0.7.0...v0.7.1) (2026-10-01)
+
+
+### Fixed
+
+* **docs:** show sidebar on docs homepage ([0d2dbbe](https://github.com/rshade/ax-go/commit/0d2dbbec873a0198116216bb105c8d76d3cdb7e4))
+
 ## [0.7.0](https://github.com/rshade/ax-go/compare/v0.6.0...v0.7.0) (2026-09-24)
 
 
