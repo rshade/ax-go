@@ -184,11 +184,7 @@ jobs:
         run: golangci-lint run --timeout=5m
 
       - name: Run markdownlint
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx --yes markdownlint-cli@0.49.0 \
-            AGENTS.md README.md CONTRIBUTING.md .github/copilot-instructions.md 'docs/**/*.md'
+        run: make lint-markdown
 
       - name: Run actionlint
         run: find .github/workflows -name '*.yml' -not -name '*.lock.yml' -print0 | xargs -0 actionlint
