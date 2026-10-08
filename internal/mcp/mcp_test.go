@@ -247,7 +247,7 @@ func TestBuildToolCapability(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.class, func(t *testing.T) {
 			cmd := &cobra.Command{Use: "demo", RunE: noopRunE}
-			if err := internalschema.DeclareCapability(cmd, tc.class, "note"); err != nil {
+			if err := internalschema.AddCapability(cmd, tc.class, "note"); err != nil {
 				t.Fatalf("DeclareCapability: %v", err)
 			}
 			tool := BuildTool(cmd)
@@ -275,7 +275,7 @@ func TestBuildToolCapability(t *testing.T) {
 			{Use: "mcp-server", RunE: noopRunE},
 			{Use: "completion", RunE: noopRunE},
 		} {
-			if err := internalschema.DeclareCapability(child, "admin", ""); err != nil {
+			if err := internalschema.AddCapability(child, "admin", ""); err != nil {
 				t.Fatalf("DeclareCapability(%s): %v", child.Use, err)
 			}
 			root.AddCommand(child)

@@ -320,32 +320,34 @@ prompts or resources yet; that runtime phase is deferred
 
 #### Declaring flag and command semantics
 
-Three declaration functions, in the same `With…(cmd, …)` idiom, add the facts
-an agent needs to call a command correctly on the first try. `default` and
-`required` are still derived from Cobra, so you do not declare them again. Each
-function returns an error wrapping `ax.ErrInvalidDeclaration` for an authoring
-mistake, such as a default outside the enum, and leaves the command unchanged:
+Three more declaration functions, in the same `Declare…(cmd, …)` idiom as
+`DeclarePrompt`, add the facts an agent needs to call a command correctly on the
+first try. `default` and `required` are still derived from Cobra, so you do not
+declare them again. An authoring mistake, such as a default outside the enum,
+returns the same `invalid_schema_declaration` error as `DeclarePrompt` (exit
+`2`, with `context.field` and `context.reason`) and leaves the command
+unchanged:
 
 ```go
 cmd.Flags().String("output", "json", "output format")
 cmd.Flags().Duration("timeout", 30*time.Second, "deadline")
 
-if err := ax.WithFlagEnum(cmd, "output", "json", "table", "yaml"); err != nil {
+if err := ax.DeclareFlagEnum(cmd, "output", "json", "table", "yaml"); err != nil {
     return err
 }
-if err := ax.WithFlagExample(cmd, "timeout", "45s"); err != nil {
+if err := ax.DeclareFlagExample(cmd, "timeout", "45s"); err != nil {
     return err
 }
-if err := ax.WithCapability(cmd, ax.CapabilityMutate, "idempotent by release name"); err != nil {
+if err := ax.DeclareCapability(cmd, ax.CapabilityMutate, "idempotent by release name"); err != nil {
     return err
 }
 ```
 
 | Declaration | `__schema` | `__schema --as=mcp` |
 |-------------|------------|---------------------|
-| `WithFlagEnum` | flag `enum`, CLI strings in author order | typed JSON-Schema `enum` |
-| `WithFlagExample` | flag `example`, in CLI form | one-element `examples` array |
-| `WithCapability` | command `capability: {class, note}` | tool `capability` plus MCP `annotations` hints |
+| `DeclareFlagEnum` | flag `enum`, CLI strings in author order | typed JSON-Schema `enum` |
+| `DeclareFlagExample` | flag `example`, in CLI form | one-element `examples` array |
+| `DeclareCapability` | command `capability: {class, note}` | tool `capability` plus MCP `annotations` hints |
 
 The capability class comes from a fixed vocabulary. A command that never
 declares one is unclassified: the field is omitted and no class is implied.

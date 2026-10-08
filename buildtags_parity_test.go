@@ -249,7 +249,10 @@ func TestBuildTagParityIdempotencyKeyIsSurfaced(t *testing.T) {
 // enriched goldens in whichever configuration this binary was built for.
 func TestBuildTagParityEnrichedSchemaMatchesGolden(t *testing.T) {
 	var native, mcp bytes.Buffer
-	if err := WriteJSON(&native, BuildSchema(newEnrichedSchemaTestCommand(t), WithSchemaVersion("v0.1.0"))); err != nil {
+	if err := WriteJSON(
+		&native,
+		BuildSchema(newEnrichedSchemaTestCommand(t), WithSchemaVersion("v0.1.0")),
+	); err != nil {
 		t.Fatalf("WriteJSON returned error: %v", err)
 	}
 	assertGolden(t, "testdata/schema_ax_enriched.golden.json", native.Bytes())

@@ -312,8 +312,8 @@ func TestToolsListCarriesCapabilityAnnotations(t *testing.T) {
 	}
 	for use, class := range classes {
 		cmd := &cobra.Command{Use: use, Short: use, RunE: noopRunE}
-		if err := schema.WithCapability(cmd, class, ""); err != nil {
-			t.Fatalf("WithCapability(%s): %v", use, err)
+		if err := schema.DeclareCapability(cmd, class, ""); err != nil {
+			t.Fatalf("DeclareCapability(%s): %v", use, err)
 		}
 		root.AddCommand(cmd)
 	}
@@ -357,13 +357,17 @@ func TestDiscoverToolsCapabilityMatchesStaticAdapter(t *testing.T) {
 		root := fixedRoot()
 		for _, child := range root.Commands() {
 			if child.Name() == "greet" {
-				if err := schema.WithCapability(child, schema.CapabilityCreate, "one greeting per call"); err != nil {
-					t.Fatalf("WithCapability: %v", err)
+				if err := schema.DeclareCapability(
+					child,
+					schema.CapabilityCreate,
+					"one greeting per call",
+				); err != nil {
+					t.Fatalf("DeclareCapability: %v", err)
 				}
 			}
 		}
-		if err := schema.WithCapability(root, schema.CapabilityExternalNetwork, ""); err != nil {
-			t.Fatalf("WithCapability: %v", err)
+		if err := schema.DeclareCapability(root, schema.CapabilityExternalNetwork, ""); err != nil {
+			t.Fatalf("DeclareCapability: %v", err)
 		}
 		return root
 	}

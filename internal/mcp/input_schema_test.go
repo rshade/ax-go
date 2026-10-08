@@ -483,7 +483,7 @@ func TestInputSchemaEnum(t *testing.T) {
 			cmd := &cobra.Command{Use: "demo", RunE: noopRunE}
 			tc.register(cmd)
 			if tc.values != nil {
-				if err := internalschema.DeclareFlagEnum(cmd, tc.flagName, tc.values); err != nil {
+				if err := internalschema.AddFlagEnum(cmd, tc.flagName, tc.values); err != nil {
 					t.Fatalf("DeclareFlagEnum: %v", err)
 				}
 			}
@@ -505,7 +505,7 @@ func TestInputSchemaEnum(t *testing.T) {
 		root.PersistentFlags().String("region", "us", "region")
 		child := &cobra.Command{Use: "deploy", RunE: noopRunE}
 		root.AddCommand(child)
-		if err := internalschema.DeclareFlagEnum(root, "region", []string{"us", "eu"}); err != nil {
+		if err := internalschema.AddFlagEnum(root, "region", []string{"us", "eu"}); err != nil {
 			t.Fatalf("DeclareFlagEnum: %v", err)
 		}
 		got := schemaProperty(t, BuildTool(child), "region")["enum"]
@@ -559,7 +559,7 @@ func TestInputSchemaExamples(t *testing.T) {
 			cmd := &cobra.Command{Use: "demo", RunE: noopRunE}
 			tc.register(cmd)
 			if tc.example != "" {
-				if err := internalschema.DeclareFlagExample(cmd, tc.flagName, tc.example); err != nil {
+				if err := internalschema.AddFlagExample(cmd, tc.flagName, tc.example); err != nil {
 					t.Fatalf("DeclareFlagExample: %v", err)
 				}
 			}

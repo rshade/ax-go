@@ -123,7 +123,7 @@ func TestEnumValueSet(t *testing.T) {
 
 func mustDeclareEnum(t *testing.T, cmd *cobra.Command, flag string, values ...string) {
 	t.Helper()
-	if err := DeclareFlagEnum(cmd, flag, values); err != nil {
-		t.Fatalf("DeclareFlagEnum(%s): %v", flag, err)
+	if err := AddFlagEnum(cmd, flag, values); err != nil {
+		t.Fatalf("AddFlagEnum(%s): %v", flag, err)
 	}
 }

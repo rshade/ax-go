@@ -97,23 +97,20 @@ func DeclareResource(cmd *cobra.Command, resource Resource) error {
 	return isolatedschema.DeclareResource(cmd, resource)
 }
 
-// ErrInvalidDeclaration is wrapped by every authoring error returned from
-// WithFlagEnum, WithFlagExample, and WithCapability. It is the same value as
-// schema.ErrInvalidDeclaration, so errors.Is holds across both packages.
-var ErrInvalidDeclaration = isolatedschema.ErrInvalidDeclaration
-
-// WithFlagEnum declares the only values the named flag accepts; a value outside
-// the set is rejected at parse time with validation_error and exit code 2,
-// before PersistentPreRunE and RunE and so before any dry-run handling. See
-// schema.WithFlagEnum for the full contract.
-func WithFlagEnum(cmd *cobra.Command, flag string, values ...string) error {
-	return isolatedschema.WithFlagEnum(cmd, flag, values...)
+// DeclareFlagEnum declares the only values the named flag accepts; a value
+// outside the set is rejected at parse time with validation_error and exit
+// code 2, before PersistentPreRunE and RunE and so before any dry-run handling.
+// An authoring mistake returns an *Error with error_code
+// invalid_schema_declaration (exit 2), like DeclarePrompt. See
+// schema.DeclareFlagEnum for the full contract.
+func DeclareFlagEnum(cmd *cobra.Command, flag string, values ...string) error {
+	return isolatedschema.DeclareFlagEnum(cmd, flag, values...)
 }
 
-// WithFlagExample attaches one CLI-form example value to the named flag. See
-// schema.WithFlagExample for the full contract.
-func WithFlagExample(cmd *cobra.Command, flag string, example string) error {
-	return isolatedschema.WithFlagExample(cmd, flag, example)
+// DeclareFlagExample attaches one CLI-form example value to the named flag. See
+// schema.DeclareFlagExample for the full contract.
+func DeclareFlagExample(cmd *cobra.Command, flag string, example string) error {
+	return isolatedschema.DeclareFlagExample(cmd, flag, example)
 }
 
 // Capability is a command's side-effect class from ax-go's fixed vocabulary.
@@ -144,9 +141,9 @@ type CapabilitySchema = isolatedschema.CapabilitySchema
 // class.
 type MCPToolAnnotations = isolatedschema.MCPToolAnnotations
 
-// WithCapability classifies cmd's side effects with one class from the fixed
-// vocabulary plus an optional note. See schema.WithCapability for the full
+// DeclareCapability classifies cmd's side effects with one class from the fixed
+// vocabulary plus an optional note. See schema.DeclareCapability for the full
 // contract.
-func WithCapability(cmd *cobra.Command, class Capability, note string) error {
-	return isolatedschema.WithCapability(cmd, class, note)
+func DeclareCapability(cmd *cobra.Command, class Capability, note string) error {
+	return isolatedschema.DeclareCapability(cmd, class, note)
 }

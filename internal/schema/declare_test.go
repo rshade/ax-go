@@ -1,7 +1,6 @@
 package schema
 
 import (
-	"errors"
 	"maps"
 	"reflect"
 	"strings"
@@ -44,30 +43,24 @@ func TestLookupFlag(t *testing.T) {
 	root.AddCommand(child)
 
 	cases := []struct {
-		name    string
-		cmd     *cobra.Command
-		flag    string
-		wantErr string
+		name string
+		cmd  *cobra.Command
+		flag string
+		want *Violation
 	}{
 		{name: "local flag", cmd: child, flag: "output"},
 		{name: "persistent flag on owner", cmd: root, flag: "region"},
-		{name: "nil command", cmd: nil, flag: "output", wantErr: "nil command"},
-		{name: "missing flag", cmd: child, flag: "nope", wantErr: "app deploy"},
+		{name: "nil command", cmd: nil, flag: "output", want: &Violation{Field: "cmd", Reason: ReasonNilCommand}},
+		{name: "missing flag", cmd: child, flag: "nope", want: &Violation{Field: "flag", Reason: ReasonFlagNotFound}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			flag, err := lookupFlag(tc.cmd, tc.flag)
-			if tc.wantErr == "" {
-				if err != nil || flag == nil || flag.Name != tc.flag {
-					t.Fatalf("lookupFlag() = (%v, %v), want flag %q", flag, err, tc.flag)
-				}
-				return
+			flag, violation := lookupFlag(tc.cmd, tc.flag)
+			if !reflect.DeepEqual(violation, tc.want) {
+				t.Fatalf("lookupFlag() violation = %+v, want %+v", violation, tc.want)
 			}
-			if !errors.Is(err, ErrInvalidDeclaration) {
-				t.Fatalf("lookupFlag() error = %v, want ErrInvalidDeclaration", err)
-			}
-			if !strings.Contains(err.Error(), tc.wantErr) {
-				t.Fatalf("lookupFlag() error = %q, want it to mention %q", err, tc.wantErr)
+			if tc.want == nil && (flag == nil || flag.Name != tc.flag) {
+				t.Fatalf("lookupFlag() flag = %v, want %q", flag, tc.flag)
 			}
 		})
 	}
@@ -112,14 +105,14 @@ func enumFixture() (*cobra.Command, *cobra.Command) {
 	return root, child
 }
 
-func TestDeclareFlagEnum(t *testing.T) {
+func TestAddFlagEnum(t *testing.T) {
 	cases := []struct {
 		name    string
 		target  string
 		flag    string
 		values  []string
 		example string
-		wantErr bool
+		want    *Violation
 	}{
 		{name: "string", flag: "output", values: []string{"json", "table"}},
 		{name: "int", flag: "n", values: []string{"1", "3", "5"}},
@@ -127,20 +120,87 @@ func TestDeclareFlagEnum(t *testing.T) {
 		{name: "custom type", flag: "format", values: []string{"json", "yaml"}},
 		{name: "persistent on owner", target: "root", flag: "region", values: []string{"us", "eu"}},
 		{name: "empty default exempt", flag: "mode", values: []string{"fast", "slow"}},
-		{name: "nil command", target: "nil", flag: "output", values: []string{"json"}, wantErr: true},
-		{name: "missing flag", flag: "nope", values: []string{"x"}, wantErr: true},
-		{name: "bool", flag: "force", values: []string{"true"}, wantErr: true},
-		{name: "count", flag: "verbose", values: []string{"1"}, wantErr: true},
-		{name: "float64", flag: "ratio", values: []string{"0.5"}, wantErr: true},
-		{name: "duration", flag: "timeout", values: []string{"0s"}, wantErr: true},
-		{name: "stringSlice", flag: "tags", values: []string{"a"}, wantErr: true},
-		{name: "custom slice", flag: "csv", values: []string{"a"}, wantErr: true},
-		{name: "empty values", flag: "output", values: nil, wantErr: true},
-		{name: "non-int on int", flag: "n", values: []string{"3", "x"}, wantErr: true},
-		{name: "int8 overflow", flag: "small", values: []string{"0", "300"}, wantErr: true},
-		{name: "canonical duplicates", flag: "n", values: []string{"3", "03"}, wantErr: true},
-		{name: "default outside set", flag: "output", values: []string{"table", "yaml"}, wantErr: true},
-		{name: "example outside set", flag: "output", values: []string{"json", "table"}, example: "yaml", wantErr: true},
+		{
+			name:   "nil command",
+			target: "nil",
+			flag:   "output",
+			values: []string{"json"},
+			want:   &Violation{Field: "cmd", Reason: ReasonNilCommand},
+		},
+		{
+			name:   "missing flag",
+			flag:   "nope",
+			values: []string{"x"},
+			want:   &Violation{Field: "flag", Reason: ReasonFlagNotFound},
+		},
+		{
+			name:   "bool",
+			flag:   "force",
+			values: []string{"true"},
+			want:   &Violation{Field: "flag", Reason: ReasonUnsupportedType},
+		},
+		{
+			name:   "count",
+			flag:   "verbose",
+			values: []string{"1"},
+			want:   &Violation{Field: "flag", Reason: ReasonUnsupportedType},
+		},
+		{
+			name:   "float64",
+			flag:   "ratio",
+			values: []string{"0.5"},
+			want:   &Violation{Field: "flag", Reason: ReasonUnsupportedType},
+		},
+		{
+			name:   "duration",
+			flag:   "timeout",
+			values: []string{"0s"},
+			want:   &Violation{Field: "flag", Reason: ReasonUnsupportedType},
+		},
+		{
+			name:   "stringSlice",
+			flag:   "tags",
+			values: []string{"a"},
+			want:   &Violation{Field: "flag", Reason: ReasonUnsupportedType},
+		},
+		{
+			name:   "custom slice",
+			flag:   "csv",
+			values: []string{"a"},
+			want:   &Violation{Field: "flag", Reason: ReasonUnsupportedType},
+		},
+		{name: "empty values", flag: "output", values: nil, want: &Violation{Field: "values", Reason: ReasonRequired}},
+		{
+			name:   "non-int on int",
+			flag:   "n",
+			values: []string{"3", "x"},
+			want:   &Violation{Field: "values", Reason: ReasonInvalidValue},
+		},
+		{
+			name:   "int8 overflow",
+			flag:   "small",
+			values: []string{"0", "300"},
+			want:   &Violation{Field: "values", Reason: ReasonInvalidValue},
+		},
+		{
+			name:   "canonical duplicates",
+			flag:   "n",
+			values: []string{"3", "03"},
+			want:   &Violation{Field: "values", Reason: ReasonDuplicate},
+		},
+		{
+			name:   "default outside set",
+			flag:   "output",
+			values: []string{"table", "yaml"},
+			want:   &Violation{Field: "default", Reason: ReasonNotInEnum},
+		},
+		{
+			name:    "example outside set",
+			flag:    "output",
+			values:  []string{"json", "table"},
+			example: "yaml",
+			want:    &Violation{Field: "example", Reason: ReasonNotInEnum},
+		},
 		{name: "example inside set", flag: "n", values: []string{"3", "5"}, example: "05"},
 	}
 	for _, tc := range cases {
@@ -165,18 +225,15 @@ func TestDeclareFlagEnum(t *testing.T) {
 				before = flag.Value
 			}
 
-			err := DeclareFlagEnum(cmd, tc.flag, tc.values)
-			if tc.wantErr {
-				if !errors.Is(err, ErrInvalidDeclaration) {
-					t.Fatalf("DeclareFlagEnum() error = %v, want ErrInvalidDeclaration", err)
-				}
+			violation := AddFlagEnum(cmd, tc.flag, tc.values)
+			if !reflect.DeepEqual(violation, tc.want) {
+				t.Fatalf("AddFlagEnum() violation = %+v, want %+v", violation, tc.want)
+			}
+			if tc.want != nil {
 				if flag != nil && flag.Value != before {
-					t.Fatalf("failed DeclareFlagEnum mutated flag.Value")
+					t.Fatalf("failed AddFlagEnum mutated flag.Value")
 				}
 				return
-			}
-			if err != nil {
-				t.Fatalf("DeclareFlagEnum() error = %v", err)
 			}
 			if got := FlagEnum(flag); !reflect.DeepEqual(got, tc.values) {
 				t.Fatalf("FlagEnum() = %v, want %v", got, tc.values)
@@ -188,13 +245,13 @@ func TestDeclareFlagEnum(t *testing.T) {
 	}
 }
 
-func TestDeclareFlagEnumRedeclarationReplaces(t *testing.T) {
+func TestAddFlagEnumRedeclarationReplaces(t *testing.T) {
 	_, child := enumFixture()
-	if err := DeclareFlagEnum(child, "output", []string{"json", "table"}); err != nil {
-		t.Fatalf("first DeclareFlagEnum: %v", err)
+	if v := AddFlagEnum(child, "output", []string{"json", "table"}); v != nil {
+		t.Fatalf("first AddFlagEnum: %+v", v)
 	}
-	if err := DeclareFlagEnum(child, "output", []string{"yaml", "json"}); err != nil {
-		t.Fatalf("second DeclareFlagEnum: %v", err)
+	if v := AddFlagEnum(child, "output", []string{"yaml", "json"}); v != nil {
+		t.Fatalf("second AddFlagEnum: %+v", v)
 	}
 	flag := child.Flags().Lookup("output")
 	wrapper, ok := flag.Value.(*enumValue)
@@ -207,15 +264,15 @@ func TestDeclareFlagEnumRedeclarationReplaces(t *testing.T) {
 	if got := FlagEnum(flag); !reflect.DeepEqual(got, []string{"yaml", "json"}) {
 		t.Fatalf("FlagEnum() = %v, want [yaml json]", got)
 	}
-	if err := DeclareFlagEnum(child, "output", []string{"table"}); !errors.Is(err, ErrInvalidDeclaration) {
-		t.Fatalf("invalid re-declaration error = %v, want ErrInvalidDeclaration", err)
+	if v := AddFlagEnum(child, "output", []string{"table"}); v == nil || v.Reason != ReasonNotInEnum {
+		t.Fatalf("invalid re-declaration violation = %+v, want default not_in_enum", v)
 	}
 	if got := FlagEnum(flag); !reflect.DeepEqual(got, []string{"yaml", "json"}) {
 		t.Fatalf("failed re-declaration changed FlagEnum() to %v", got)
 	}
 }
 
-func TestDeclareFlagExample(t *testing.T) {
+func TestAddFlagExample(t *testing.T) {
 	newCmd := func(t *testing.T) *cobra.Command {
 		t.Helper()
 		cmd := &cobra.Command{Use: "app"}
@@ -226,8 +283,8 @@ func TestDeclareFlagExample(t *testing.T) {
 		cmd.Flags().IntSlice("ports", nil, "ports")
 		cmd.Flags().Var(&formatValue{}, "format", "format")
 		cmd.Flags().String("output", "json", "output")
-		if err := DeclareFlagEnum(cmd, "output", []string{"json", "table"}); err != nil {
-			t.Fatalf("DeclareFlagEnum: %v", err)
+		if err := AddFlagEnum(cmd, "output", []string{"json", "table"}); err != nil {
+			t.Fatalf("AddFlagEnum: %v", err)
 		}
 		return cmd
 	}
@@ -236,7 +293,7 @@ func TestDeclareFlagExample(t *testing.T) {
 		nilCmd  bool
 		flag    string
 		example string
-		wantErr bool
+		want    *Violation
 	}{
 		{name: "string", flag: "service", example: "svc-a"},
 		{name: "int", flag: "n", example: "5"},
@@ -245,13 +302,34 @@ func TestDeclareFlagExample(t *testing.T) {
 		{name: "intSlice", flag: "ports", example: "1,2"},
 		{name: "custom unchecked", flag: "format", example: "anything at all"},
 		{name: "enum member", flag: "output", example: "table"},
-		{name: "nil command", nilCmd: true, flag: "service", example: "x", wantErr: true},
-		{name: "missing flag", flag: "nope", example: "x", wantErr: true},
-		{name: "empty", flag: "service", example: "", wantErr: true},
-		{name: "non-int", flag: "n", example: "three", wantErr: true},
-		{name: "bad duration", flag: "timeout", example: "abc", wantErr: true},
-		{name: "bad intSlice element", flag: "ports", example: "1,x", wantErr: true},
-		{name: "outside enum", flag: "output", example: "yaml", wantErr: true},
+		{
+			name:    "nil command",
+			nilCmd:  true,
+			flag:    "service",
+			example: "x",
+			want:    &Violation{Field: "cmd", Reason: ReasonNilCommand},
+		},
+		{name: "missing flag", flag: "nope", example: "x", want: &Violation{Field: "flag", Reason: ReasonFlagNotFound}},
+		{name: "empty", flag: "service", example: "", want: &Violation{Field: "example", Reason: ReasonRequired}},
+		{name: "non-int", flag: "n", example: "three", want: &Violation{Field: "example", Reason: ReasonInvalidValue}},
+		{
+			name:    "bad duration",
+			flag:    "timeout",
+			example: "abc",
+			want:    &Violation{Field: "example", Reason: ReasonInvalidValue},
+		},
+		{
+			name:    "bad intSlice element",
+			flag:    "ports",
+			example: "1,x",
+			want:    &Violation{Field: "example", Reason: ReasonInvalidValue},
+		},
+		{
+			name:    "outside enum",
+			flag:    "output",
+			example: "yaml",
+			want:    &Violation{Field: "example", Reason: ReasonNotInEnum},
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -265,18 +343,18 @@ func TestDeclareFlagExample(t *testing.T) {
 				flag.Annotations = map[string][]string{exampleAnnotationKey: {"previous"}}
 			}
 
-			err := DeclareFlagExample(target, tc.flag, tc.example)
-			if tc.wantErr {
-				if !errors.Is(err, ErrInvalidDeclaration) {
-					t.Fatalf("DeclareFlagExample() error = %v, want ErrInvalidDeclaration", err)
-				}
+			violation := AddFlagExample(target, tc.flag, tc.example)
+			if !reflect.DeepEqual(violation, tc.want) {
+				t.Fatalf("AddFlagExample() violation = %+v, want %+v", violation, tc.want)
+			}
+			if tc.want != nil {
 				if flag != nil && !reflect.DeepEqual(flag.Annotations[exampleAnnotationKey], []string{"previous"}) {
-					t.Fatalf("failed DeclareFlagExample changed annotation to %v", flag.Annotations[exampleAnnotationKey])
+					t.Fatalf(
+						"failed AddFlagExample changed annotation to %v",
+						flag.Annotations[exampleAnnotationKey],
+					)
 				}
 				return
-			}
-			if err != nil {
-				t.Fatalf("DeclareFlagExample() error = %v", err)
 			}
 			if got := FlagExample(flag); got != tc.example {
 				t.Fatalf("FlagExample() = %q, want %q", got, tc.example)
@@ -287,8 +365,8 @@ func TestDeclareFlagExample(t *testing.T) {
 	t.Run("re-declaration replaces", func(t *testing.T) {
 		cmd := newCmd(t)
 		for _, example := range []string{"svc-a", "svc-b"} {
-			if err := DeclareFlagExample(cmd, "service", example); err != nil {
-				t.Fatalf("DeclareFlagExample(%q): %v", example, err)
+			if err := AddFlagExample(cmd, "service", example); err != nil {
+				t.Fatalf("AddFlagExample(%q): %v", example, err)
 			}
 		}
 		if got := FlagExample(cmd.Flags().Lookup("service")); got != "svc-b" {
@@ -297,12 +375,12 @@ func TestDeclareFlagExample(t *testing.T) {
 	})
 }
 
-func TestDeclareCapability(t *testing.T) {
+func TestAddCapability(t *testing.T) {
 	for _, class := range []string{"read-only", "create", "mutate", "delete", "external-network", "admin"} {
 		t.Run(class, func(t *testing.T) {
 			cmd := &cobra.Command{Use: "app"}
-			if err := DeclareCapability(cmd, class, ""); err != nil {
-				t.Fatalf("DeclareCapability(%q): %v", class, err)
+			if err := AddCapability(cmd, class, ""); err != nil {
+				t.Fatalf("AddCapability(%q): %v", class, err)
 			}
 			got, note, ok := CommandCapability(cmd.Annotations)
 			if !ok || got != class || note != "" {
@@ -314,34 +392,36 @@ func TestDeclareCapability(t *testing.T) {
 	for _, bad := range []string{"", "Read-Only", " mutate", "write"} {
 		t.Run("invalid "+bad, func(t *testing.T) {
 			cmd := &cobra.Command{Use: "app"}
-			if err := DeclareCapability(cmd, "mutate", "kept"); err != nil {
+			if err := AddCapability(cmd, "mutate", "kept"); err != nil {
 				t.Fatalf("seed: %v", err)
 			}
 			before := maps.Clone(cmd.Annotations)
-			if err := DeclareCapability(cmd, bad, "ignored"); !errors.Is(err, ErrInvalidDeclaration) {
-				t.Fatalf("DeclareCapability(%q) error = %v, want ErrInvalidDeclaration", bad, err)
+			want := &Violation{Field: "class", Reason: ReasonNotVocabulary}
+			if v := AddCapability(cmd, bad, "ignored"); !reflect.DeepEqual(v, want) {
+				t.Fatalf("AddCapability(%q) violation = %+v, want %+v", bad, v, want)
 			}
 			if !reflect.DeepEqual(cmd.Annotations, before) {
-				t.Fatalf("failed DeclareCapability changed annotations to %v", cmd.Annotations)
+				t.Fatalf("failed AddCapability changed annotations to %v", cmd.Annotations)
 			}
 		})
 	}
 
 	t.Run("nil command", func(t *testing.T) {
-		if err := DeclareCapability(nil, "mutate", ""); !errors.Is(err, ErrInvalidDeclaration) {
-			t.Fatalf("DeclareCapability(nil) error = %v, want ErrInvalidDeclaration", err)
+		want := &Violation{Field: "cmd", Reason: ReasonNilCommand}
+		if v := AddCapability(nil, "mutate", ""); !reflect.DeepEqual(v, want) {
+			t.Fatalf("AddCapability(nil) violation = %+v, want %+v", v, want)
 		}
 	})
 
 	t.Run("note trimmed and re-declaration replaces", func(t *testing.T) {
 		cmd := &cobra.Command{Use: "app"}
-		if err := DeclareCapability(cmd, "mutate", "  idempotent by name \n"); err != nil {
+		if err := AddCapability(cmd, "mutate", "  idempotent by name \n"); err != nil {
 			t.Fatal(err)
 		}
 		if class, note, _ := CommandCapability(cmd.Annotations); class != "mutate" || note != "idempotent by name" {
 			t.Fatalf("got (%q, %q), want (mutate, idempotent by name)", class, note)
 		}
-		if err := DeclareCapability(cmd, "delete", "   "); err != nil {
+		if err := AddCapability(cmd, "delete", "   "); err != nil {
 			t.Fatal(err)
 		}
 		if _, present := cmd.Annotations[capabilityNoteAnnotationKey]; present {

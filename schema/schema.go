@@ -49,7 +49,7 @@ type CommandSchema struct {
 	Prompts   []Prompt        `json:"prompts,omitempty"`
 	Resources []Resource      `json:"resources,omitempty"`
 	// Capability is the command's declared side-effect class (see
-	// WithCapability). It is nil, and omitted, when the command is
+	// DeclareCapability). It is nil, and omitted, when the command is
 	// unclassified; an agent must not assume any class for it.
 	Capability             *CapabilitySchema `json:"capability,omitempty"`
 	NonDeterministicFields []string          `json:"non_deterministic_fields"`
@@ -72,10 +72,10 @@ type FlagSchema struct {
 	Usage     string `json:"usage,omitempty"`
 	Required  bool   `json:"required,omitempty"`
 	// Enum lists the only values the flag accepts, in CLI string form and the
-	// author's order (see WithFlagEnum). It is absent when none is declared.
+	// author's order (see DeclareFlagEnum). It is absent when none is declared.
 	Enum []string `json:"enum,omitempty"`
 	// Example is one value in CLI form, exactly as an agent would pass it on
-	// argv (see WithFlagExample). It is absent when none is declared.
+	// argv (see DeclareFlagExample). It is absent when none is declared.
 	Example string `json:"example,omitempty"`
 }
 

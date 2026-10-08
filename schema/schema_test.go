@@ -283,15 +283,15 @@ func newEnrichedSchemaTestCommand(t *testing.T) *cobra.Command {
 	root.AddCommand(deploy, status, secret)
 
 	for _, declare := range []error{
-		WithFlagEnum(root, "region", "us", "eu"),
-		WithFlagExample(root, "region", "eu"),
-		WithFlagEnum(deploy, "output", "json", "table", "yaml"),
-		WithFlagEnum(deploy, "replicas", "1", "3", "5"),
-		WithFlagExample(deploy, "tags", "a,b"),
-		WithFlagExample(deploy, "timeout", "45s"),
-		WithCapability(deploy, CapabilityMutate, "idempotent by release name"),
-		WithCapability(status, CapabilityReadOnly, ""),
-		WithCapability(secret, CapabilityAdmin, ""),
+		DeclareFlagEnum(root, "region", "us", "eu"),
+		DeclareFlagExample(root, "region", "eu"),
+		DeclareFlagEnum(deploy, "output", "json", "table", "yaml"),
+		DeclareFlagEnum(deploy, "replicas", "1", "3", "5"),
+		DeclareFlagExample(deploy, "tags", "a,b"),
+		DeclareFlagExample(deploy, "timeout", "45s"),
+		DeclareCapability(deploy, CapabilityMutate, "idempotent by release name"),
+		DeclareCapability(status, CapabilityReadOnly, ""),
+		DeclareCapability(secret, CapabilityAdmin, ""),
 	} {
 		if declare != nil {
 			t.Fatalf("declaration failed: %v", declare)
@@ -303,7 +303,10 @@ func newEnrichedSchemaTestCommand(t *testing.T) *cobra.Command {
 func TestBuildSchemaEnrichedGolden(t *testing.T) {
 	render := func() []byte {
 		var stdout bytes.Buffer
-		if err := contract.WriteJSON(&stdout, BuildSchema(newEnrichedSchemaTestCommand(t), WithSchemaVersion("v0.1.0"))); err != nil {
+		if err := contract.WriteJSON(
+			&stdout,
+			BuildSchema(newEnrichedSchemaTestCommand(t), WithSchemaVersion("v0.1.0")),
+		); err != nil {
 			t.Fatalf("WriteJSON returned error: %v", err)
 		}
 		return stdout.Bytes()
