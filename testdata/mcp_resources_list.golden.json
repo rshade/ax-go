@@ -1,0 +1,1 @@
+{"resultType":"complete","_meta":{"io.modelcontextprotocol/serverInfo":{"name":"demo","version":"v1.2.3-test"}},"ttlMs":0,"cacheScope":"public","resources":[{"description":"the protocol","mimeType":"text/markdown","name":"skill","title":"Skill","uri":"demo://docs/skill"},{"mimeType":"text/plain","name":"empty","uri":"demo://docs/empty"}]}

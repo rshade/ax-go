@@ -6,12 +6,14 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode/utf8"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 	"github.com/spf13/cobra"
 
 	"github.com/rshade/ax-go/contract"
 	internalmcp "github.com/rshade/ax-go/internal/mcp"
+	internalschema "github.com/rshade/ax-go/internal/schema"
 	"github.com/rshade/ax-go/schema"
 )
 
@@ -37,6 +39,11 @@ const (
 	// initialize handshake (FR-003, Principle X).
 	versionDev     = "dev"
 	versionUnknown = "unknown"
+
+	// maxInstructionsBytes bounds the server instructions, which land in every
+	// connecting agent's system prompt (Constitution IX). Long reference text
+	// belongs in a declared resource's content instead.
+	maxInstructionsBytes = 8 << 10
 )
 
 // Config is the resolved engine configuration handed down from the public mcp
@@ -57,6 +64,10 @@ type Config struct {
 	// ServerName is the MCP implementation name; defaults to the root command's
 	// Name().
 	ServerName string
+	// Instructions is the optional server-instructions string delivered in the
+	// initialize result. It must be valid UTF-8 and at most
+	// maxInstructionsBytes; an empty value leaves the field absent.
+	Instructions string
 	// Stderr receives server logs and captured command stderr. It defaults to
 	// os.Stderr. The protocol channel is never written here (FR-013/FR-014).
 	Stderr io.Writer
@@ -81,6 +92,12 @@ func Serve(ctx context.Context, root *cobra.Command, cfg Config) error {
 		cfg.ServerName = root.Name()
 	}
 	if err := validateVersion(ctx, cfg.Version); err != nil {
+		return err
+	}
+	if err := validateInstructions(ctx, cfg.Instructions); err != nil {
+		return err
+	}
+	if err := validateDeclarations(ctx, root); err != nil {
 		return err
 	}
 
@@ -114,14 +131,76 @@ func validateVersion(ctx context.Context, version string) error {
 	}
 }
 
+// validateInstructions rejects instructions that are not valid UTF-8 or exceed
+// maxInstructionsBytes, fail-closed with exit 2 like validateVersion. The
+// message states the limit and never echoes the text.
+func validateInstructions(ctx context.Context, text string) error {
+	switch {
+	case len(text) > maxInstructionsBytes:
+		return contract.NewError(
+			ctx,
+			"validation_error",
+			fmt.Sprintf(
+				"mcp: server instructions are %d bytes, over the %d-byte limit",
+				len(text),
+				maxInstructionsBytes,
+			),
+			contract.WithErrorExitCode(contract.ExitValidation),
+			contract.WithActionableFix(
+				"Shorten the instructions and move long reference text into a declared resource's content.",
+			),
+		)
+	case !utf8.ValidString(text):
+		return contract.NewError(ctx, "validation_error", "mcp: server instructions are not valid UTF-8",
+			contract.WithErrorExitCode(contract.ExitValidation),
+			contract.WithActionableFix("Pass instructions as valid UTF-8 text."))
+	default:
+		return nil
+	}
+}
+
+func promptNames(prompts []internalschema.Prompt) []string {
+	names := make([]string, 0, len(prompts))
+	for _, prompt := range prompts {
+		names = append(names, prompt.Name)
+	}
+	return names
+}
+
+func resourceURIs(resources []internalschema.Resource) []string {
+	uris := make([]string, 0, len(resources))
+	for _, resource := range resources {
+		uris = append(uris, resource.URI)
+	}
+	return uris
+}
+
+// validateDeclarations rejects a declaration tree that __schema itself would
+// refuse (a duplicate prompt name, a duplicate resource URI, or a corrupt
+// annotation) with the identical envelope, so a server that starts serves
+// exactly the set __schema projects (spec 030 FR-019).
+func validateDeclarations(ctx context.Context, root *cobra.Command) error {
+	if conflict := internalschema.FindCorrupt(root); conflict != nil {
+		return internalschema.TreeDeclarationError(ctx, conflict)
+	}
+	if conflict := internalschema.FindDuplicate(root); conflict != nil {
+		return internalschema.TreeDeclarationError(ctx, conflict)
+	}
+	return nil
+}
+
 // newMCPServer constructs the SDK server and registers every discovered tool
-// with the shared dispatch handler. The implementation name and version come
+// with the shared dispatch handler, then the declared prompts and resources. The implementation name and version come
 // from cfg and surface in the initialize handshake (C-1).
 func newMCPServer(dispatch *dispatcher, cfg Config) *sdk.Server {
+	var opts *sdk.ServerOptions
+	if cfg.Instructions != "" {
+		opts = &sdk.ServerOptions{Instructions: cfg.Instructions}
+	}
 	server := sdk.NewServer(&sdk.Implementation{
 		Name:    cfg.ServerName,
 		Version: cfg.Version,
-	}, nil)
+	}, opts)
 	for _, tool := range dispatch.tools {
 		server.AddTool(&sdk.Tool{
 			Name:        tool.Name,
@@ -130,6 +209,10 @@ func newMCPServer(dispatch *dispatcher, cfg Config) *sdk.Server {
 			Annotations: sdkAnnotations(tool.Annotations),
 		}, dispatch.handle)
 	}
+	prompts, resources := internalschema.CollectDeclarations(dispatch.root)
+	registerPrompts(server, prompts)
+	registerResources(server, resources)
+	preserveDeclarationOrder(server, promptNames(prompts), resourceURIs(resources))
 	return server
 }
 

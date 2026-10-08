@@ -196,10 +196,14 @@ what to change:
 - A prompt name or resource URI already declared on the same command is
   rejected, and all text must be valid UTF-8.
 
-Resources carry metadata only, never content or live state. For now an agent
-can discover a resource but cannot read it; content arrives when `mcp-server`
-serves resources. ax-go never inlines a truncated body, because an agent cannot
-tell a fragment from the whole.
+A resource can carry static `Content` (at most 1 MiB, valid UTF-8) that
+`mcp-server` returns from `resources/read`. `__schema` never projects it, so a
+long document does not bloat discovery. Content is fixed text captured when you
+declare it, never a callback, so a resource cannot expose live state or run
+records. A resource declared without content is still listed and reads as an
+empty body. ax-go never inlines a truncated body, because an agent cannot tell a
+fragment from the whole. Keep prompt templates short (at most 64 KiB), because
+`__schema` includes them; put long reference text in resource content.
 
 Declarations under a hidden command are dropped, like the command itself. The
 root command always keeps its own, even when it is hidden, exactly as
@@ -213,11 +217,32 @@ resource URI, naming both commands, and when a declaration annotation was
 written by hand and does not decode cleanly. Declare only through
 `ax.DeclarePrompt` and `ax.DeclareResource`.
 
-:::note
-`mcp-server` does not serve prompts or resources yet. For now they live in the
-schema contract, so the output is pinned before any runtime behavior depends on
-it.
-:::
+### Serve them, and tell the agent where to look
+
+`mcp-server` registers every declared prompt and resource it would list in
+`__schema --as=mcp`, in the same order, and advertises a capability only when
+something is declared, so a CLI that declares nothing sends the handshake it
+always did. Pass `mcp.WithInstructions` to put a short string in the
+`initialize` result:
+
+```go
+root.AddCommand(mcp.NewCommand(root,
+    mcp.WithVersion(version),
+    mcp.WithInstructions("Read yourcli://docs/pricing-model before calling any tool."),
+))
+```
+
+Instructions must be valid UTF-8 and at most 8 KiB, or the server fails at
+startup with a `validation_error` (exit `2`). In Claude Code the instructions
+reach the agent's context when it connects, the model can read a resource itself,
+and a prompt becomes a `/mcp__<server>__<prompt>` slash command the user runs.
+`prompts/get` replaces each declared `{{name}}` with the argument's value,
+leaves other brace text alone, and rejects a missing required argument or an
+undeclared one with an invalid-params error. An absent optional argument
+renders as empty text. The server only renders text; it never runs it.
+
+When the server starts, it applies the same duplicate and corrupt-annotation
+checks as `__schema`, so it never serves a set `__schema` would refuse.
 
 ## Keep the schema stable in CI
 

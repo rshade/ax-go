@@ -704,3 +704,176 @@ func FuzzValidateResource(f *testing.F) {
 		}
 	})
 }
+
+func TestValidateResourceContent(t *testing.T) {
+	valid := Resource{URI: "app://docs/x", Name: "x"}
+	cases := []struct {
+		name    string
+		content string
+		want    *Violation
+	}{
+		{name: "absent content is valid", content: ""},
+		{name: "text with newlines and unicode", content: "# Title\n\ncafé ✓\n"},
+		{name: "exactly at the cap", content: strings.Repeat("a", maxResourceContentBytes)},
+		{
+			name:    "over the cap",
+			content: strings.Repeat("a", maxResourceContentBytes+1),
+			want:    &Violation{Field: "content", Reason: ReasonTooLong},
+		},
+		{
+			name:    "invalid utf8",
+			content: string([]byte{0xff, 0xfe}),
+			want:    &Violation{Field: "content", Reason: ReasonInvalidUTF8},
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			resource := valid
+			resource.Content = tc.content
+			if got := ValidateResource(resource); !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("ValidateResource = %+v, want %+v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestAddResourceRoundTripsContent(t *testing.T) {
+	cmd := &cobra.Command{Use: "app"}
+	want := Resource{URI: "app://docs/x", Name: "x", MIMEType: "text/markdown", Content: "# body\n"}
+	mustAddResource(t, cmd, want)
+
+	if got := Resources(cmd.Annotations); !reflect.DeepEqual(got, []Resource{want}) {
+		t.Fatalf("Resources = %+v, want %+v", got, []Resource{want})
+	}
+}
+
+func TestValidatePromptTemplateCap(t *testing.T) {
+	prompt := Prompt{Name: "p", Template: strings.Repeat("a", maxTemplateBytes)}
+	if got := ValidatePrompt(prompt); got != nil {
+		t.Fatalf("template at the cap = %+v, want valid", got)
+	}
+	prompt.Template += "a"
+	want := &Violation{Field: "template", Reason: ReasonTooLong}
+	if got := ValidatePrompt(prompt); !reflect.DeepEqual(got, want) {
+		t.Fatalf("template over the cap = %+v, want %+v", got, want)
+	}
+}
+
+func TestRenderTemplate(t *testing.T) {
+	cases := []struct {
+		name     string
+		template string
+		values   map[string]string
+		want     string
+	}{
+		{name: "no placeholders", template: "run app report", want: "run app report"},
+		{name: "single", template: "since {{window}}", values: map[string]string{"window": "7d"}, want: "since 7d"},
+		{
+			name:     "repeated and ordered",
+			template: "{{a}} then {{b}} then {{a}}",
+			values:   map[string]string{"a": "1", "b": "2"},
+			want:     "1 then 2 then 1",
+		},
+		{name: "absent optional renders empty", template: "[{{a}}]", values: map[string]string{}, want: "[]"},
+		{name: "empty value renders empty", template: "[{{a}}]", values: map[string]string{"a": ""}, want: "[]"},
+		{
+			name:     "spaced braces are literal",
+			template: "{{ a }} {{a}}",
+			values:   map[string]string{"a": "x"},
+			want:     "{{ a }} x",
+		},
+		{name: "unknown name renders empty", template: "{{missing}}!", values: map[string]string{"a": "x"}, want: "!"},
+		{name: "single braces literal", template: "{a} }} {{", values: map[string]string{"a": "x"}, want: "{a} }} {{"},
+		{name: "triple brace is literal", template: "{{{a}}}", values: map[string]string{"a": "x"}, want: "{{{a}}}"},
+		{
+			name:     "even brace run reaches the name",
+			template: "{{{{a}}",
+			values:   map[string]string{"a": "x"},
+			want:     "{{x",
+		},
+		{name: "extra closing brace stays", template: "{{a}}}", values: map[string]string{"a": "x"}, want: "x}"},
+		{
+			name:     "unterminated is literal",
+			template: "{{a and more",
+			values:   map[string]string{"a": "x"},
+			want:     "{{a and more",
+		},
+		{
+			name:     "value is never re-expanded",
+			template: "{{a}} {{b}}",
+			values:   map[string]string{"a": "{{b}}", "b": "B"},
+			want:     "{{b}} B",
+		},
+		{
+			name:     "unicode and newlines are byte exact",
+			template: "café\n{{a}}\n✓",
+			values:   map[string]string{"a": "naïve\r\n日本"},
+			want:     "café\nnaïve\r\n日本\n✓",
+		},
+		{name: "empty template", template: "", want: ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := RenderTemplate(tc.template, tc.values); got != tc.want {
+				t.Fatalf("RenderTemplate(%q) = %q, want %q", tc.template, got, tc.want)
+			}
+		})
+	}
+}
+
+// TestRenderTemplateAgreesWithPlaceholderScanner pins the shared grammar:
+// RenderTemplate substitutes exactly the spans templatePlaceholders reports, so
+// a template that validates can never render differently than it validated.
+func TestRenderTemplateAgreesWithPlaceholderScanner(t *testing.T) {
+	for _, template := range []string{
+		"", "{{a}}", "{{a}} {{b}}", "{{ a }}", "{{{x}}}", "{{a}}}", "{{{{{a}}", "{{{{a}}",
+		"{{a{{b}}", "{{a", "}}{{", "{{}}", "x{{y}}z{{", "{{a.b-c_d}}", "{{é}}", "{{ x }} {{y}}",
+	} {
+		names := templatePlaceholders(template)
+		values := map[string]string{}
+		for _, name := range names {
+			values[name] = "\x00" + name + "\x00"
+		}
+		rendered := RenderTemplate(template, values)
+		want := 0
+		for _, name := range names {
+			want += strings.Count(rendered, "\x00"+name+"\x00")
+		}
+		if sentinels := strings.Count(rendered, "\x00") / 2; sentinels < len(names) || want < len(names) {
+			t.Errorf("RenderTemplate(%q) = %q substituted fewer spans than the %d placeholders reported",
+				template, rendered, len(names))
+		}
+		if len(names) == 0 && rendered != template {
+			t.Errorf("RenderTemplate(%q) = %q, want the template unchanged", template, rendered)
+		}
+	}
+}
+
+func FuzzRenderTemplate(f *testing.F) {
+	for _, seed := range [][2]string{
+		{"", ""}, {"{{a}}", "v"}, {"{{a}} {{b}}", "{{a}}"}, {"{{ a }}", "x"}, {"{{{x}}}", "x"},
+		{"{{{{a}}", "{{"}, {"{{a{{b}}", "}}"}, {"x{{y}}z{{", "é\n"},
+	} {
+		f.Add(seed[0], seed[1])
+	}
+	f.Fuzz(func(t *testing.T, template, value string) {
+		names := templatePlaceholders(template)
+		values := map[string]string{}
+		for _, name := range names {
+			values[name] = value
+		}
+		got := RenderTemplate(template, values)
+		if again := RenderTemplate(template, values); again != got {
+			t.Fatalf("non-deterministic render of %q", template)
+		}
+		if len(names) == 0 && got != template {
+			t.Fatalf("RenderTemplate(%q) = %q with no placeholders, want the template unchanged", template, got)
+		}
+		if bound := len(template) + len(names)*len(value); len(got) > bound {
+			t.Fatalf("render of %q grew to %d bytes, bound %d: a value was re-expanded", template, len(got), bound)
+		}
+		if empty := RenderTemplate(template, nil); len(empty) > len(template) {
+			t.Fatalf("rendering with no values grew %q to %q", template, empty)
+		}
+	})
+}

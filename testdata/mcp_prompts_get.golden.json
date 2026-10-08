@@ -1,0 +1,1 @@
+{"_meta":{"io.modelcontextprotocol/serverInfo":{"name":"demo","version":"v1.2.3-test"}},"description":"run the protocol","messages":[{"content":{"type":"text","text":"Decide: Should we ship?\nContext: \nLiteral {x} and {{ spaced }} stay."},"role":"user"}],"resultType":"complete"}

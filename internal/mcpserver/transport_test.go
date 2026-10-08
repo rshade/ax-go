@@ -2,7 +2,9 @@ package mcpserver
 
 import (
 	"context"
+	"io"
 	"net"
+	"os"
 	"testing"
 	"time"
 
@@ -17,6 +19,12 @@ import (
 // is canceled on cleanup and asserted to return nil (clean shutdown).
 func serveHTTPForTest(t *testing.T, root *cobra.Command) string {
 	t.Helper()
+	return serveHTTPForServer(t, newTestServer(t, root))
+}
+
+// serveHTTPForServer is serveHTTPForTest for a caller-built server.
+func serveHTTPForServer(t *testing.T, server *sdk.Server) string {
+	t.Helper()
 	listener, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
 		t.Fatalf("listen: %v", err)
@@ -24,7 +32,6 @@ func serveHTTPForTest(t *testing.T, root *cobra.Command) string {
 	addr := listener.Addr().String()
 
 	ctx, cancel := context.WithCancel(context.Background())
-	server := newTestServerCtx(t, ctx, root)
 	serveErr := make(chan error, 1)
 	go func() { serveErr <- serveOnListener(ctx, server, listener) }()
 
@@ -138,5 +145,51 @@ func TestHTTPTransportParity(t *testing.T) {
 	}
 	if env := decodeEnvelope(t, resultText(t, call)); env.Data.Name != "over-http" {
 		t.Errorf("data.name = %q, want %q", env.Data.Name, "over-http")
+	}
+}
+
+// TestServedSurfacesNeverWriteProcessStdout pins Principle I for this feature:
+// rendering a prompt, reading a resource, and the handshake carrying
+// instructions travel only on the protocol channel, never on the process's own
+// stdout (spec 030 FR-014).
+func TestServedSurfacesNeverWriteProcessStdout(t *testing.T) {
+	reader, writer, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	original := os.Stdout
+	os.Stdout = writer                         //nolint:reassign // redirect process stdout to prove nothing but the protocol channel is written
+	t.Cleanup(func() { os.Stdout = original }) //nolint:reassign // restore process stdout after capture
+
+	ctx := context.Background()
+	session := newInMemorySession(
+		t,
+		newServerWithConfig(t, ctx, declaredRoot(t), Config{Instructions: "read the skill"}),
+	)
+	if _, err := session.ListPrompts(ctx, nil); err != nil {
+		t.Fatalf("prompts/list: %v", err)
+	}
+	if _, err := session.GetPrompt(ctx, &sdk.GetPromptParams{
+		Name: "decide", Arguments: map[string]string{"question": "Q"},
+	}); err != nil {
+		t.Fatalf("prompts/get: %v", err)
+	}
+	if _, err := session.ListResources(ctx, nil); err != nil {
+		t.Fatalf("resources/list: %v", err)
+	}
+	if _, err := session.ReadResource(ctx, &sdk.ReadResourceParams{URI: "demo://docs/skill"}); err != nil {
+		t.Fatalf("resources/read: %v", err)
+	}
+
+	os.Stdout = original //nolint:reassign // restore process stdout before reading the capture
+	if err := writer.Close(); err != nil {
+		t.Fatalf("close pipe: %v", err)
+	}
+	leaked, err := io.ReadAll(reader)
+	if err != nil {
+		t.Fatalf("read pipe: %v", err)
+	}
+	if len(leaked) != 0 {
+		t.Fatalf("process stdout received %d bytes: %.200s", len(leaked), leaked)
 	}
 }

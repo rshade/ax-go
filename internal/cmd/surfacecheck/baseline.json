@@ -641,6 +641,12 @@
           "profiles": "all"
         },
         {
+          "id": "field:Resource.Content",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:Resource.Description",
           "signature": "string",
           "configurations": "all",
@@ -2174,6 +2180,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:WithInstructions",
+          "signature": "func(string) Option",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:WithTransport",
           "signature": "func(Transport) Option",
           "configurations": "all",
@@ -2605,6 +2617,12 @@
           "profiles": "all"
         },
         {
+          "id": "field:Resource.Content",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:Resource.Description",
           "signature": "string",
           "configurations": "all",
@@ -2816,7 +2834,7 @@
         },
         {
           "id": "type:Resource",
-          "signature": "struct{URI string \"json:\\\"uri\\\"\"; Name string \"json:\\\"name\\\"\"; Title string \"json:\\\"title,omitempty\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; MIMEType string \"json:\\\"mime_type,omitempty\\\"\"}",
+          "signature": "struct{URI string \"json:\\\"uri\\\"\"; Name string \"json:\\\"name\\\"\"; Title string \"json:\\\"title,omitempty\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; MIMEType string \"json:\\\"mime_type,omitempty\\\"\"; Content string \"json:\\\"-\\\"\"}",
           "configurations": "all",
           "profiles": "all"
         },

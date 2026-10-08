@@ -2,6 +2,7 @@ package schema
 
 import (
 	"bytes"
+	"encoding/json"
 	"errors"
 	"path/filepath"
 	"reflect"
@@ -448,11 +449,91 @@ func TestEveryDeclarationReasonHasAFix(t *testing.T) {
 		internalschema.ReasonNotInEnum,
 		internalschema.ReasonNotVocabulary,
 	} {
-		if declarationFix(reason) == "" {
+		if declarationFix(reason, "") == "" {
 			t.Errorf("reason %q has no actionable_fix", reason)
 		}
 	}
-	if fix := declarationFix("unknown_reason"); fix != "" {
+	if fix := declarationFix("unknown_reason", ""); fix != "" {
 		t.Errorf("unknown reason fix = %q, want empty", fix)
+	}
+}
+
+func TestResourceContentIsNeverProjected(t *testing.T) {
+	root := newSchemaTestCommand()
+	mustDeclare(t, DeclareResource(root, Resource{
+		URI: "app://docs/x", Name: "x", MIMEType: "text/markdown", Content: "SECRET-BODY",
+	}))
+
+	for _, args := range [][]string{nil, {"--as=mcp"}} {
+		out, err := runSchema(t, root, args...)
+		if err != nil {
+			t.Fatalf("__schema %v: %v", args, err)
+		}
+		if bytes.Contains(out, []byte("SECRET-BODY")) || bytes.Contains(out, []byte(`"content"`)) {
+			t.Errorf("__schema %v projected resource content: %s", args, out)
+		}
+	}
+
+	direct, err := json.Marshal(Resource{URI: "app://x", Name: "x", Content: "SECRET-BODY"})
+	if err != nil || bytes.Contains(direct, []byte("SECRET-BODY")) {
+		t.Fatalf("marshaling Resource leaked Content (err %v): %s", err, direct)
+	}
+	if got := BuildSchema(root).Command.Resources[0].Content; got != "" {
+		t.Errorf("BuildSchema carries Content %q, want it cleared", got)
+	}
+}
+
+func TestDeclareRejectsOversizedContentAndTemplate(t *testing.T) {
+	cases := []struct {
+		name    string
+		declare func() error
+		field   string
+		fixHas  string
+	}{
+		{
+			name: "content over 1 MiB",
+			declare: func() error {
+				return DeclareResource(&cobra.Command{Use: "app"}, Resource{
+					URI: "app://x", Name: "x", Content: strings.Repeat("a", 1<<20+1),
+				})
+			},
+			field:  "content",
+			fixHas: "1 MiB",
+		},
+		{
+			name: "template over 64 KiB",
+			declare: func() error {
+				return DeclarePrompt(&cobra.Command{Use: "app"}, Prompt{
+					Name: "p", Template: strings.Repeat("a", 64<<10+1),
+				})
+			},
+			field:  "template",
+			fixHas: "64 KiB",
+		},
+		{
+			name: "uri over 2048 bytes",
+			declare: func() error {
+				return DeclareResource(&cobra.Command{Use: "app"}, Resource{
+					URI: "app://" + strings.Repeat("a", 2048), Name: "x",
+				})
+			},
+			field:  "uri",
+			fixHas: "2048",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var envelope *contract.Error
+			if err := tc.declare(); !errors.As(err, &envelope) {
+				t.Fatalf("declare error = %v, want *contract.Error", err)
+			}
+			if envelope.ErrorCode != invalidDeclarationCode || envelope.Context["field"] != tc.field ||
+				envelope.Context["reason"] != "too_long" {
+				t.Fatalf("envelope = %+v, want %s too_long on %s", envelope, invalidDeclarationCode, tc.field)
+			}
+			if !strings.Contains(envelope.ActionableFix, tc.fixHas) {
+				t.Fatalf("actionable_fix = %q, want it to name %q", envelope.ActionableFix, tc.fixHas)
+			}
+		})
 	}
 }

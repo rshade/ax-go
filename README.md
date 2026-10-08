@@ -291,7 +291,8 @@ an `ax.Envelope` or `ax.Error` first. It resolves the same live trace/span IDs
 
 A command can also declare MCP **prompts** (workflow templates that answer "how
 do I drive this tool") and static **resources** (addressable reference
-metadata). An agent with no repository on disk can find both in the schema:
+documents). An agent with no repository on disk can find both in the schema and
+use them on the live `mcp-server`:
 
 ```go
 if err := ax.DeclarePrompt(root, ax.Prompt{
@@ -303,6 +304,7 @@ if err := ax.DeclarePrompt(root, ax.Prompt{
 }
 if err := ax.DeclareResource(root, ax.Resource{
     URI: "app://docs/pricing-model", Name: "pricing-model", MIMEType: "text/markdown",
+    Content: pricingModelMarkdown, // static text, served by resources/read
 }); err != nil {
     return err
 }
@@ -311,12 +313,22 @@ if err := ax.DeclareResource(root, ax.Resource{
 Declarations appear on their command in `__schema` and in top-level `prompts`
 and `resources` arrays in `__schema --as=mcp`. Trees that declare none emit
 exactly the output they did before. Each `{{name}}` placeholder must name a
-declared argument. A resource needs a URI with a scheme and carries metadata
-only. A prompt name or resource URI declared on two commands, or a
-declaration annotation written by hand that does not decode, makes `__schema`
-fail with a `validation_error` (exit `2`). The live `mcp-server` does not serve
-prompts or resources yet; that runtime phase is deferred
-([`specs/028-mcp-prompts-resources/`](specs/028-mcp-prompts-resources/spec.md)).
+declared argument. A resource needs a URI with a scheme. Its `Content` is fixed
+text (at most 1 MiB) that `__schema` never projects, so a long document does not
+bloat discovery: keep prompt templates short (at most 64 KiB) and put long
+reference text in resource content. A prompt name or resource URI declared on
+two commands, or a declaration annotation written by hand that does not decode,
+makes `__schema` and `mcp-server` fail with a `validation_error` (exit `2`).
+
+The live `mcp-server` serves them: `prompts/list` and `resources/list` match
+`__schema --as=mcp`, `prompts/get` renders the template with the supplied
+arguments (a missing required or undeclared argument is an invalid-params
+error, and an absent optional argument renders as empty text), and
+`resources/read` returns the declared content. Pass `mcp.WithInstructions` to
+send a short string at `initialize` that points the agent at the resource to
+read first (see below). Content is static: it is never a callback, so a resource
+cannot expose live state or run records
+([`specs/030-serve-mcp-prompts-resources/`](specs/030-serve-mcp-prompts-resources/spec.md)).
 
 #### Declaring flag and command semantics
 
@@ -391,7 +403,10 @@ import (
 
 func main() {
     root := newRootCommand()
-    root.AddCommand(mcp.NewCommand(root, mcp.WithVersion(version)))
+    root.AddCommand(mcp.NewCommand(root,
+        mcp.WithVersion(version),
+        mcp.WithInstructions("Read app://docs/pricing-model before calling any tool."),
+    ))
     os.Exit(ax.Execute(context.Background(), root))
 }
 ```
@@ -413,6 +428,13 @@ mycli mcp-server --transport=http --addr=0.0.0.0:8080 --allow-non-loopback
   tools. Call `mcp.Exclude(cmd)` to keep one command, such as a TUI root or a
   long-running `serve`, out of MCP while leaving its children callable and the
   command itself in `--help`.
+- **Prompts, resources, instructions**: declared prompts and resources are
+  served exactly as `__schema --as=mcp` lists them. `mcp.WithInstructions(text)`
+  sends a short string (valid UTF-8, at most 8 KiB, else exit 2 at startup) in
+  the `initialize` result. In Claude Code, instructions reach the system prompt
+  automatically, a resource is read by the model (`ReadMcpResource`) or attached
+  with an `@` mention, and a prompt is a `/mcp__<server>__<prompt>` slash command
+  the user runs. Use instructions as the pointer and resource content as the body.
 - **Execution**: `tools/call` runs the command in machine/JSON mode and returns
   its verbatim `stdout` payload; a non-zero exit returns the `ax.Error` envelope
   with `IsError` set, and the server keeps serving.

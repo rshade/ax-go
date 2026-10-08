@@ -33,6 +33,7 @@ func (o options) config() mcpserver.Config {
 		HTTPAddr:         o.httpAddr,
 		AllowNonLoopback: o.allowNonLoopback,
 		Version:          o.version,
+		Instructions:     o.instructions,
 	}
 	switch o.transport {
 	case TransportHTTP:
