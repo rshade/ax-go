@@ -91,8 +91,7 @@ func walkDataLocators(
 	active[t] = true
 	defer delete(active, t)
 
-	for fieldIndex := range t.NumField() {
-		field := t.Field(fieldIndex)
+	for field := range t.Fields() {
 		if field.PkgPath != "" {
 			continue
 		}

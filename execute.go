@@ -349,8 +349,7 @@ func wrapCommandPersistentPreRun(cmd *cobra.Command, cfg executeConfig) {
 // is copied first: the caller owns that value and Execute must not mutate it,
 // so normalization lands on the copy while the caller's fields stay untouched.
 func normalizeExecuteError(ctx context.Context, tool, version string, err error) *Error {
-	var axErr *Error
-	if errors.As(err, &axErr) {
+	if axErr, ok := errors.AsType[*Error](err); ok {
 		normalized := *axErr
 		if normalized.TraceID == "" {
 			normalized.TraceID = TraceIDFromContext(ctx)

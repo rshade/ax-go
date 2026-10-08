@@ -47,7 +47,7 @@ func envWith(values map[string]string) func(string) string {
 // nonEmptyLines splits s on newlines and drops blank lines.
 func nonEmptyLines(s string) []string {
 	var out []string
-	for _, line := range strings.Split(s, "\n") {
+	for line := range strings.SplitSeq(s, "\n") {
 		if strings.TrimSpace(line) != "" {
 			out = append(out, line)
 		}

@@ -259,11 +259,10 @@ collect:
 // value is malformed, "unknown" is returned.
 func extractLevel(line string) string {
 	const prefix = `"level":"`
-	idx := strings.Index(line, prefix)
-	if idx < 0 {
+	_, rest, ok := strings.Cut(line, prefix)
+	if !ok {
 		return levelUnknown
 	}
-	rest := line[idx+len(prefix):]
 	end := strings.IndexByte(rest, '"')
 	if end <= 0 {
 		return levelUnknown
@@ -456,8 +455,7 @@ func (lw *lokiWriter) postBatch(ctx context.Context, batch []lokiEntry) {
 		// diagnostic. The *url.Error wrapper is stripped so the message cannot
 		// echo credentials an operator embedded in AX_LOKI_URL; %q escapes any
 		// control characters in the transport error text.
-		var urlErr *url.Error
-		if errors.As(err, &urlErr) {
+		if urlErr, ok := errors.AsType[*url.Error](err); ok {
 			err = urlErr.Err
 		}
 		lw.diagf("ax: loki push failed: %q\n", err)

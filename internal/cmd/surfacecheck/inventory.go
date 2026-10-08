@@ -690,19 +690,16 @@ func declarationIDs(pkg *types.Package) map[types.Object]string {
 			continue
 		}
 		owner := typeName.Name()
-		for i := range named.NumMethods() {
-			method := named.Method(i)
+		for method := range named.Methods() {
 			ids[method] = declaredMethodID(owner, method)
 		}
 		switch underlying := named.Underlying().(type) {
 		case *types.Struct:
-			for i := range underlying.NumFields() {
-				field := underlying.Field(i)
+			for field := range underlying.Fields() {
 				ids[field] = kindField + ":" + owner + "." + field.Name()
 			}
 		case *types.Interface:
-			for i := range underlying.NumExplicitMethods() {
-				method := underlying.ExplicitMethod(i)
+			for method := range underlying.ExplicitMethods() {
 				ids[method] = kindInterfaceMethod + ":" + owner + "." + method.Name()
 			}
 		}
@@ -828,8 +825,7 @@ func memberAccess(access string, sel *types.Selection) string {
 func (c *collector) methods(named *types.Named, owner, access string) {
 	valueSet := map[string]bool{}
 	msV := types.NewMethodSet(named)
-	for i := range msV.Len() {
-		sel := msV.At(i)
+	for sel := range msV.Methods() {
 		m, isFunc := sel.Obj().(*types.Func)
 		if !isFunc || !m.Exported() {
 			continue
@@ -838,8 +834,7 @@ func (c *collector) methods(named *types.Named, owner, access string) {
 		c.addMethod(owner, m, false, memberAccess(access, sel))
 	}
 	msP := types.NewMethodSet(types.NewPointer(named))
-	for i := range msP.Len() {
-		sel := msP.At(i)
+	for sel := range msP.Methods() {
 		m, isFunc := sel.Obj().(*types.Func)
 		if !isFunc || !m.Exported() || valueSet[m.Id()] {
 			continue
@@ -872,12 +867,11 @@ func (c *collector) ifaceMethods(named *types.Named, owner, access string) {
 		return
 	}
 	explicit := map[string]bool{}
-	for i := range iface.NumExplicitMethods() {
-		explicit[iface.ExplicitMethod(i).Id()] = true
+	for method := range iface.ExplicitMethods() {
+		explicit[method.Id()] = true
 	}
 	ms := types.NewMethodSet(named)
-	for i := range ms.Len() {
-		sel := ms.At(i)
+	for sel := range ms.Methods() {
 		m, isFunc := sel.Obj().(*types.Func)
 		if !isFunc || !m.Exported() {
 			continue
@@ -940,8 +934,7 @@ func fieldFrame(frontier []*types.Struct, emitted map[string]bool,
 	counts := map[string]int{}
 	var next []*types.Struct
 	for _, s := range frontier {
-		for i := range s.NumFields() {
-			f := s.Field(i)
+		for f := range s.Fields() {
 			if f.Anonymous() {
 				if inner := underlyingStruct(f.Type()); inner != nil && !seen[inner] {
 					next = append(next, inner)
@@ -1031,20 +1024,20 @@ func (c *collector) expose(t types.Type) {
 		c.expose(t.Params())
 		c.expose(t.Results())
 	case *types.Tuple:
-		for i := range t.Len() {
-			c.expose(t.At(i).Type())
+		for v := range t.Variables() {
+			c.expose(v.Type())
 		}
 	case *types.Alias:
 		c.expose(types.Unalias(t))
 	case *types.Struct:
-		for i := range t.NumFields() {
-			if f := t.Field(i); f.Exported() {
+		for f := range t.Fields() {
+			if f.Exported() {
 				c.expose(f.Type())
 			}
 		}
 	case *types.Interface:
-		for i := range t.NumMethods() {
-			c.expose(t.Method(i).Type())
+		for method := range t.Methods() {
+			c.expose(method.Type())
 		}
 	case *types.Named:
 		obj := t.Obj()
@@ -1063,8 +1056,7 @@ func (c *collector) expose(t types.Type) {
 func canonicalSignature(sig *types.Signature, qf types.Qualifier) string {
 	var tparams []*types.TypeParam
 	if tp := sig.TypeParams(); tp != nil {
-		for i := range tp.Len() {
-			old := tp.At(i)
+		for old := range tp.TypeParams() {
 			name := types.NewTypeName(old.Obj().Pos(), nil, old.Obj().Name(), nil)
 			tparams = append(tparams, types.NewTypeParam(name, old.Constraint()))
 		}
@@ -1304,7 +1296,7 @@ func hasDeprecatedParagraph(doc *ast.CommentGroup) bool {
 	if doc == nil {
 		return false
 	}
-	for _, paragraph := range strings.Split(doc.Text(), "\n\n") {
+	for paragraph := range strings.SplitSeq(doc.Text(), "\n\n") {
 		if strings.HasPrefix(strings.TrimSpace(paragraph), "Deprecated:") {
 			return true
 		}

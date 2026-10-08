@@ -158,8 +158,6 @@ func withAuditSetting(ctx context.Context, enabled *bool) context.Context {
 	return ax.WithAudit(ctx, *enabled)
 }
 
-func boolPointer(value bool) *bool { return &value }
-
 func TestAuditEnabledFromContext(t *testing.T) {
 	tests := []struct {
 		name string
@@ -261,15 +259,15 @@ func TestGuardAuditTruthTable(t *testing.T) {
 		wantLog      string
 	}{
 		{"real success audits by default", false, nil, false, nil, true, true, "audit-success"},
-		{"real failure audits explicit enabled", false, boolPointer(true), false, wrapped, true, true, "audit-failure"},
-		{"real success opt-out is silent", false, boolPointer(false), false, nil, true, true, "none"},
+		{"real failure audits explicit enabled", false, new(true), false, wrapped, true, true, "audit-failure"},
+		{"real success opt-out is silent", false, new(false), false, nil, true, true, "none"},
 		{"real nil effect is silent", false, nil, true, nil, false, false, "none"},
 		{"dry-run effect suppresses with audit default", true, nil, false, nil, false, false, "suppression"},
 		{
 			"dry-run effect suppresses with audit opt-out",
-			true, boolPointer(false), false, nil, false, false, "suppression",
+			true, new(false), false, nil, false, false, "suppression",
 		},
-		{"dry-run nil effect is silent", true, boolPointer(true), true, nil, false, false, "none"},
+		{"dry-run nil effect is silent", true, new(true), true, nil, false, false, "none"},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -298,8 +296,7 @@ func TestGuardAuditTruthTable(t *testing.T) {
 				if !errors.Is(err, tagged) {
 					t.Errorf("errors.Is(err, tagged) = false; err=%v", err)
 				}
-				var gotTagged *taggedError
-				if !errors.As(err, &gotTagged) {
+				if _, ok := errors.AsType[*taggedError](err); !ok {
 					t.Errorf("errors.As(err, *taggedError) = false; err=%v", err)
 				}
 			}
@@ -441,11 +438,11 @@ func TestPerformAuditTruthTable(t *testing.T) {
 			wantLog: "audit-success",
 		},
 		{
-			name: "real failure audits explicit enabled", auditEnabled: boolPointer(true),
+			name: "real failure audits explicit enabled", auditEnabled: new(true),
 			commitErr: wrapped, wantCommitRan: true, wantErr: tagged, wantLog: "audit-failure",
 		},
 		{
-			name: "real success opt-out is silent", auditEnabled: boolPointer(false),
+			name: "real success opt-out is silent", auditEnabled: new(false),
 			wantCommitRan: true, wantLog: "none",
 		},
 		{name: "real nil commit is silent", commitNil: true, wantLog: "none"},
@@ -454,12 +451,12 @@ func TestPerformAuditTruthTable(t *testing.T) {
 			wantLog: "suppression",
 		},
 		{
-			name: "dry nil callbacks are silent", dryRun: true, auditEnabled: boolPointer(false),
+			name: "dry nil callbacks are silent", dryRun: true, auditEnabled: new(false),
 			rehearseNil: true, commitNil: true, wantLog: "none",
 		},
 		{
 			name: "dry successful rehearse suppresses commit", dryRun: true,
-			auditEnabled: boolPointer(false), wantRehearseRan: true, wantLog: "suppression",
+			auditEnabled: new(false), wantRehearseRan: true, wantLog: "suppression",
 		},
 		{
 			name: "dry successful rehearse with nil commit is silent", dryRun: true,
@@ -467,7 +464,7 @@ func TestPerformAuditTruthTable(t *testing.T) {
 		},
 		{
 			name: "dry failed rehearse does not suppress commit", dryRun: true,
-			auditEnabled: boolPointer(true), rehearseErr: errSentinel,
+			auditEnabled: new(true), rehearseErr: errSentinel,
 			wantRehearseRan: true, wantErr: errSentinel, wantLog: "none",
 		},
 		{
@@ -501,8 +498,7 @@ func TestPerformAuditTruthTable(t *testing.T) {
 				t.Errorf("err = %v, want %v", err, tc.wantErr)
 			}
 			if tc.commitErr != nil {
-				var gotTagged *taggedError
-				if !errors.As(err, &gotTagged) {
+				if _, ok := errors.AsType[*taggedError](err); !ok {
 					t.Errorf("errors.As(err, *taggedError) = false; err=%v", err)
 				}
 			}
@@ -566,8 +562,7 @@ func TestPerformWithAuditDescription(t *testing.T) {
 	if !errors.Is(err, tagged) {
 		t.Errorf("errors.Is(err, tagged) = false; err=%v", err)
 	}
-	var gotTagged *taggedError
-	if !errors.As(err, &gotTagged) {
+	if _, ok := errors.AsType[*taggedError](err); !ok {
 		t.Errorf("errors.As(err, *taggedError) = false; err=%v", err)
 	}
 	assertAuditLines(t, out, "Perform", description, wrapped)
@@ -700,7 +695,7 @@ func TestPerformDryRunRehearsalFailureHasNoAudit(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			for _, auditEnabled := range []*bool{nil, boolPointer(false)} {
+			for _, auditEnabled := range []*bool{nil, new(false)} {
 				ctx := withAuditSetting(dryRunCtx(), auditEnabled)
 				var err error
 				out := captureStderr(t, func() { err = tc.invoke(ctx) })
@@ -832,8 +827,7 @@ func TestGuardPerformPreserveWrapChain(t *testing.T) {
 		if !errors.Is(err, tagged) {
 			t.Errorf("errors.Is(err, tagged) = false; wrap chain not preserved (err=%v)", err)
 		}
-		var te *taggedError
-		if !errors.As(err, &te) {
+		if _, ok := errors.AsType[*taggedError](err); !ok {
 			t.Errorf("errors.As failed; wrap chain not preserved (err=%v)", err)
 		}
 	}

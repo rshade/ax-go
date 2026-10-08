@@ -407,7 +407,7 @@ func TestRunUsesResolvedVersionAcrossSchemaAndLogger(t *testing.T) {
 	}
 
 	gotLogVersion := ""
-	for _, line := range strings.Split(strings.TrimSpace(stderr.String()), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(stderr.String()), "\n") {
 		if line == "" {
 			continue
 		}

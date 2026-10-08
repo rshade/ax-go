@@ -234,7 +234,7 @@ func addBoundedConfig(coll *benchstat.Collection, config, path string) (benchInp
 }
 
 func looksLikeGoTestOutput(data []byte) bool {
-	for _, line := range bytes.Split(data, []byte{'\n'}) {
+	for line := range bytes.SplitSeq(data, []byte{'\n'}) {
 		line = bytes.TrimSpace(line)
 		switch {
 		case bytes.HasPrefix(line, []byte("goos:")):

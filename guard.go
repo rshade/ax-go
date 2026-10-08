@@ -117,8 +117,7 @@ func logAuditOutcome(ctx context.Context, logger Logger, helper, description str
 	if err != nil {
 		// Redact *url.Error to strip embedded URLs with query-string secrets
 		// before logging; preserve the full wrapped error for the caller.
-		var urlErr *url.Error
-		if errors.As(err, &urlErr) {
+		if urlErr, ok := errors.AsType[*url.Error](err); ok {
 			err = urlErr.Err
 		}
 		logger.

@@ -18,8 +18,7 @@ import (
 func TestMetadataNonDeterministicTagsMatchBuiltInLocators(t *testing.T) {
 	metadataType := reflect.TypeFor[contract.Metadata]()
 	got := make([]string, 0, metadataType.NumField())
-	for fieldIndex := range metadataType.NumField() {
-		field := metadataType.Field(fieldIndex)
+	for field := range metadataType.Fields() {
 		if field.Tag.Get("ax") != "nondeterministic" {
 			continue
 		}

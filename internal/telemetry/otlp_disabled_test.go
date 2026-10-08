@@ -167,7 +167,7 @@ func TestShutdownDoesNotBlockOnAbsentExporter(t *testing.T) {
 
 func countDiagnostics(stderr, message string) int {
 	count := 0
-	for _, line := range strings.Split(strings.TrimSpace(stderr), "\n") {
+	for line := range strings.SplitSeq(strings.TrimSpace(stderr), "\n") {
 		if strings.Contains(line, message) {
 			count++
 		}

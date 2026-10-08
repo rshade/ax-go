@@ -169,8 +169,7 @@ func TestNormalizeOTLPEndpointWrapsParseError(t *testing.T) {
 	if err == nil {
 		t.Fatal("normalizeOTLPEndpoint returned nil error for unparseable endpoint")
 	}
-	var urlErr *url.Error
-	if !errors.As(err, &urlErr) {
+	if _, ok := errors.AsType[*url.Error](err); !ok {
 		t.Fatalf("normalizeOTLPEndpoint error chain = %v, want a *url.Error reachable via errors.As", err)
 	}
 }

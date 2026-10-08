@@ -97,8 +97,7 @@ func ExampleError() {
 		ax.WithErrorExitCode(ax.ExitValidation),
 	)
 
-	var axErr *ax.Error
-	if errors.As(err, &axErr) {
+	if axErr, ok := errors.AsType[*ax.Error](err); ok {
 		fmt.Println(axErr.ErrorCode)
 		fmt.Println(axErr.ExitCode())
 	}
@@ -201,8 +200,7 @@ func ExampleConfirm() {
 	fmt.Println(approved == ax.ConfirmationApproved)
 
 	_, blockedErr := ax.Confirm(ax.WithMode(context.Background(), ax.ModeJSON), "delete the record")
-	var blocked *ax.Error
-	if errors.As(blockedErr, &blocked) {
+	if blocked, ok := errors.AsType[*ax.Error](blockedErr); ok {
 		fmt.Println(blocked.ErrorCode)
 	}
 

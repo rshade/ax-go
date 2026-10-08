@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 )
 
 const (
@@ -112,9 +113,7 @@ func WithErrorContext(fields map[string]any) ErrorOption {
 		if e.Context == nil {
 			e.Context = make(map[string]any, len(fields))
 		}
-		for key, value := range fields {
-			e.Context[key] = value
-		}
+		maps.Copy(e.Context, fields)
 	}
 }
 
@@ -189,8 +188,7 @@ func ErrorExitCode(err error) int {
 		return ExitSuccess
 	}
 
-	var contractErr *Error
-	if errors.As(err, &contractErr) {
+	if contractErr, ok := errors.AsType[*Error](err); ok {
 		return contractErr.ExitCode()
 	}
 

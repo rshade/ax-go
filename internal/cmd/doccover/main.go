@@ -127,8 +127,8 @@ func requiredSymbols() []string {
 // qualification existed.
 // It returns (packageAlias, symbolName).
 func splitQualified(entry string) (string, string) {
-	if idx := strings.Index(entry, "."); idx >= 0 {
-		return entry[:idx], entry[idx+1:]
+	if before, after, ok := strings.Cut(entry, "."); ok {
+		return before, after
 	}
 	return rootPackageAlias, entry
 }
