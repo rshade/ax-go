@@ -143,3 +143,67 @@ func TestExecuteWarningsAndStrict(t *testing.T) {
 		}
 	})
 }
+
+// TestExecuteStrictResetsBetweenCalls runs two Executes on one command tree.
+// The second call must see a fresh --strict value and the stdout writer
+// Execute was given for that call.
+func TestExecuteStrictResetsBetweenCalls(t *testing.T) {
+	payload := map[string]string{"status": "ok"}
+	warnings := []Warning{
+		{Code: "first", Message: "one"},
+		{Code: "third", Message: "three"},
+	}
+	t.Run("same tree can run again after strict", func(t *testing.T) {
+		cases := []struct {
+			name string
+			args []string
+		}{
+			{name: "second call passes --strict=false", args: []string{"warn", "--strict=false"}},
+			{name: "second call omits --strict", args: []string{"warn"}},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				root := &cobra.Command{Use: "app"}
+				root.AddCommand(&cobra.Command{
+					Use: "warn",
+					RunE: func(cmd *cobra.Command, _ []string) error {
+						env := WithWarnings(cmd.Context(), NewEnvelope(cmd.Context(), payload), warnings...)
+						return WriteJSON(cmd.OutOrStdout(), env)
+					},
+				})
+
+				run := func(args []string) (int, *bytes.Buffer, *bytes.Buffer) {
+					stdout, stderr := &bytes.Buffer{}, &bytes.Buffer{}
+					root.SetArgs(args)
+					code := Execute(context.Background(), root,
+						WithStdout(stdout), WithStderr(stderr), WithStdoutIsTTY(false))
+					return code, stdout, stderr
+				}
+
+				code, stdout, stderr := run([]string{"warn", "--strict"})
+				if code != ExitValidation || stdout.Len() != 0 ||
+					!bytes.Contains(stderr.Bytes(), []byte("warnings_as_errors")) {
+					t.Fatalf("first exit=%d stdout=%s stderr=%s", code, stdout.Bytes(), stderr.Bytes())
+				}
+
+				code, stdout, stderr = run(tc.args)
+				if code != ExitSuccess {
+					t.Fatalf("second exit = %d, want 0; stdout=%s stderr=%s", code, stdout.Bytes(), stderr.Bytes())
+				}
+				if stderr.Len() != 0 {
+					t.Fatalf("second stderr = %s, want empty", stderr.Bytes())
+				}
+				var got struct {
+					Data     map[string]string `json:"data"`
+					Warnings []Warning         `json:"warnings"`
+				}
+				if err := json.Unmarshal(stdout.Bytes(), &got); err != nil {
+					t.Fatalf("second stdout %s: %v", stdout.Bytes(), err)
+				}
+				if got.Data["status"] != "ok" || len(got.Warnings) != 2 || got.Warnings[0].Code != "first" {
+					t.Fatalf("second stdout = %s", stdout.Bytes())
+				}
+			})
+		}
+	})
+}
