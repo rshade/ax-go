@@ -123,6 +123,26 @@ if (-not $enabled) {
     exit 0
 }
 
+# Optional top-level `auto_commit_paths:` list. When present, only these paths
+# are staged and committed, so unrelated work-in-progress elsewhere in the tree
+# is never swept into a Spec Kit commit. When absent, everything is committed.
+$stagePaths = @()
+$inPaths = $false
+foreach ($line in Get-Content $configFile) {
+    if ($line -match '^auto_commit_paths:') {
+        $inPaths = $true
+        continue
+    }
+    if ($inPaths) {
+        if ($line -match '^\s+-\s+(.+)$') {
+            $p = $matches[1].Trim() -replace '^["'']' -replace '["'']$'
+            if ($p) { $stagePaths += $p }
+        } elseif ($line -match '^[^\s#]') {
+            $inPaths = $false
+        }
+    }
+}
+
 # Check if there are changes to commit
 # Relax ErrorActionPreference so CRLF warnings on stderr do not terminate.
 $savedEAP = $ErrorActionPreference
@@ -155,10 +175,33 @@ if (-not $commitMsg) {
 $savedEAP = $ErrorActionPreference
 $ErrorActionPreference = 'Continue'
 try {
-    $out = git add . 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) { throw "git add failed: $out" }
-    $out = git commit -q -m $commitMsg 2>&1 | Out-String
-    if ($LASTEXITCODE -ne 0) { throw "git commit failed: $out" }
+    if ($stagePaths.Count -gt 0) {
+        # A configured path that neither exists nor is tracked would make git
+        # fail with "pathspec did not match", so drop it rather than abort.
+        $existing = @($stagePaths | Where-Object {
+            (Test-Path $_) -or (git ls-files -- $_ 2>$null)
+        })
+        if ($existing.Count -eq 0) {
+            Write-Host "[specify] No auto_commit_paths exist; skipped auto-commit after $EventName" -ForegroundColor DarkGray
+            exit 0
+        }
+        $out = git add -A -- @existing 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) { throw "git add failed: $out" }
+        git diff --cached --quiet -- @existing 2>$null
+        if ($LASTEXITCODE -eq 0) {
+            Write-Host "[specify] No changes under auto_commit_paths after $EventName" -ForegroundColor DarkGray
+            exit 0
+        }
+        # `-- <paths>` commits only these paths, leaving anything else the user
+        # had already staged untouched in the index.
+        $out = git commit -q -m $commitMsg -- @existing 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) { throw "git commit failed: $out" }
+    } else {
+        $out = git add . 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) { throw "git add failed: $out" }
+        $out = git commit -q -m $commitMsg 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) { throw "git commit failed: $out" }
+    }
 } catch {
     Write-Warning "[specify] Error: $_"
     exit 1

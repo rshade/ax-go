@@ -345,6 +345,25 @@ original and compares.
   update the compatibility matrix in `README.md` → `## Compatibility`. See
   [`CONTRIBUTING.md`](CONTRIBUTING.md) for the full update process.
 
+### Spec Kit Phase Commits
+
+Each spec-artifact phase (`/speckit-specify`, `-clarify`, `-checklist`, `-plan`,
+`-tasks`) ends in its own small `docs(spec): …` commit, made automatically by the
+git extension's mandatory `after_*` hook. Two settings make that safe:
+
+- **CI lints every commit in a PR**, not just the title (`commitlint --from base
+  --to head`). Every `message` in `.specify/extensions/git/git-config.yml` must
+  therefore be a Conventional Commit. Spec Kit's stock `[Spec Kit] …` messages
+  fail it.
+- **`auto_commit_paths`** in the same file limits staging to `specs/`,
+  `.specify/feature.json` and the agent-context files. The stock script runs
+  `git add .`, which would sweep unrelated work-in-progress into a spec commit.
+  The local change lives in both `auto-commit.sh` and `auto-commit.ps1`; re-apply
+  it if `specify extension update` overwrites them.
+
+`/speckit-implement` does not auto-commit. Code lands in deliberate, typed
+(`feat:` / `fix:`) commits after the quality gates pass.
+
 ## Testing-First Discipline
 
 **Tests land before implementation.** For every new behavior or
