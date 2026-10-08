@@ -14,7 +14,7 @@ Add three author-declared facts to the machine-discoverability contract:
   an optional note.
 
 Authors declare these through three functions in the import-isolated `schema`
-package: `WithFlagEnum`, `WithFlagExample` and `WithCapability`. The root package
+package: `DeclareFlagEnum`, `DeclareFlagExample` and `DeclareCapability`. The root package
 `ax` re-exports them. They follow the idiom `WithNonDeterministicFields[T](cmd)`
 already uses: the function annotates the Cobra object directly, and reflection
 reads the annotation later. Unlike that function, they return an error, so an
@@ -96,7 +96,7 @@ decision it changes, so no ADR is absorbed or retired.
 | VII. Test-First | Failing tests come first for each FR. Golden, fuzz (canonicaliser) and `ExampleXxx` tests are added, and every new export has a doc comment. | PASS (gated in tasks) |
 | VIII. Observability | No logging; the rejection envelope keeps `trace_id` because `normalizeExecuteError` fills it | PASS |
 | IX. Security | No panic: declarations return errors. The rejection envelope never echoes the user's value, in `message` or in `context`, because stderr is shipped to Loki (Principle VIII) and a secret passed to the wrong flag must not reach logs (research.md R9). | PASS |
-| X. Idiomatic Go | No new dependency and no package-level mutable state. The vocabulary is a `const` block, and membership is checked with a `switch`. Errors wrap with `%w` (`ErrInvalidDeclaration`). | PASS |
+| X. Idiomatic Go | No new dependency and no package-level mutable state. The vocabulary is a `const` block, and membership is checked with a `switch`. Authoring errors share spec 028's `invalid_schema_declaration` contract (exit 2, `context {field, reason}`). | PASS |
 | XI. Stability & SemVer | Additive Go API and additive payload fields, so the commit type is `feat:` and the release is a minor bump. No `breaking-change-approved` label is needed. | PASS |
 | XII. Deprecation | Nothing deprecated | N/A |
 
@@ -153,8 +153,8 @@ internal/mcpserver/
 schema/
 ├── schema.go             # FlagSchema.Enum/Example, CommandSchema.Capability, MCPTool.Capability/Annotations,
 │                         # CapabilitySchema, MCPToolAnnotations, conversion
-├── declare.go            # NEW: Capability type + 6 consts, ErrInvalidDeclaration,
-│                         #      WithFlagEnum / WithFlagExample / WithCapability
+├── declare.go            # NEW: Capability type + 6 consts,
+│                         #      DeclareFlagEnum / DeclareFlagExample / DeclareCapability
 ├── declare_test.go       # NEW
 └── example_test.go       # ExampleWithFlagEnum, ExampleWithFlagExample, ExampleWithCapability
 

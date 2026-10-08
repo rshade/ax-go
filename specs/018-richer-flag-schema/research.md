@@ -21,7 +21,7 @@ by this spec and research record.
 
 ## R1. Where enum enforcement happens
 
-**Decision**: `WithFlagEnum` replaces the flag's `pflag.Value` with an internal
+**Decision**: `DeclareFlagEnum` replaces the flag's `pflag.Value` with an internal
 `enumValue` wrapper. The wrapper checks membership in `Set` and only then calls
 the inner value's `Set`. It delegates `String()` and `Type()` to the inner value.
 
@@ -59,8 +59,8 @@ the inner value's `Set`. It delegates `String()` and `Type()` to the inner value
   completion only and do not enforce anything. Rejected.
 
 **Consequence**: Code that type-asserts `flag.Value` to a concrete pflag type,
-such as `*stringValue`, no longer matches after `WithFlagEnum`. That pattern is
-rare and unsupported by pflag. It is documented on `WithFlagEnum`.
+such as `*stringValue`, no longer matches after `DeclareFlagEnum`. That pattern is
+rare and unsupported by pflag. It is documented on `DeclareFlagEnum`.
 
 ## R2. Source of truth for the allowed set
 
@@ -102,11 +102,16 @@ longer validates against the flag's type or enum.
 
 ## R4. Surfacing authoring errors (FR-013)
 
-**Decision**: Each declaration function returns `error`. Every authoring
-failure wraps the sentinel `schema.ErrInvalidDeclaration` with `%w`, plus
-detail naming the command path, the flag and the cause. When a declaration
-fails, the function changes nothing: it checks everything before it mutates
-anything.
+**Decision** (revised 2026-10-07 to align with spec 028, which landed on main
+first): each declaration function returns `error`. An authoring failure is an
+`*ax.Error` with `error_code` `invalid_schema_declaration` and exit code `2`,
+built by the same `declarationError` helper as `DeclarePrompt` and
+`DeclareResource`. Its `context` holds `field` (`cmd`, `flag`, `values`,
+`default`, `example` or `class`) and a stable `reason` (`nil_command`,
+`flag_not_found`, `unsupported_type`, `required`, `invalid_value`,
+`duplicate`, `not_in_enum` or `not_in_vocabulary`). The internal layer returns
+a `*Violation{Field, Reason}`, as `AddPrompt` does. When a declaration fails,
+the function changes nothing: it checks everything before it mutates anything.
 
 **Rationale**:
 
@@ -114,11 +119,13 @@ anything.
   author builds the command tree, not when an agent first runs `__schema`.
 - `BuildSchema` and `BuildMCPSchema` have no error return. Adding one would be a
   breaking change.
-- The no-panic rule (Principle IX) rules out panicking. `errors.Is` works on the
-  returned errors.
-- The sentinel is a plain error, not an `*ax.Error`. A programmer error that
-  reaches `ax.Execute` maps to exit code `1` (internal), which is correct,
-  because a malformed declaration is not bad input from the agent.
+- The no-panic rule (Principle IX) rules out panicking.
+- One package, one authoring-error contract. The original decision wrapped a
+  plain sentinel (`ErrInvalidDeclaration`) that `ax.Execute` mapped to exit
+  `1`. Spec 028 merged first with `invalid_schema_declaration` / exit `2`, and
+  shipping two contracts for the same job would make a later alignment a
+  breaking change (Principle XI). The structured `context.reason` is also more
+  useful than a sentinel: an author's tooling can branch on it.
 
 **Defence in depth**: If the state changes after a successful declaration, for
 example because the author mutates `DefValue` or edits an annotation by hand,
@@ -129,7 +136,7 @@ the schema readers check consistency again and omit the field (R3).
 - *No return value, matching `WithNonDeterministicFields`, with errors reported
   at schema-build time*: the error would surface late and only to agents, which
   is the opposite of FR-013. Rejected.
-- *A `MustWithFlagEnum` that panics*: this violates Principle IX. Rejected.
+- *A `MustDeclareFlagEnum` that panics*: this violates Principle IX. Rejected.
 
 ## R5. Type support and canonical membership
 
@@ -140,7 +147,7 @@ the schema readers check consistency again and omit the field (R3).
 - **Custom `pflag.Value` types**: any type whose `Type()` is not a built-in
   scalar or slice type name is treated as a string.
 - **Declaration errors**: `bool`, `count`, float types, duration and every slice
-  type return `ErrInvalidDeclaration` (unsupported type).
+  type return `invalid_schema_declaration` with reason `unsupported_type`.
 - **Comparison**:
   - Integer flags compare canonically. The input is parsed with `strconv` at
     the flag's bit size and compared numerically, so `--n=03` matches `"3"`.
@@ -297,23 +304,31 @@ finds one, so the live path returns the same envelope as `ax.Execute`.
 
 ## R10. Naming and placement of the public API
 
-**Decision**: `schema.WithFlagEnum`, `schema.WithFlagExample`,
-`schema.WithCapability`, the typed `schema.Capability` with constants
-`CapabilityReadOnly`, `CapabilityCreate`, `CapabilityMutate`,
-`CapabilityDelete`, `CapabilityExternalNetwork` and `CapabilityAdmin`, and
-`schema.ErrInvalidDeclaration`. Root `ax` re-exports all of them by alias or
-forwarding function. The constants are re-declared as typed constants of the
-alias type, so `ax.CapabilityMutate` and `schema.CapabilityMutate` are the same
-value.
+**Decision** (revised 2026-10-07 to align with spec 028): `schema.DeclareFlagEnum`,
+`schema.DeclareFlagExample`, `schema.DeclareCapability`, and the typed
+`schema.Capability` with constants `CapabilityReadOnly`, `CapabilityCreate`,
+`CapabilityMutate`, `CapabilityDelete`, `CapabilityExternalNetwork` and
+`CapabilityAdmin`. Root `ax` re-exports all of them by alias or forwarding
+function. The constants are re-declared as typed constants of the alias type,
+so `ax.CapabilityMutate` and `schema.CapabilityMutate` are the same value. No
+error sentinel is exported; callers use `errors.As` to an `*ax.Error` and read
+`ErrorCode` and `Context`, exactly as for `DeclarePrompt`.
 
-**Rationale**: The `With<Thing>(cmd, ...)` shape mirrors
-`WithNonDeterministicFields[T](cmd)`. That is the "one idiom" US4 asks for. The
-`schema` package is the import-isolated home of the existing declaration
-function, so a thin consumer can declare metadata without linking the runtime.
+**Rationale**: The `Declare<Thing>(cmd, ...)` shape matches spec 028's
+`DeclarePrompt` and `DeclareResource`, so every metadata declaration that can
+fail reads alike and shares one error contract. That is the "one idiom" US4 asks
+for. The original `With<Thing>` naming mirrored `WithNonDeterministicFields`,
+which cannot fail and returns nothing; it remains the one `With…` declaration.
+The `schema` package is the import-isolated home of both, so a thin consumer can
+declare metadata without linking the runtime.
 
-**Alternatives considered**: Functional options on `NewSchemaCommand`, for
-example `WithFlagEnums(map[...]...)`. That moves the declaration away from the
-flag, and an option has no way to return an error. Rejected.
+**Alternatives considered**:
+
+- *Keep `With<Thing>` and the exit-1 sentinel*: two naming styles and two error
+  contracts for one job. Rejected.
+- *Functional options on `NewSchemaCommand`*, for example
+  `WithFlagEnums(map[...]...)`: this moves the declaration away from the flag,
+  and an option has no way to return an error. Rejected.
 
 ## Rejected for scope
 

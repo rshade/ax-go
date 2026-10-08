@@ -34,10 +34,14 @@ These conventions apply to every task:
 - **Annotation keys**: `github.com/rshade/ax-go/schema/example` is a flag
   annotation. `github.com/rshade/ax-go/schema/capability` and
   `github.com/rshade/ax-go/schema/capability-note` are command annotations.
-- **Sentinel**: `ErrInvalidDeclaration` is defined in `internal/schema`, and
-  `schema.ErrInvalidDeclaration` and `ax.ErrInvalidDeclaration` refer to that
-  same value. Every authoring error wraps it with `%w`, and a failed declaration
-  mutates nothing.
+- **Authoring errors** (revised 2026-10-07, Phase 8): declaration failures
+  share spec 028's contract. The internal `Add…` functions return a
+  `*Violation{Field, Reason}`; the public `Declare…` functions turn it into an
+  `*ax.Error` with `invalid_schema_declaration`, exit 2, and
+  `context {field, reason}` through 028's `declarationError`. A failed
+  declaration mutates nothing. Phases 2–6 originally used an
+  `ErrInvalidDeclaration` sentinel (exit 1) and `With…` names; Phase 8 replaces
+  both.
 - **Enum rejection**: `contract.NewError(context.Background(), "validation_error", "flag --<name>: value is not one of the allowed values", contract.WithErrorExitCode(contract.ExitValidation), contract.WithErrorContext(map[string]any{"flag": name, "allowed": allowed}), contract.WithSuggestions("--<name>=<v>"...))`.
   The raw input never appears anywhere in the envelope, neither `message` nor `context` (research.md R9).
 - **Default exemption**: `enumValue.Set` accepts any value equal to the live `flag.DefValue` before the membership check (research.md R5).
@@ -100,7 +104,7 @@ and flag lookup. Every story depends on these.
 
 **Goal**:
 
-- An author declares an allowed-value set with `WithFlagEnum`.
+- An author declares an allowed-value set with `DeclareFlagEnum`.
 - The set appears in `__schema` as `enum` (CLI strings, author order) and in
   `--as=mcp` as a typed JSON-Schema `enum`.
 - Any value outside the set is rejected at parse time with `validation_error`
@@ -186,7 +190,7 @@ empty stdout, one envelope on stderr, and that `RunE` was never entered.
   - `BuildMCPSchema` emits a typed enum;
   - two `BuildSchema` and `WriteJSON` runs are byte-identical.
 
-  In root `schema_test.go`, add a test that `errors.Is(err, ax.ErrInvalidDeclaration)` holds for an error from `ax.WithFlagEnum`.
+  In root `schema_test.go`, add a test that `errors.Is(err, ax.ErrInvalidDeclaration)` holds for an error from `ax.DeclareFlagEnum`.
 
 ### Implementation for User Story 1
 
@@ -198,7 +202,7 @@ empty stdout, one envelope on stderr, and that `RunE` was never entered.
 - [X] T015 [US1] In `internal/schema/schema.go`, add `Enum []string` to `Flag` and an exported `FlagEnum(*pflag.Flag) []string` reader (exported so `internal/mcp` can share it). It type-asserts `*enumValue`, returns a copy of `allowed`, and returns nil if a non-empty `DefValue` no longer canonicalises to a member. Populate it in `CollectFlags`. Done when T009 passes. A flag without an enum must add zero allocations: one type assertion only.
 - [X] T016 [US1] In `internal/mcp/mcp.go`, have `flagProperty` call `internalschema.FlagEnum` and emit `"enum"` as a `[]any` converted per element with `ScalarJSON`. Omit the key when the enum is nil or when any element fails to convert. Make T010 pass.
 - [X] T017 [US1] In `internal/mcpserver/dispatch.go`, change the `root.SetFlagErrorFunc` closure in `newDispatcher` so that when `errors.As(ferr, &contractErr)` finds a `*contract.Error`, it returns that error unchanged. Otherwise it keeps the existing `d.validationError(...)` path. Make T012 pass.
-- [X] T018 [US1] In `schema/schema.go`, add `` Enum []string `json:"enum,omitempty"` `` to `FlagSchema`, after `Required`, and map it in `convertFlagSchemas`. In `schema/declare.go`, add `WithFlagEnum(cmd *cobra.Command, flag string, values ...string) error`, which forwards to `internalschema.DeclareFlagEnum`. Its doc comment states:
+- [X] T018 [US1] In `schema/schema.go`, add `` Enum []string `json:"enum,omitempty"` `` to `FlagSchema`, after `Required`, and map it in `convertFlagSchemas`. In `schema/declare.go`, add `DeclareFlagEnum(cmd *cobra.Command, flag string, values ...string) error`, which forwards to `internalschema.DeclareFlagEnum`. Its doc comment states:
   - that enforcement happens at parse time, before `PersistentPreRunE` and `RunE`, including under dry-run;
   - that the rejection is exit 2;
   - the supported types;
@@ -207,7 +211,7 @@ empty stdout, one envelope on stderr, and that `RunE` was never entered.
   - that `flag.Value` is no longer the concrete pflag type.
 
   Make T013 pass.
-- [X] T019 [US1] In root `schema.go`, add `var ErrInvalidDeclaration = isolatedschema.ErrInvalidDeclaration` and `func WithFlagEnum(cmd *cobra.Command, flag string, values ...string) error`, which forwards. Confirm T011 now passes. **No change to `execute.go`**, per research.md R1. If T011 fails, diagnose the error chain; do not add a special case in `Execute`.
+- [X] T019 [US1] In root `schema.go`, add `var ErrInvalidDeclaration = isolatedschema.ErrInvalidDeclaration` and `func DeclareFlagEnum(cmd *cobra.Command, flag string, values ...string) error`, which forwards. Confirm T011 now passes. **No change to `execute.go`**, per research.md R1. If T011 fails, diagnose the error chain; do not add a special case in `Execute`.
 - [X] T020 [US1] Add `ExampleWithFlagEnum` in `schema/example_test.go`. It declares an enum, writes `BuildSchema(...).Command.Flags` for that flag with `contract.WriteJSON`, and has a verified `// Output:` line.
 
 **Checkpoint**: US1 is fully functional. `go test -race ./...` is green. `testdata/schema_*.golden.json` are unchanged.
@@ -216,7 +220,7 @@ empty stdout, one envelope on stderr, and that `RunE` was never entered.
 
 ## Phase 4: User Story 2 - Agent learns the exact input shape from an example (Priority: P2)
 
-**Goal**: `WithFlagExample` attaches one CLI-form example. It appears as
+**Goal**: `DeclareFlagExample` attaches one CLI-form example. It appears as
 `example` in `__schema` and as a typed one-element `examples` array in
 `--as=mcp`. A value that doesn't fit the type, or is outside the flag's enum, is
 an authoring error.
@@ -268,7 +272,7 @@ that two runs are byte-identical.
 
 - [X] T025 [US2] In `internal/schema/declare.go`, add `DeclareFlagExample(cmd, name, example string) error`, which runs the data-model.md checks 1–4 and writes the annotation `[]string{example}`. In `internal/schema/schema.go`, add `Example string` to `Flag` and a fail-closed exported `FlagExample(*pflag.Flag) string` reader, and populate it in `CollectFlags`. Make T021 and T022 pass.
 - [X] T026 [US2] In `internal/mcp/mcp.go`, make `flagProperty` emit `"examples"`. A scalar uses `ScalarJSON`. A slice is split as CSV, converted per element with `ArrayItemJSON`, and wrapped in a one-element array. Omit the key when conversion fails. Make T023 pass.
-- [X] T027 [US2] In `schema/schema.go`, add `` Example string `json:"example,omitempty"` `` to `FlagSchema`, after `Enum`, and map it. In `schema/declare.go`, add `WithFlagExample(cmd *cobra.Command, flag string, example string) error` with a contract doc comment: CLI form, CSV for slices, custom types unchecked, must be an enum member, last call wins. In root `schema.go`, add the forwarding `WithFlagExample`. Make T024 pass.
+- [X] T027 [US2] In `schema/schema.go`, add `` Example string `json:"example,omitempty"` `` to `FlagSchema`, after `Enum`, and map it. In `schema/declare.go`, add `DeclareFlagExample(cmd *cobra.Command, flag string, example string) error` with a contract doc comment: CLI form, CSV for slices, custom types unchecked, must be an enum member, last call wins. In root `schema.go`, add the forwarding `DeclareFlagExample`. Make T024 pass.
 - [X] T028 [US2] Add `ExampleWithFlagExample` in `schema/example_test.go`, with a verified `// Output:`.
 
 **Checkpoint**: US1 and US2 both work independently. The existing goldens are unchanged.
@@ -277,7 +281,7 @@ that two runs are byte-identical.
 
 ## Phase 5: User Story 3 - Agent classifies a command's side effects before calling (Priority: P3)
 
-**Goal**: `WithCapability` records one class from the vocabulary and an
+**Goal**: `DeclareCapability` records one class from the vocabulary and an
 optional note. They appear as `capability` on the command node in `__schema`,
 and as `capability` plus the standard `annotations` hints on the `--as=mcp`
 tool. The live `mcp-server` tool carries the hints. Hidden and reserved
@@ -321,7 +325,7 @@ both carry a declaration but are still not tools.
   - `` MCPTool.Capability *CapabilitySchema `json:"capability,omitempty"` `` and `` MCPTool.Annotations *MCPToolAnnotations `json:"annotations,omitempty"` ``, after `NonDeterministicFields`.
 
   Map them in `convertCommandSchema` and `BuildMCPSchema`. In
-  `schema/declare.go`, add `WithCapability(cmd *cobra.Command, class
+  `schema/declare.go`, add `DeclareCapability(cmd *cobra.Command, class
   Capability, note string) error` with a contract doc comment. The schema
   package must **not** import the MCP SDK. Make T032 pass.
 - [X] T036 [US3] In `internal/mcpserver/server.go`:
@@ -335,7 +339,7 @@ both carry a declaration but are still not tools.
   - the six typed constants (`const CapabilityReadOnly = isolatedschema.CapabilityReadOnly`, and so on);
   - `type CapabilitySchema = isolatedschema.CapabilitySchema`;
   - `type MCPToolAnnotations = isolatedschema.MCPToolAnnotations`;
-  - the forwarding `WithCapability`.
+  - the forwarding `DeclareCapability`.
 - [X] T038 [US3] Add `ExampleWithCapability` in `schema/example_test.go`. It prints the command node's `capability` JSON with a verified `// Output:`.
 
 **Checkpoint**: US1–US3 all work independently.
@@ -373,7 +377,7 @@ golden files match their T001 checksums.
   `../testdata/schema_mcp_enriched.golden.json`, plus a two-run byte-equality
   check. Mirror both tests in root `schema_test.go` through the `ax` facade
   against `testdata/…_enriched.golden.json`.
-- [X] T040 [P] [US4] Add `TestDerivedFieldsSurviveEnumDeclaration` in `schema/declare_test.go` (US4-AS3, FR-006). A required flag with a default, given only `WithFlagEnum`, still shows `default`, `required: true` and `enum` in `__schema`. In `--as=mcp`, the flag is still listed in `inputSchema.required` and carries a typed `default`.
+- [X] T040 [P] [US4] Add `TestDerivedFieldsSurviveEnumDeclaration` in `schema/declare_test.go` (US4-AS3, FR-006). A required flag with a default, given only `DeclareFlagEnum`, still shows `default`, `required: true` and `enum` in `__schema`. In `--as=mcp`, the flag is still listed in `inputSchema.required` and carries a typed `default`.
 - [X] T041 [P] [US4] In `buildtags_parity_test.go`, add assertions that the enriched goldens hold under every build configuration. The file is untagged, per the AGENTS.md parity rule.
 
 ### Implementation for User Story 4
@@ -407,7 +411,7 @@ golden files match their T001 checksums.
 - [ ] T047 Verify SC-004 and FR-008. `testdata/schema_ax.golden.json`, `testdata/schema_mcp.golden.json` and `testdata/mcp_tools_list.golden.json` must match their T001 checksums byte for byte. Also run `git diff --exit-code` on all three. A mismatch is a defect in the omitempty or nil handling: fix it, do not regenerate.
 - [ ] T048 Run `make surface-update`, then review `git diff internal/cmd/surfacecheck/baseline.json`. Every line must be an **addition** naming an identifier or field from contracts/declaration-api.md or data-model.md, in `schema` or `ax`, with presence `"all"`. Any removed or changed line is a defect.
 - [ ] T049 Append retained audit rows for every new **root-package** feature from T048 to `specs/015-internalize-helpers/public-surface-audit.json`:
-  - `WithFlagEnum`, `WithFlagExample`, `WithCapability` and `ErrInvalidDeclaration`;
+  - `DeclareFlagEnum`, `DeclareFlagExample`, `DeclareCapability` and `ErrInvalidDeclaration`;
   - `Capability` and its six constants;
   - `CapabilitySchema` and `MCPToolAnnotations` with their fields;
   - the new `FlagSchema`, `CommandSchema` and `MCPTool` fields.
@@ -422,6 +426,21 @@ golden files match their T001 checksums.
 - [ ] T053 Run the full gate: `gofmt -l .` must print nothing, then `make test` (all 4 build-tag configurations, `-race`), `make lint` (all 4 configurations), `go vet ./...`, `make validate` and `make size-check`. The logging probe must be unaffected, and `go list -deps ./examples/logging` must not newly include `schema`.
 - [ ] T054 Run the verification commands in `specs/018-richer-flag-schema/quickstart.md`, including `go test -run '^$' -fuzz FuzzEnumCanonicalise -fuzztime 30s ./internal/schema`, and confirm each expected outcome listed there.
 - [ ] T055 Remove debug code and make sure no `TODO` remains in the changed files. Confirm `CHANGELOG.md` is **not** modified, because release-please owns it. Draft a Conventional Commit subject, `feat(schema): add per-flag enum/example and command capability class to __schema (#28)`, and validate it with `npx commitlint`.
+
+---
+
+## Phase 8: Align with spec 028 (authoring-error contract and naming)
+
+**Purpose**: Spec 028 (`DeclarePrompt`, `DeclareResource`) landed on main
+first with `invalid_schema_declaration` / exit 2 and `Declare…` names. Ship
+one contract and one naming style for every fallible declaration (research.md
+R4 and R10, revised).
+
+- [ ] T056 Rewrite the authoring-error tests first: internal tests assert the returned `*Violation` (`Field`, `Reason`) for every case in contracts/declaration-api.md's reason table; public `schema` and root tests assert `errors.As` to `*contract.Error`, `ErrorCode` `invalid_schema_declaration`, `ExitCode()` 2, and `Context` `{field, reason}`. Confirm they fail.
+- [ ] T057 In `internal/schema`, rename `DeclareFlagEnum` / `DeclareFlagExample` / `DeclareCapability` to `AddFlagEnum` / `AddFlagExample` / `AddCapability` returning `*Violation`; add the reasons `flag_not_found`, `unsupported_type`, `invalid_value`, `not_in_enum` and `not_in_vocabulary` beside 028's; delete `ErrInvalidDeclaration`.
+- [ ] T058 In `schema` and root `ax`, rename the public functions to `DeclareFlagEnum` / `DeclareFlagExample` / `DeclareCapability`, route failures through `declarationError` (kinds `flag enum`, `flag example`, `capability`), and remove `ErrInvalidDeclaration` from both packages. Rename the three `ExampleWith…` functions to `ExampleDeclare…`.
+- [ ] T059 Update `examples/integration`, README.md, AGENTS.md and `examples/integration/README.md` to the new names and contract.
+- [ ] T060 Re-run `make surface-update` and replace the spec 018 audit rows (drop `ErrInvalidDeclaration`, rename the three functions), then the full gate (T047–T054) on the mise-pinned toolchain.
 
 ---
 

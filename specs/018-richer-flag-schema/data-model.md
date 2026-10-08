@@ -20,7 +20,8 @@ legal values (FR-015):
 
 - **Validation**: membership is checked with an exhaustive `switch`. Any other
   value, including `""`, a different case such as `Read-Only`, and surrounding
-  whitespace, makes `WithCapability` return `ErrInvalidDeclaration`.
+  whitespace, makes `DeclareCapability` return `invalid_schema_declaration`
+  (`class`/`not_in_vocabulary`).
 - **Absence**: a command that never declares a class is *unclassified*. The
   field is omitted, and no class is assumed (FR-003).
 
@@ -65,11 +66,12 @@ An internal type in `internal/schema` that wraps a flag's `pflag.Value`.
   variable is not modified. If `v` is a member, it returns `inner.Set(v)`.
 - `String()` and `Type()` delegate to `inner`.
 
-**Re-declaration**: calling `WithFlagEnum` on a flag that is already wrapped
+**Re-declaration**: calling `DeclareFlagEnum` on a flag that is already wrapped
 replaces `allowed` on the existing wrapper. It never wraps twice.
 
 **Declaration-time validation** (R5). The checks run in this order, and the
-first failure returns `ErrInvalidDeclaration` with nothing mutated:
+first failure returns `invalid_schema_declaration` (exit 2) with nothing
+mutated:
 
 1. `cmd` is non-nil, and the flag exists in `cmd.Flags()` or
    `cmd.PersistentFlags()`.
@@ -92,14 +94,14 @@ first failure returns `ErrInvalidDeclaration` with nothing mutated:
 `[]string{example}`.
 
 **Declaration-time validation**. The first failure returns
-`ErrInvalidDeclaration`:
+`invalid_schema_declaration` (exit 2):
 
 1. `cmd` is non-nil and the flag exists.
 2. The example is non-empty.
 3. The example parses as the flag's type. Known scalar types are checked with
    the shared converter, and known slice types are split as CSV with each
    element converted. Custom types are accepted unchecked, because ax-go cannot
-   build a fresh instance of an unknown `pflag.Value`. The `WithFlagExample`
+   build a fresh instance of an unknown `pflag.Value`. The `DeclareFlagExample`
    doc comment says so.
 4. If the flag has an enum, the example is a member of the set.
 

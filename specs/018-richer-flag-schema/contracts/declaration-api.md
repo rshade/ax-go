@@ -24,11 +24,6 @@ const (
     CapabilityExternalNetwork Capability = "external-network"
     CapabilityAdmin           Capability = "admin"
 )
-
-// ErrInvalidDeclaration is wrapped (%w) by every authoring error returned from
-// WithFlagEnum, WithFlagExample, and WithCapability. It is a programmer error:
-// if it reaches ax.Execute it maps to exit code 1, not 2.
-var ErrInvalidDeclaration = errors.New("schema: invalid declaration")
 ```
 
 The root facade exposes the same names:
@@ -36,12 +31,34 @@ The root facade exposes the same names:
 - `type Capability = schema.Capability`
 - the six constants, re-declared as `const CapabilityReadOnly = schema.CapabilityReadOnly`,
   and so on
-- `var ErrInvalidDeclaration = schema.ErrInvalidDeclaration`, which is the same
-  error value, so `errors.Is` holds across both packages.
+
+## Authoring-error contract
+
+Shared with spec 028's `DeclarePrompt` and `DeclareResource`. Every declaration
+function returns nil on success. On an authoring mistake it returns an
+`*ax.Error` (`*contract.Error`) and leaves `cmd` unchanged:
+
+- `error_code`: `invalid_schema_declaration`
+- exit code: `2`
+- `message`: `invalid <kind> declaration "<key>": <field> <reason>`, where kind
+  is `flag enum`, `flag example` or `capability`
+- `context`: `{"field": ..., "reason": ...}`
+
+| `field` | `reason` values |
+|---------|-----------------|
+| `cmd` | `nil_command` |
+| `flag` | `flag_not_found`, `unsupported_type` |
+| `values` | `required`, `invalid_value`, `duplicate` |
+| `default` | `not_in_enum` |
+| `example` | `required`, `invalid_value`, `not_in_enum` |
+| `class` | `not_in_vocabulary` |
+
+Callers branch with `errors.As(err, &axErr)` and `axErr.ErrorCode` /
+`axErr.Context["reason"]`. No sentinel error is exported.
 
 ## Functions
 
-### `WithFlagEnum(cmd *cobra.Command, flag string, values ...string) error`
+### `DeclareFlagEnum(cmd *cobra.Command, flag string, values ...string) error`
 
 Declares the only values the named flag accepts. The function finds the flag in
 `cmd.Flags()` first, then in `cmd.PersistentFlags()`. A persistent flag's
@@ -53,19 +70,21 @@ declaration applies to every descendant command.
   `PersistentPreRunE` or `RunE` runs, with `validation_error` and exit code `2`,
   including under `--dry-run`. The flag's own default is always accepted, even
   when it is empty and not a member. Calling the function again replaces the set.
-- **Errors**: the function returns an error wrapping `ErrInvalidDeclaration`,
-  and leaves `cmd` unchanged, when:
-  - `cmd` is nil or the flag is not found;
-  - the flag type is not a string, custom, or integer scalar type;
-  - `values` is empty;
-  - a value does not parse as the flag's type;
-  - two values are duplicates after canonicalisation;
-  - a non-empty default is not a member of the set;
-  - an example already declared on the flag is not a member.
+- **Errors** (see the authoring-error contract), checked in this order:
+  - `cmd` is nil (`cmd`/`nil_command`) or the flag is not found
+    (`flag`/`flag_not_found`);
+  - the flag type is not a string, custom, or integer scalar type
+    (`flag`/`unsupported_type`);
+  - `values` is empty (`values`/`required`);
+  - a value does not parse as the flag's type (`values`/`invalid_value`);
+  - two values are duplicates after canonicalisation (`values`/`duplicate`);
+  - a non-empty default is not a member of the set (`default`/`not_in_enum`);
+  - an example already declared on the flag is not a member
+    (`example`/`not_in_enum`).
 - **Caveat**: after the call, `flag.Value` is no longer the concrete pflag type.
   Do not type-assert it.
 
-### `WithFlagExample(cmd *cobra.Command, flag string, example string) error`
+### `DeclareFlagExample(cmd *cobra.Command, flag string, example string) error`
 
 Attaches one example value, written in CLI form exactly as it would appear on
 argv. For a slice flag, write the elements as CSV, for example `a,b`.
@@ -73,16 +92,17 @@ argv. For a slice flag, write the elements as CSV, for example `a,b`.
 - **On success**: `__schema` emits the value as `example`. `--as=mcp` emits it
   as a one-element `examples` array typed to the property. Calling the function
   again replaces the example.
-- **Errors**: the function returns an error wrapping `ErrInvalidDeclaration`
-  when:
+- **Errors** (see the authoring-error contract):
   - `cmd` is nil or the flag is not found;
-  - the example is empty;
-  - the example does not parse as the flag's known type;
-  - the example is not a member of the flag's declared enum.
+  - the example is empty (`example`/`required`);
+  - the example does not parse as the flag's known type
+    (`example`/`invalid_value`);
+  - the example is not a member of the flag's declared enum
+    (`example`/`not_in_enum`).
 
   Values for custom `pflag.Value` types are not type-checked.
 
-### `WithCapability(cmd *cobra.Command, class Capability, note string) error`
+### `DeclareCapability(cmd *cobra.Command, class Capability, note string) error`
 
 Classifies the command's side effects. `note` is optional free-form detail, for
 example `"idempotent by name"`. Surrounding whitespace is trimmed, and an empty
@@ -94,8 +114,9 @@ note is omitted.
   `mcp-server` tool carries the hints. Hidden and reserved commands keep their
   declaration but stay out of the MCP tool set. Calling the function again
   replaces the class and note.
-- **Errors**: the function returns an error wrapping `ErrInvalidDeclaration`
-  when `cmd` is nil or `class` is not one of the six constants.
+- **Errors** (see the authoring-error contract): `cmd` is nil
+  (`cmd`/`nil_command`), or `class` is not one of the six constants
+  (`class`/`not_in_vocabulary`).
 
 ## Unchanged behaviour (FR-006 / FR-008)
 
@@ -111,13 +132,13 @@ deploy := &cobra.Command{Use: "deploy", RunE: runDeploy}
 deploy.Flags().String("output", "json", "output format")
 deploy.Flags().Duration("timeout", 30*time.Second, "deadline")
 
-if err := schema.WithFlagEnum(deploy, "output", "json", "table", "yaml"); err != nil {
+if err := schema.DeclareFlagEnum(deploy, "output", "json", "table", "yaml"); err != nil {
     return err
 }
-if err := schema.WithFlagExample(deploy, "timeout", "45s"); err != nil {
+if err := schema.DeclareFlagExample(deploy, "timeout", "45s"); err != nil {
     return err
 }
-if err := schema.WithCapability(deploy, schema.CapabilityMutate, "idempotent by release name"); err != nil {
+if err := schema.DeclareCapability(deploy, schema.CapabilityMutate, "idempotent by release name"); err != nil {
     return err
 }
 ```
