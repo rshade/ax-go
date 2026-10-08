@@ -15,6 +15,10 @@ type warningState struct {
 	strict   bool
 	buf      *bytes.Buffer
 	real     io.Writer
+	// release puts back the stdout writer --strict replaced. Execute defers
+	// it so the next call on this command tree writes to the writer that call
+	// installed, not to the discarded buffer.
+	release func()
 }
 
 type warningStateKey struct{}
@@ -26,6 +30,15 @@ func withWarningState(ctx context.Context) context.Context {
 func warningStateFrom(ctx context.Context) *warningState {
 	state, _ := ctx.Value(warningStateKey{}).(*warningState)
 	return state
+}
+
+// restoreOut returns a command stdout writer that --strict replaced.
+func (s *warningState) restoreOut() {
+	if s == nil || s.release == nil {
+		return
+	}
+	s.release()
+	s.release = nil
 }
 
 // WithWarnings returns env with warnings in caller order. A blank code or

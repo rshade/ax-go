@@ -511,6 +511,8 @@ objects, omitted when empty. Order is the order the command attached them.
 Without `--strict`, warnings do not change the exit code. With `--strict`,
 any warning exits `2`, writes `error_code: warnings_as_errors` to stderr, and
 leaves stdout empty. `--strict` is a boolean. There is no severity rank.
+Each `ax.Execute` reads the flag from that call's arguments, so a second
+call on the same command tree is strict only when that call passes it.
 
 ## Engineering Standards
 

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
@@ -194,6 +195,9 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	defer span.End()
 
 	prepareCommand(root, cfg)
+	// Cobra leaves a persistent bool at the value the previous Execute parsed.
+	// Omitting --strict on the next call has to mean the default.
+	resetStrictFlag(root)
 	root.SetIn(cfg.stdin)
 	root.SetOut(cfg.stdout)
 	root.SetErr(cfg.stderr)
@@ -203,8 +207,18 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	// already wired into Cobra's SetErr and the rest of the diagnostic stream.
 	ctx = logcore.WithDiagnosticWriter(ctx, cfg.stderr)
 	ctx = withWarningState(ctx)
+	// Restore even when Execute returns on the command error or the
+	// warnings_as_errors path; those paths do not flush the held buffer.
+	defer warningStateFrom(ctx).restoreOut()
 	rebindCommandContexts(ctx, root)
 
+	return finishCommand(ctx, span, root, cfg)
+}
+
+// finishCommand maps the command result to an exit code. A returned error
+// wins. With --strict and at least one kept warning, stdout stays empty and
+// the process exits 2. Otherwise held stdout is flushed to the real writer.
+func finishCommand(ctx context.Context, span trace.Span, root *cobra.Command, cfg executeConfig) int {
 	if executeErr := root.ExecuteContext(ctx); executeErr != nil {
 		span.SetStatus(codes.Error, executeErr.Error())
 		axErr := normalizeExecuteError(root.Context(), root.Name(), cfg.version, executeErr)
@@ -227,7 +241,6 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	if state != nil && state.buf != nil && state.real != nil {
 		_, _ = state.real.Write(state.buf.Bytes())
 	}
-
 	return ExitSuccess
 }
 
@@ -350,9 +363,15 @@ func wrapCommandPersistentPreRun(cmd *cobra.Command, cfg executeConfig) {
 		if strict {
 			if state := warningStateFrom(ctx); state != nil {
 				state.strict = true
+				// OutOrStdout walks to the parent when this command has no
+				// writer of its own. Remember that so restore clears the
+				// local writer instead of pinning this call's parent writer
+				// onto the command.
+				held := holdStdout(invoked)
 				state.real = invoked.OutOrStdout()
 				state.buf = &bytes.Buffer{}
 				invoked.SetOut(state.buf)
+				state.release = held.restore
 			}
 		}
 		invoked.SetContext(ctx)
@@ -373,6 +392,54 @@ func wrapCommandPersistentPreRun(cmd *cobra.Command, cfg executeConfig) {
 		cmd.Annotations = map[string]string{}
 	}
 	cmd.Annotations[persistentHookWrappedAnnotation] = "true"
+}
+
+// resetStrictFlag puts --strict back to its default and clears Changed.
+// A persistent bool otherwise stays set when the next argv omits it.
+func resetStrictFlag(cmd *cobra.Command) {
+	persistent := cmd.PersistentFlags().Lookup(cli.FlagStrict)
+	resetChangedFlag(persistent)
+	if flag := cmd.Flags().Lookup(cli.FlagStrict); flag != nil && flag != persistent {
+		resetChangedFlag(flag)
+	}
+}
+
+func resetChangedFlag(flag *pflag.Flag) {
+	if flag == nil || !flag.Changed {
+		return
+	}
+	_ = flag.Value.Set(flag.DefValue)
+	flag.Changed = false
+}
+
+// heldStdout is the invoked command's writer before --strict replaces it.
+// inherited means the command had no local writer, so restore must clear it
+// rather than pin the parent writer from this call.
+type heldStdout struct {
+	cmd       *cobra.Command
+	prior     io.Writer
+	inherited bool
+}
+
+func holdStdout(cmd *cobra.Command) heldStdout {
+	held := heldStdout{cmd: cmd}
+	if parent := cmd.Parent(); parent != nil && cmd.OutOrStdout() == parent.OutOrStdout() {
+		held.inherited = true
+		return held
+	}
+	held.prior = cmd.OutOrStdout()
+	return held
+}
+
+func (h heldStdout) restore() {
+	if h.cmd == nil {
+		return
+	}
+	if h.inherited {
+		h.cmd.SetOut(nil)
+		return
+	}
+	h.cmd.SetOut(h.prior)
 }
 
 // normalizeExecuteError fills empty envelope fields (trace ID, tool, version,
