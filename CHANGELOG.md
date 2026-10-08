@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.8.0](https://github.com/rshade/ax-go/compare/v0.7.0...v0.8.0) (2026-10-08)
+
+
+### Added
+
+* **schema:** declare MCP prompts and static resources in __schema ([ba409a0](https://github.com/rshade/ax-go/commit/ba409a0acc4b7252f5a9dc6ec66de8a6b7c569ea)), closes [#138](https://github.com/rshade/ax-go/issues/138)
+
+
+### Fixed
+
+* **deps:** update golang.org/x/perf digest to 406019b ([c5f49b2](https://github.com/rshade/ax-go/commit/c5f49b20fc7ca6bde42c5ae5838a5718c72cb5e0))
+* **deps:** update module go.opentelemetry.io/proto/otlp to v1.11.1 ([ab2679e](https://github.com/rshade/ax-go/commit/ab2679ed0bb9e4ba275b5e96ea20162a1c578b57))
+* **deps:** update opentelemetry-go monorepo to v1.47.0 ([9d71e6b](https://github.com/rshade/ax-go/commit/9d71e6bc4c48cd2ca308355c038698feba4154fc))
+* **deps:** update opentelemetry-go-contrib monorepo to v0.72.0 ([e4ba6c5](https://github.com/rshade/ax-go/commit/e4ba6c5a6882341f0f38b4d1f2ac4e590f644c92))
+* **docs:** show sidebar on docs homepage ([0d2dbbe](https://github.com/rshade/ax-go/commit/0d2dbbec873a0198116216bb105c8d76d3cdb7e4))
+* **schema:** close review findings on prompt and resource declarations ([d750d97](https://github.com/rshade/ax-go/commit/d750d97b5a736fcbae21880242ecd1b63a507b50))
+
 ## [0.7.0](https://github.com/rshade/ax-go/compare/v0.6.0...v0.7.0) (2026-09-24)
 
 
