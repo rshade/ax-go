@@ -280,6 +280,32 @@ func TestDeleteJSONLocatorsMapValue(t *testing.T) {
 }
 
 // TestGoldenRootSuccess pins the root command's bounded JSON success envelope.
+func TestGoldenWarnSuccess(t *testing.T) {
+	stdout, stderr, code := runGolden(t, []string{
+		warnCommandName, "--format=json", "--idempotency-key=" + goldenIdempotencyKey,
+	})
+	if code != ax.ExitSuccess {
+		t.Fatalf("exit code = %d, want %d; stderr=%s", code, ax.ExitSuccess, stderr)
+	}
+	if stderr != "" {
+		t.Fatalf("stderr = %s, want empty", stderr)
+	}
+	assertGolden(t, "warn_success.golden.json", testutil.MaskNonDeterministic([]byte(stdout)))
+}
+
+func TestGoldenWarnStrict(t *testing.T) {
+	stdout, stderr, code := runGolden(t, []string{
+		warnCommandName, "--format=json", "--idempotency-key=" + goldenIdempotencyKey, "--strict",
+	})
+	if code != ax.ExitValidation {
+		t.Fatalf("exit code = %d, want %d; stdout=%s stderr=%s", code, ax.ExitValidation, stdout, stderr)
+	}
+	if stdout != "" {
+		t.Fatalf("stdout = %s, want empty", stdout)
+	}
+	assertGolden(t, "warn_strict.golden.json", testutil.MaskNonDeterministic([]byte(stderr)))
+}
+
 func TestGoldenRootSuccess(t *testing.T) {
 	stdout, _, code := runGolden(t, []string{
 		"--format=json", "--idempotency-key=" + goldenIdempotencyKey, "--name=Ada",

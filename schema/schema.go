@@ -34,6 +34,7 @@ type ErrorSchemaInfo struct {
 	SchemaVersion          string   `json:"schema_version"`
 	Required               []string `json:"required"`
 	Optional               []string `json:"optional"`
+	KnownCodes             []string `json:"known_codes"`
 	NonDeterministicFields []string `json:"non_deterministic_fields"`
 }
 
@@ -117,6 +118,7 @@ func BuildSchema(root *cobra.Command, opts ...Option) Schema {
 				"context",
 				"suggestions",
 			},
+			KnownCodes:             contract.KnownErrorCodes(),
 			NonDeterministicFields: []string{traceIDField},
 		},
 	}

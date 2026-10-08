@@ -145,6 +145,25 @@ func ExampleNewEnvelope() {
 	// Output: {"data":{"id":"abc"},"meta":{"trace_id":"00000000000000000000000000000000","span_id":"0000000000000000"}}
 }
 
+// ExampleWithWarnings attaches findings without failing the command. Blank
+// codes are dropped. Order is the caller's order.
+func ExampleWithWarnings() {
+	type result struct {
+		ID string `json:"id"`
+	}
+
+	env := ax.WithWarnings(
+		context.Background(),
+		ax.NewEnvelope(context.Background(), result{ID: "abc"}),
+		ax.Warning{Code: "sample", Message: "check the name"},
+		ax.Warning{Code: "", Message: "dropped"},
+	)
+	if err := ax.WriteJSON(os.Stdout, env); err != nil {
+		fmt.Println("error:", err)
+	}
+	// Output: {"data":{"id":"abc"},"meta":{"trace_id":"00000000000000000000000000000000","span_id":"0000000000000000"},"warnings":[{"code":"sample","message":"check the name"}]}
+}
+
 // ExampleEnvelope shows the envelope shape directly: a typed Data field and a
 // Metadata block. span_id is omitted when empty.
 func ExampleEnvelope() {
@@ -525,7 +544,7 @@ func ExampleBuildSchema() {
 	if err := ax.WriteJSON(os.Stdout, s); err != nil {
 		fmt.Println("error:", err)
 	}
-	// Output: {"schema_version":"1.0.0","tool":"app","version":"v0.1.0","mode_detection":"--format flag \u003e AGENT_MODE env \u003e TTY detection","command":{"use":"app","short":"test app","example":"app run","flags":[{"name":"config","type":"string","usage":"config file"}],"non_deterministic_fields":[]},"error_envelope":{"schema_version":"1.0.0","required":["error_code","message","trace_id","tool","version","schema_version"],"optional":["actionable_fix","context","suggestions"],"non_deterministic_fields":["trace_id"]}}
+	// Output: {"schema_version":"1.0.0","tool":"app","version":"v0.1.0","mode_detection":"--format flag \u003e AGENT_MODE env \u003e TTY detection","command":{"use":"app","short":"test app","example":"app run","flags":[{"name":"config","type":"string","usage":"config file"}],"non_deterministic_fields":[]},"error_envelope":{"schema_version":"1.0.0","required":["error_code","message","trace_id","tool","version","schema_version"],"optional":["actionable_fix","context","suggestions"],"known_codes":["confirmation_required","internal_error","validation_error","warnings_as_errors"],"non_deterministic_fields":["trace_id"]}}
 }
 
 // ExampleBuildMCPSchema adapts the command tree to the MCP tools-list shape

@@ -179,6 +179,12 @@
           "profiles": "all"
         },
         {
+          "id": "field:Envelope.Warnings",
+          "signature": "[]github.com/rshade/ax-go/contract.Warning",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:Error.ActionableFix",
           "signature": "string",
           "configurations": "all",
@@ -241,6 +247,12 @@
         {
           "id": "field:Error.Version",
           "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:ErrorSchemaInfo.KnownCodes",
+          "signature": "[]string",
           "configurations": "all",
           "profiles": "all"
         },
@@ -601,6 +613,18 @@
         {
           "id": "field:Telemetry.TracerProvider",
           "signature": "*go.opentelemetry.io/otel/sdk/trace.TracerProvider",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Warning.Code",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Warning.Message",
+          "signature": "string",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1040,6 +1064,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:WithWarnings",
+          "signature": "func[T any](context.Context, Envelope[T], ...Warning) Envelope[T]",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:WriteError",
           "signature": "func(io.Writer, error) error",
           "configurations": "all",
@@ -1284,6 +1314,12 @@
           "signature": "func(*telemetryConfig)",
           "configurations": "all",
           "profiles": "all"
+        },
+        {
+          "id": "type:Warning",
+          "signature": "= github.com/rshade/ax-go/contract.Warning",
+          "configurations": "all",
+          "profiles": "all"
         }
       ]
     },
@@ -1391,6 +1427,12 @@
       "path": "github.com/rshade/ax-go/contract",
       "features": [
         {
+          "id": "const:ErrorCodeWarningsAsErrors",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "const:ErrorSchemaVersion",
           "signature": "untyped string",
           "configurations": "all",
@@ -1465,6 +1507,12 @@
         {
           "id": "field:Envelope.Meta",
           "signature": "Metadata",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Envelope.Warnings",
+          "signature": "[]Warning",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1559,6 +1607,18 @@
           "profiles": "all"
         },
         {
+          "id": "field:Warning.Code",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Warning.Message",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:ApprovalFromContext",
           "signature": "func(context.Context) bool",
           "configurations": "all",
@@ -1579,6 +1639,12 @@
         {
           "id": "func:IdempotencyKeyFromContext",
           "signature": "func(context.Context) (string, bool)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:KnownErrorCodes",
+          "signature": "func() []string",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1715,6 +1781,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:WithWarnings",
+          "signature": "func[T any](Envelope[T], ...Warning) Envelope[T]",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:WriteError",
           "signature": "func(io.Writer, error) error",
           "configurations": "all",
@@ -1758,7 +1830,7 @@
         },
         {
           "id": "type:Envelope",
-          "signature": "struct{Data T \"json:\\\"data\\\"\"; Meta Metadata \"json:\\\"meta\\\"\"}",
+          "signature": "struct{Data T \"json:\\\"data\\\"\"; Meta Metadata \"json:\\\"meta\\\"\"; Warnings []Warning \"json:\\\"warnings,omitempty\\\"\"}",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1783,6 +1855,12 @@
         {
           "id": "type:Mode",
           "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Warning",
+          "signature": "struct{Code string \"json:\\\"code\\\"\"; Message string \"json:\\\"message\\\"\"}",
           "configurations": "all",
           "profiles": "all"
         }
@@ -2049,6 +2127,12 @@
         {
           "id": "field:CommandSchema.Use",
           "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:ErrorSchemaInfo.KnownCodes",
+          "signature": "[]string",
           "configurations": "all",
           "profiles": "all"
         },
@@ -2408,7 +2492,7 @@
         },
         {
           "id": "type:ErrorSchemaInfo",
-          "signature": "struct{SchemaVersion string \"json:\\\"schema_version\\\"\"; Required []string \"json:\\\"required\\\"\"; Optional []string \"json:\\\"optional\\\"\"; NonDeterministicFields []string \"json:\\\"non_deterministic_fields\\\"\"}",
+          "signature": "struct{SchemaVersion string \"json:\\\"schema_version\\\"\"; Required []string \"json:\\\"required\\\"\"; Optional []string \"json:\\\"optional\\\"\"; KnownCodes []string \"json:\\\"known_codes\\\"\"; NonDeterministicFields []string \"json:\\\"non_deterministic_fields\\\"\"}",
           "configurations": "all",
           "profiles": "all"
         },

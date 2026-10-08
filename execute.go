@@ -1,6 +1,7 @@
 package ax
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -201,6 +202,7 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 	// call (no explicit WithWriter) through the same mutex-wrapped stderr
 	// already wired into Cobra's SetErr and the rest of the diagnostic stream.
 	ctx = logcore.WithDiagnosticWriter(ctx, cfg.stderr)
+	ctx = withWarningState(ctx)
 	rebindCommandContexts(ctx, root)
 
 	if executeErr := root.ExecuteContext(ctx); executeErr != nil {
@@ -210,8 +212,27 @@ func Execute(ctx context.Context, root *cobra.Command, opts ...ExecuteOption) in
 		return axErr.ExitCode()
 	}
 
+	state := warningStateFrom(root.Context())
+	if state != nil && state.strict && len(state.warnings) > 0 {
+		span.SetStatus(codes.Error, contractErrorWarnings)
+		escalated := NewError(root.Context(), contractErrorWarnings, "warnings escalated by --strict",
+			WithErrorExitCode(ExitValidation),
+			WithActionableFix("rerun without --strict to keep the success envelope"),
+			WithErrorContext(map[string]any{"warnings": state.warnings}),
+		)
+		axErr := normalizeExecuteError(root.Context(), root.Name(), cfg.version, escalated)
+		_ = WriteError(cfg.stderr, axErr)
+		return axErr.ExitCode()
+	}
+	if state != nil && state.buf != nil && state.real != nil {
+		_, _ = state.real.Write(state.buf.Bytes())
+	}
+
 	return ExitSuccess
 }
+
+// contractErrorWarnings is the stderr error_code for a --strict escalation.
+const contractErrorWarnings = "warnings_as_errors"
 
 // rebindCommandContexts makes Execute's decorated context authoritative for
 // every command. Cobra does not replace a selected subcommand's non-nil cached
@@ -234,6 +255,7 @@ func prepareCommand(root *cobra.Command, cfg executeConfig) {
 	cli.EnsurePersistentStringFlag(root, cli.FlagFormat, "", "output format: json or human")
 	cli.EnsurePersistentBoolFlag(root, cli.FlagDryRun, false, "emit the envelope without side effects")
 	cli.EnsurePersistentBoolFlag(root, cli.FlagYes, false, "confirm a confirmation-gated operation")
+	cli.EnsurePersistentBoolFlag(root, cli.FlagStrict, false, "escalate warnings to a validation error")
 	cli.EnsurePersistentStringFlag(
 		root,
 		cli.FlagIdempotencyKey,
@@ -304,6 +326,7 @@ func wrapCommandPersistentPreRun(cmd *cobra.Command, cfg executeConfig) {
 		format := cli.LookupFlagString(invoked, cli.FlagFormat)
 		dryRun := cli.LookupFlagBool(invoked, cli.FlagDryRun)
 		approval := cli.LookupFlagBool(invoked, cli.FlagYes)
+		strict := cli.LookupFlagBool(invoked, cli.FlagStrict)
 		idempotencyKey := cli.LookupFlagString(invoked, cli.FlagIdempotencyKey)
 		if idempotencyKey == "" {
 			idempotencyKey = NewIdempotencyKey()
@@ -324,6 +347,14 @@ func wrapCommandPersistentPreRun(cmd *cobra.Command, cfg executeConfig) {
 		ctx = WithDryRun(ctx, dryRun)
 		ctx = WithApproval(ctx, approval)
 		ctx = WithIdempotencyKey(ctx, idempotencyKey)
+		if strict {
+			if state := warningStateFrom(ctx); state != nil {
+				state.strict = true
+				state.real = invoked.OutOrStdout()
+				state.buf = &bytes.Buffer{}
+				invoked.SetOut(state.buf)
+			}
+		}
 		invoked.SetContext(ctx)
 		trace.SpanFromContext(ctx).SetName(invoked.CommandPath())
 

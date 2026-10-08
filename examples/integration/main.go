@@ -27,6 +27,7 @@ const crashCommandName = "crash"
 const patchConfigCommandName = "patch-config"
 const streamCommandName = "stream"
 const confirmCommandName = "confirm"
+const warnCommandName = "warn"
 const fetchRetryAfterSeconds = 5
 
 // errSimulatedCrash is the sentinel cause wrapped by the crash command. It is a
@@ -60,6 +61,10 @@ type patchConfigPayload struct {
 
 type confirmationPayload struct {
 	Confirmed bool `json:"confirmed"`
+}
+
+type warnPayload struct {
+	Status string `json:"status"`
 }
 
 func main() {
@@ -146,6 +151,8 @@ func newRootCommand(
   ax-integration authz
   ax-integration crash
   ax-integration confirm --format=json --yes
+  ax-integration warn --format=json
+  ax-integration warn --format=json --strict
   ax-integration __schema`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			currentLogger := ax.NewLogger(
@@ -201,6 +208,7 @@ func newRootCommand(
 	root.AddCommand(newAuthzCommand())
 	root.AddCommand(newCrashCommand())
 	root.AddCommand(newConfirmCommand())
+	root.AddCommand(newWarnCommand())
 
 	// Opt in to the MCP server: `ax-integration mcp-server` exposes this CLI's
 	// command tree as a live MCP server with no per-tool work (feature 011).
@@ -293,6 +301,22 @@ func promptForConfirmation(cmd *cobra.Command, subject string) (bool, error) {
 	}
 	response = strings.TrimSpace(response)
 	return strings.EqualFold(response, "y") || strings.EqualFold(response, "yes"), nil
+}
+
+func newWarnCommand() *cobra.Command {
+	return &cobra.Command{
+		Use:   warnCommandName,
+		Short: "Succeed with a structured warning",
+		Example: `  ax-integration warn --format=json
+  ax-integration warn --format=json --strict`,
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			env := ax.WithWarnings(cmd.Context(),
+				ax.NewEnvelope(cmd.Context(), warnPayload{Status: "ok"}),
+				ax.Warning{Code: "sample_warning", Message: "sample finding"},
+			)
+			return ax.WriteJSON(cmd.OutOrStdout(), env)
+		},
+	}
 }
 
 func newStreamCommand() *cobra.Command {
