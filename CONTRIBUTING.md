@@ -89,6 +89,10 @@ development workflow and coverage floor policy.
 of `make ci`, and findings do not fail the build. ast-grep has no type
 information; read its output as a triage list, not as a gate.
 
+`make clone-report` is a separate report of `*_test.go` clones (`dupl -t 100`,
+pinned in `mise.toml`). It is not part of `make ci`, and the pairs it prints
+do not fail the build.
+
 ## Documentation standards
 
 - Every exported Go symbol must carry a doc comment (`golangci-lint` gates this).
