@@ -29,8 +29,7 @@ type InvalidMaxBytesError struct {
 }
 
 // Error returns the validation message for an out-of-range config read limit.
-// The receiver is unnamed because the message cites the ceiling constant, not
-// the rejected value. Callers read MaxBytes from the error value itself.
+// MaxBytes stays on the error value; the message cites the ceiling constant.
 func (InvalidMaxBytesError) Error() string {
 	return fmt.Sprintf("config max bytes must be between 0 and %d", MaxConfigBytesCeiling)
 }
