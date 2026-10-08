@@ -117,6 +117,26 @@ if [ "$_enabled" != "true" ]; then
     exit 0
 fi
 
+# Optional top-level `auto_commit_paths:` list. When present, only these paths
+# are staged and committed, so unrelated work-in-progress elsewhere in the tree
+# is never swept into a Spec Kit commit. When absent, everything is committed.
+_stage_paths=()
+_in_paths=false
+while IFS= read -r _line; do
+    if echo "$_line" | grep -q '^auto_commit_paths:'; then
+        _in_paths=true
+        continue
+    fi
+    if $_in_paths; then
+        if echo "$_line" | grep -Eq '^[[:space:]]+-[[:space:]]+'; then
+            _p=$(echo "$_line" | sed -E 's/^[[:space:]]+-[[:space:]]+//' | sed 's/^["'\'']//' | sed -E 's/["'\'']?[[:space:]]*$//')
+            [ -n "$_p" ] && _stage_paths+=("$_p")
+        elif echo "$_line" | grep -Eq '^[^[:space:]#]'; then
+            _in_paths=false
+        fi
+    fi
+done < "$_config_file"
+
 # Check if there are changes to commit
 if git diff --quiet HEAD 2>/dev/null && git diff --cached --quiet 2>/dev/null && [ -z "$(git ls-files --others --exclude-standard 2>/dev/null)" ]; then
     echo "[specify] No changes to commit after $EVENT_NAME" >&2
@@ -134,7 +154,30 @@ if [ -z "$_commit_msg" ]; then
 fi
 
 # Stage and commit
-_git_out=$(git add . 2>&1) || { echo "[specify] Error: git add failed: $_git_out" >&2; exit 1; }
-_git_out=$(git commit -q -m "$_commit_msg" 2>&1) || { echo "[specify] Error: git commit failed: $_git_out" >&2; exit 1; }
+if [ "${#_stage_paths[@]}" -gt 0 ]; then
+    # A configured path that neither exists nor is tracked would make git fail
+    # with "pathspec did not match", so drop it rather than abort the commit.
+    _existing=()
+    for _p in "${_stage_paths[@]}"; do
+        if [ -e "$_p" ] || [ -n "$(git ls-files -- "$_p" 2>/dev/null)" ]; then
+            _existing+=("$_p")
+        fi
+    done
+    if [ "${#_existing[@]}" -eq 0 ]; then
+        echo "[specify] No auto_commit_paths exist; skipped auto-commit after $EVENT_NAME" >&2
+        exit 0
+    fi
+    _git_out=$(git add -A -- "${_existing[@]}" 2>&1) || { echo "[specify] Error: git add failed: $_git_out" >&2; exit 1; }
+    if git diff --cached --quiet -- "${_existing[@]}"; then
+        echo "[specify] No changes under auto_commit_paths after $EVENT_NAME" >&2
+        exit 0
+    fi
+    # `-- <paths>` commits only these paths, leaving anything else the user
+    # had already staged untouched in the index.
+    _git_out=$(git commit -q -m "$_commit_msg" -- "${_existing[@]}" 2>&1) || { echo "[specify] Error: git commit failed: $_git_out" >&2; exit 1; }
+else
+    _git_out=$(git add . 2>&1) || { echo "[specify] Error: git add failed: $_git_out" >&2; exit 1; }
+    _git_out=$(git commit -q -m "$_commit_msg" 2>&1) || { echo "[specify] Error: git commit failed: $_git_out" >&2; exit 1; }
+fi
 
 echo "[OK] Changes committed ${_phase} ${_command_name}" >&2

@@ -5,58 +5,74 @@
 branch_numbering: sequential
 
 # Commit message used by `git commit` during repository initialization
-init_commit_message: "[Spec Kit] Initial commit"
+init_commit_message: "chore: initial commit"
 
 # Auto-commit before/after core commands.
 # Set "default" to enable for all commands, then override per-command.
 # Each key can be true/false. Message is customizable per-command.
+#
+# ax-go: CI runs commitlint (config-conventional) over EVERY commit in a PR, so
+# every message below MUST be a Conventional Commit. The spec-artifact events
+# (specify, clarify, checklist, plan, tasks) are enabled so each SDD phase
+# lands as its own small docs(spec) commit; implement stays off because code
+# commits are deliberate, typed (feat/fix), and gated on tests and lint.
 auto_commit:
   default: false
   before_clarify:
     enabled: false
-    message: "[Spec Kit] Save progress before clarification"
+    message: "docs(spec): save progress before clarification"
   before_plan:
     enabled: false
-    message: "[Spec Kit] Save progress before planning"
+    message: "docs(spec): save progress before planning"
   before_tasks:
     enabled: false
-    message: "[Spec Kit] Save progress before task generation"
+    message: "docs(spec): save progress before task generation"
   before_implement:
     enabled: false
-    message: "[Spec Kit] Save progress before implementation"
+    message: "docs(spec): save progress before implementation"
   before_checklist:
     enabled: false
-    message: "[Spec Kit] Save progress before checklist"
+    message: "docs(spec): save progress before checklist"
   before_analyze:
     enabled: false
-    message: "[Spec Kit] Save progress before analysis"
+    message: "docs(spec): save progress before analysis"
   before_taskstoissues:
     enabled: false
-    message: "[Spec Kit] Save progress before issue sync"
+    message: "docs(spec): save progress before issue sync"
   after_constitution:
     enabled: false
-    message: "[Spec Kit] Add project constitution"
+    message: "docs(constitution): amend project constitution"
   after_specify:
-    enabled: false
-    message: "[Spec Kit] Add specification"
+    enabled: true
+    message: "docs(spec): add feature specification"
   after_clarify:
-    enabled: false
-    message: "[Spec Kit] Clarify specification"
+    enabled: true
+    message: "docs(spec): record specification clarifications"
   after_plan:
-    enabled: false
-    message: "[Spec Kit] Add implementation plan"
+    enabled: true
+    message: "docs(spec): add implementation plan"
   after_tasks:
-    enabled: false
-    message: "[Spec Kit] Add tasks"
+    enabled: true
+    message: "docs(spec): add task breakdown"
   after_implement:
     enabled: false
-    message: "[Spec Kit] Implementation progress"
+    message: "docs(spec): record implementation progress"
   after_checklist:
-    enabled: false
-    message: "[Spec Kit] Add checklist"
+    enabled: true
+    message: "docs(spec): add requirements checklist"
   after_analyze:
     enabled: false
-    message: "[Spec Kit] Add analysis report"
+    message: "docs(spec): record analysis remediation"
   after_taskstoissues:
     enabled: false
-    message: "[Spec Kit] Sync tasks to issues"
+    message: "docs(spec): sync tasks to issues"
+
+# Only these paths are staged by auto-commit, so unrelated work-in-progress
+# (e.g. a dirty ROADMAP.md) is never swept into a Spec Kit commit. The agent
+# context files are included because /speckit-plan updates their plan pointer.
+auto_commit_paths:
+  - specs/
+  - .specify/feature.json
+  - AGENTS.md
+  - CLAUDE.md
+  - GEMINI.md
