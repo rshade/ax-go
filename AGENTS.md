@@ -88,7 +88,7 @@ conflicts with the constitution, the constitution wins.
   package's reserved `mcp-server` subcommand (`mcp.NewCommand`) runs the same
   command tree as a live MCP server with no per-tool work. Authors declare
   per-flag `enum`/`example` and a per-command `capability` class once, with
-  `WithFlagEnum`, `WithFlagExample`, and `WithCapability`; a declared enum is
+  `DeclareFlagEnum`, `DeclareFlagExample`, and `DeclareCapability`; a declared enum is
   enforced in the flag's `Set` at parse time (exit 2, before `--dry-run`).
 - The `non_deterministic_fields` enumeration in `__schema` output is the
   authoritative source of truth for fields an agent may safely ignore when

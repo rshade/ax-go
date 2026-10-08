@@ -85,7 +85,7 @@ appear under `command.prompts` / `command.resources` in the ax-native schema
 and in the top-level `prompts` / `resources` arrays of `--as=mcp`.
 
 The schema also carries the semantics the example declares with
-`ax.WithFlagEnum`, `ax.WithFlagExample`, and `ax.WithCapability`:
+`ax.DeclareFlagEnum`, `ax.DeclareFlagExample`, and `ax.DeclareCapability`:
 
 - `stream --count` lists its allowed values as `enum` (`1`, `2`, `3`, `5`,
   `10`), typed as integers under `--as=mcp`.

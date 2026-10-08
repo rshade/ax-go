@@ -755,6 +755,24 @@
           "profiles": "all"
         },
         {
+          "id": "func:DeclareCapability",
+          "signature": "func(*github.com/spf13/cobra.Command, Capability, string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:DeclareFlagEnum",
+          "signature": "func(*github.com/spf13/cobra.Command, string, ...string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:DeclareFlagExample",
+          "signature": "func(*github.com/spf13/cobra.Command, string, string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:DeclarePrompt",
           "signature": "func(*github.com/spf13/cobra.Command, Prompt) error",
           "configurations": "all",
@@ -968,12 +986,6 @@
           "profiles": "all"
         },
         {
-          "id": "func:WithCapability",
-          "signature": "func(*github.com/spf13/cobra.Command, Capability, string) error",
-          "configurations": "all",
-          "profiles": "all"
-        },
-        {
           "id": "func:WithDryRun",
           "signature": "func(context.Context, bool) context.Context",
           "configurations": "all",
@@ -1012,18 +1024,6 @@
         {
           "id": "func:WithErrorVersion",
           "signature": "func(string) ErrorOption",
-          "configurations": "all",
-          "profiles": "all"
-        },
-        {
-          "id": "func:WithFlagEnum",
-          "signature": "func(*github.com/spf13/cobra.Command, string, ...string) error",
-          "configurations": "all",
-          "profiles": "all"
-        },
-        {
-          "id": "func:WithFlagExample",
-          "signature": "func(*github.com/spf13/cobra.Command, string, string) error",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1450,12 +1450,6 @@
         {
           "id": "type:Warning",
           "signature": "= github.com/rshade/ax-go/contract.Warning",
-          "configurations": "all",
-          "profiles": "all"
-        },
-        {
-          "id": "var:ErrInvalidDeclaration",
-          "signature": "error",
           "configurations": "all",
           "profiles": "all"
         }
@@ -2689,6 +2683,24 @@
           "profiles": "all"
         },
         {
+          "id": "func:DeclareCapability",
+          "signature": "func(*github.com/spf13/cobra.Command, Capability, string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:DeclareFlagEnum",
+          "signature": "func(*github.com/spf13/cobra.Command, string, ...string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:DeclareFlagExample",
+          "signature": "func(*github.com/spf13/cobra.Command, string, string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:DeclarePrompt",
           "signature": "func(*github.com/spf13/cobra.Command, Prompt) error",
           "configurations": "all",
@@ -2703,24 +2715,6 @@
         {
           "id": "func:NewSchemaCommand",
           "signature": "func(*github.com/spf13/cobra.Command, ...Option) *github.com/spf13/cobra.Command",
-          "configurations": "all",
-          "profiles": "all"
-        },
-        {
-          "id": "func:WithCapability",
-          "signature": "func(*github.com/spf13/cobra.Command, Capability, string) error",
-          "configurations": "all",
-          "profiles": "all"
-        },
-        {
-          "id": "func:WithFlagEnum",
-          "signature": "func(*github.com/spf13/cobra.Command, string, ...string) error",
-          "configurations": "all",
-          "profiles": "all"
-        },
-        {
-          "id": "func:WithFlagExample",
-          "signature": "func(*github.com/spf13/cobra.Command, string, string) error",
           "configurations": "all",
           "profiles": "all"
         },
@@ -2829,12 +2823,6 @@
         {
           "id": "type:Schema",
           "signature": "struct{SchemaVersion string \"json:\\\"schema_version\\\"\"; Tool string \"json:\\\"tool\\\"\"; Version string \"json:\\\"version\\\"\"; ModeDetection string \"json:\\\"mode_detection\\\"\"; Command CommandSchema \"json:\\\"command\\\"\"; ErrorEnvelope ErrorSchemaInfo \"json:\\\"error_envelope\\\"\"}",
-          "configurations": "all",
-          "profiles": "all"
-        },
-        {
-          "id": "var:ErrInvalidDeclaration",
-          "signature": "error",
           "configurations": "all",
           "profiles": "all"
         }

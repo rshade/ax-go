@@ -35,7 +35,30 @@ func mcpProperty(t *testing.T, tool MCPTool, name string) map[string]any {
 	return property
 }
 
-func TestWithFlagEnum(t *testing.T) {
+// assertDeclarationError pins the authoring-error contract shared with
+// DeclarePrompt: an *contract.Error with invalid_schema_declaration, exit 2, and
+// context {field, reason}.
+func assertDeclarationError(t *testing.T, err error, field, reason string) {
+	t.Helper()
+	var contractErr *contract.Error
+	if !errors.As(err, &contractErr) {
+		t.Fatalf("error = %T %v, want *contract.Error", err, err)
+	}
+	if contractErr.ErrorCode != invalidDeclarationCode || contractErr.ExitCode() != contract.ExitValidation {
+		t.Fatalf(
+			"error = %q exit %d, want %s exit 2",
+			contractErr.ErrorCode,
+			contractErr.ExitCode(),
+			invalidDeclarationCode,
+		)
+	}
+	want := map[string]any{"field": field, "reason": reason}
+	if !reflect.DeepEqual(contractErr.Context, want) {
+		t.Fatalf("context = %#v, want %#v", contractErr.Context, want)
+	}
+}
+
+func TestDeclareFlagEnum(t *testing.T) {
 	newCmd := func() *cobra.Command {
 		cmd := &cobra.Command{Use: "app", RunE: func(*cobra.Command, []string) error { return nil }}
 		cmd.Flags().String("output", "json", "output format")
@@ -44,30 +67,45 @@ func TestWithFlagEnum(t *testing.T) {
 	}
 
 	cmd := newCmd()
-	if err := WithFlagEnum(cmd, "output", "json", "table", "yaml"); err != nil {
-		t.Fatalf("WithFlagEnum(output): %v", err)
+	if err := DeclareFlagEnum(cmd, "output", "json", "table", "yaml"); err != nil {
+		t.Fatalf("DeclareFlagEnum(output): %v", err)
 	}
-	if err := WithFlagEnum(cmd, "replicas", "1", "3", "5"); err != nil {
-		t.Fatalf("WithFlagEnum(replicas): %v", err)
+	if err := DeclareFlagEnum(cmd, "replicas", "1", "3", "5"); err != nil {
+		t.Fatalf("DeclareFlagEnum(replicas): %v", err)
 	}
-	for _, bad := range [][]string{nil, {"table"}, {"1", "x"}} {
-		flag := "output"
-		if len(bad) == 2 {
-			flag = "replicas"
-		}
-		if err := WithFlagEnum(cmd, flag, bad...); !errors.Is(err, ErrInvalidDeclaration) {
-			t.Fatalf("WithFlagEnum(%s, %v) error = %v, want ErrInvalidDeclaration", flag, bad, err)
-		}
+	for _, bad := range []struct {
+		flag          string
+		values        []string
+		field, reason string
+	}{
+		{"output", nil, "values", "required"},
+		{"output", []string{"table"}, "default", "not_in_enum"},
+		{"replicas", []string{"1", "x"}, "values", "invalid_value"},
+		{"missing", []string{"x"}, "flag", "flag_not_found"},
+	} {
+		assertDeclarationError(t, DeclareFlagEnum(cmd, bad.flag, bad.values...), bad.field, bad.reason)
 	}
-	if err := WithFlagEnum(nil, "output", "json"); !errors.Is(err, ErrInvalidDeclaration) {
-		t.Fatalf("WithFlagEnum(nil) error = %v, want ErrInvalidDeclaration", err)
-	}
+	assertDeclarationError(t, DeclareFlagEnum(nil, "output", "json"), "cmd", "nil_command")
 
 	built := BuildSchema(cmd)
-	if got := findFlagSchema(t, built.Command.Flags, "output").Enum; !reflect.DeepEqual(got, []string{"json", "table", "yaml"}) {
+	if got := findFlagSchema(
+		t,
+		built.Command.Flags,
+		"output",
+	).Enum; !reflect.DeepEqual(
+		got,
+		[]string{"json", "table", "yaml"},
+	) {
 		t.Fatalf("output enum = %v", got)
 	}
-	if got := findFlagSchema(t, built.Command.Flags, "replicas").Enum; !reflect.DeepEqual(got, []string{"1", "3", "5"}) {
+	if got := findFlagSchema(
+		t,
+		built.Command.Flags,
+		"replicas",
+	).Enum; !reflect.DeepEqual(
+		got,
+		[]string{"1", "3", "5"},
+	) {
 		t.Fatalf("replicas enum = %v", got)
 	}
 
@@ -88,22 +126,20 @@ func TestWithFlagEnum(t *testing.T) {
 	}
 }
 
-func TestWithFlagExample(t *testing.T) {
+func TestDeclareFlagExample(t *testing.T) {
 	cmd := &cobra.Command{Use: "app", RunE: func(*cobra.Command, []string) error { return nil }}
 	cmd.Flags().Duration("timeout", 0, "deadline")
 	cmd.Flags().Int("replicas", 1, "replica count")
 
-	if err := WithFlagExample(cmd, "timeout", "45s"); err != nil {
-		t.Fatalf("WithFlagExample: %v", err)
+	if err := DeclareFlagExample(cmd, "timeout", "45s"); err != nil {
+		t.Fatalf("DeclareFlagExample: %v", err)
 	}
-	for _, bad := range []struct{ flag, example string }{
-		{"timeout", ""},
-		{"replicas", "three"},
-		{"missing", "x"},
+	for _, bad := range []struct{ flag, example, field, reason string }{
+		{"timeout", "", "example", "required"},
+		{"replicas", "three", "example", "invalid_value"},
+		{"missing", "x", "flag", "flag_not_found"},
 	} {
-		if err := WithFlagExample(cmd, bad.flag, bad.example); !errors.Is(err, ErrInvalidDeclaration) {
-			t.Fatalf("WithFlagExample(%s, %q) error = %v, want ErrInvalidDeclaration", bad.flag, bad.example, err)
-		}
+		assertDeclarationError(t, DeclareFlagExample(cmd, bad.flag, bad.example), bad.field, bad.reason)
 	}
 
 	if got := findFlagSchema(t, BuildSchema(cmd).Command.Flags, "timeout").Example; got != "45s" {
@@ -129,21 +165,17 @@ func TestWithFlagExample(t *testing.T) {
 	}
 }
 
-func TestWithCapability(t *testing.T) {
+func TestDeclareCapability(t *testing.T) {
 	root := &cobra.Command{Use: "app", RunE: func(*cobra.Command, []string) error { return nil }}
 	deploy := &cobra.Command{Use: "deploy", Short: "deploy", RunE: func(*cobra.Command, []string) error { return nil }}
 	root.AddCommand(deploy)
-	if err := WithCapability(deploy, CapabilityMutate, " idempotent by release name "); err != nil {
-		t.Fatalf("WithCapability: %v", err)
+	if err := DeclareCapability(deploy, CapabilityMutate, " idempotent by release name "); err != nil {
+		t.Fatalf("DeclareCapability: %v", err)
 	}
 	for _, bad := range []Capability{"", "write", "Read-Only"} {
-		if err := WithCapability(deploy, bad, ""); !errors.Is(err, ErrInvalidDeclaration) {
-			t.Fatalf("WithCapability(%q) error = %v, want ErrInvalidDeclaration", bad, err)
-		}
+		assertDeclarationError(t, DeclareCapability(deploy, bad, ""), "class", "not_in_vocabulary")
 	}
-	if err := WithCapability(nil, CapabilityAdmin, ""); !errors.Is(err, ErrInvalidDeclaration) {
-		t.Fatalf("WithCapability(nil) error = %v, want ErrInvalidDeclaration", err)
-	}
+	assertDeclarationError(t, DeclareCapability(nil, CapabilityAdmin, ""), "cmd", "nil_command")
 
 	built := BuildSchema(root)
 	if built.Command.Capability != nil {
@@ -195,8 +227,8 @@ func TestDerivedFieldsSurviveEnumDeclaration(t *testing.T) {
 	if err := cmd.MarkFlagRequired("replicas"); err != nil {
 		t.Fatal(err)
 	}
-	if err := WithFlagEnum(cmd, "replicas", "1", "3"); err != nil {
-		t.Fatalf("WithFlagEnum: %v", err)
+	if err := DeclareFlagEnum(cmd, "replicas", "1", "3"); err != nil {
+		t.Fatalf("DeclareFlagEnum: %v", err)
 	}
 
 	flag := findFlagSchema(t, BuildSchema(cmd).Command.Flags, "replicas")

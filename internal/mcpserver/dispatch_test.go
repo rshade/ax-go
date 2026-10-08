@@ -849,8 +849,8 @@ func enumRoot(t *testing.T, runs *int) *cobra.Command {
 	}}
 	show.Flags().StringVar(&output, "output", "", "output format")
 	root.AddCommand(show)
-	if err := schema.WithFlagEnum(show, "output", "json", "table"); err != nil {
-		t.Fatalf("WithFlagEnum: %v", err)
+	if err := schema.DeclareFlagEnum(show, "output", "json", "table"); err != nil {
+		t.Fatalf("DeclareFlagEnum: %v", err)
 	}
 	return root
 }

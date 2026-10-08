@@ -3,6 +3,7 @@ package ax
 import (
 	"bytes"
 	"errors"
+	"reflect"
 	"testing"
 	"time"
 
@@ -117,15 +118,19 @@ func newSchemaTestCommand() *cobra.Command {
 	return root
 }
 
-func TestWithFlagEnumErrorIsRootSentinel(t *testing.T) {
+func TestDeclareFlagEnumAuthoringErrorContract(t *testing.T) {
 	cmd := &cobra.Command{Use: "app"}
 	cmd.Flags().Bool("force", false, "force")
-	err := WithFlagEnum(cmd, "force", "true")
-	if !errors.Is(err, ErrInvalidDeclaration) {
-		t.Fatalf("ax.WithFlagEnum error = %v, want ax.ErrInvalidDeclaration", err)
+	var axErr *Error
+	if err := DeclareFlagEnum(cmd, "force", "true"); !errors.As(err, &axErr) {
+		t.Fatalf("ax.DeclareFlagEnum error = %T %v, want *ax.Error", err, err)
 	}
-	if !errors.Is(err, schema.ErrInvalidDeclaration) {
-		t.Fatalf("ax.WithFlagEnum error = %v, want schema.ErrInvalidDeclaration", err)
+	if axErr.ErrorCode != "invalid_schema_declaration" || axErr.ExitCode() != ExitValidation {
+		t.Fatalf("error = %q exit %d, want invalid_schema_declaration exit 2", axErr.ErrorCode, axErr.ExitCode())
+	}
+	want := map[string]any{"field": "flag", "reason": "unsupported_type"}
+	if !reflect.DeepEqual(axErr.Context, want) {
+		t.Fatalf("context = %#v, want %#v", axErr.Context, want)
 	}
 }
 
@@ -144,8 +149,8 @@ func TestCapabilityConstantsMatchSchema(t *testing.T) {
 		}
 	}
 	cmd := &cobra.Command{Use: "app"}
-	if err := WithCapability(cmd, CapabilityMutate, ""); err != nil {
-		t.Fatalf("ax.WithCapability: %v", err)
+	if err := DeclareCapability(cmd, CapabilityMutate, ""); err != nil {
+		t.Fatalf("ax.DeclareCapability: %v", err)
 	}
 	if got := BuildSchema(cmd).Command.Capability; got == nil || got.Class != schema.CapabilityMutate {
 		t.Fatalf("Capability = %+v, want mutate", got)
@@ -174,15 +179,15 @@ func newEnrichedSchemaTestCommand(t *testing.T) *cobra.Command {
 	root.AddCommand(deploy, status, secret)
 
 	for _, declare := range []error{
-		WithFlagEnum(root, "region", "us", "eu"),
-		WithFlagExample(root, "region", "eu"),
-		WithFlagEnum(deploy, "output", "json", "table", "yaml"),
-		WithFlagEnum(deploy, "replicas", "1", "3", "5"),
-		WithFlagExample(deploy, "tags", "a,b"),
-		WithFlagExample(deploy, "timeout", "45s"),
-		WithCapability(deploy, CapabilityMutate, "idempotent by release name"),
-		WithCapability(status, CapabilityReadOnly, ""),
-		WithCapability(secret, CapabilityAdmin, ""),
+		DeclareFlagEnum(root, "region", "us", "eu"),
+		DeclareFlagExample(root, "region", "eu"),
+		DeclareFlagEnum(deploy, "output", "json", "table", "yaml"),
+		DeclareFlagEnum(deploy, "replicas", "1", "3", "5"),
+		DeclareFlagExample(deploy, "tags", "a,b"),
+		DeclareFlagExample(deploy, "timeout", "45s"),
+		DeclareCapability(deploy, CapabilityMutate, "idempotent by release name"),
+		DeclareCapability(status, CapabilityReadOnly, ""),
+		DeclareCapability(secret, CapabilityAdmin, ""),
 	} {
 		if declare != nil {
 			t.Fatalf("declaration failed: %v", declare)
@@ -193,7 +198,10 @@ func newEnrichedSchemaTestCommand(t *testing.T) *cobra.Command {
 
 func TestBuildSchemaEnrichedGolden(t *testing.T) {
 	var stdout bytes.Buffer
-	if err := WriteJSON(&stdout, BuildSchema(newEnrichedSchemaTestCommand(t), WithSchemaVersion("v0.1.0"))); err != nil {
+	if err := WriteJSON(
+		&stdout,
+		BuildSchema(newEnrichedSchemaTestCommand(t), WithSchemaVersion("v0.1.0")),
+	); err != nil {
 		t.Fatalf("WriteJSON returned error: %v", err)
 	}
 	assertGolden(t, "testdata/schema_ax_enriched.golden.json", stdout.Bytes())

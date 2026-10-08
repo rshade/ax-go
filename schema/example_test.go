@@ -94,10 +94,10 @@ func ExampleDeclareResource() {
 	// invalid resource declaration "docs/pricing": uri not_absolute
 }
 
-func ExampleWithFlagEnum() {
+func ExampleDeclareFlagEnum() {
 	deploy := &cobra.Command{Use: "deploy"}
 	deploy.Flags().String("output", "json", "output format")
-	if err := schema.WithFlagEnum(deploy, "output", "json", "table", "yaml"); err != nil {
+	if err := schema.DeclareFlagEnum(deploy, "output", "json", "table", "yaml"); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -109,10 +109,10 @@ func ExampleWithFlagEnum() {
 	// [{"name":"output","type":"string","default":"json","usage":"output format","enum":["json","table","yaml"]}]
 }
 
-func ExampleWithFlagExample() {
+func ExampleDeclareFlagExample() {
 	deploy := &cobra.Command{Use: "deploy"}
 	deploy.Flags().Duration("timeout", 30*time.Second, "deadline")
-	if err := schema.WithFlagExample(deploy, "timeout", "45s"); err != nil {
+	if err := schema.DeclareFlagExample(deploy, "timeout", "45s"); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -124,11 +124,11 @@ func ExampleWithFlagExample() {
 	// [{"name":"timeout","type":"duration","default":"30s","usage":"deadline","example":"45s"}]
 }
 
-func ExampleWithCapability() {
+func ExampleDeclareCapability() {
 	root := &cobra.Command{Use: "app"}
 	deploy := &cobra.Command{Use: "deploy"}
 	root.AddCommand(deploy)
-	if err := schema.WithCapability(deploy, schema.CapabilityMutate, "idempotent by release name"); err != nil {
+	if err := schema.DeclareCapability(deploy, schema.CapabilityMutate, "idempotent by release name"); err != nil {
 		fmt.Println(err)
 		return
 	}

@@ -255,7 +255,7 @@ func declareAgentContext(root *cobra.Command) error {
 // declareCommandSemantics declares what an agent needs to call each command
 // correctly on the first try: the allowed --count values (enforced at parse
 // time), an example --patch document, and every command's side-effect class.
-// A command missing from the tree surfaces as ax.ErrInvalidDeclaration.
+// A command missing from the tree surfaces as invalid_schema_declaration.
 func declareCommandSemantics(root *cobra.Command) error {
 	commands := map[string]*cobra.Command{}
 	for _, cmd := range root.Commands() {
@@ -264,16 +264,16 @@ func declareCommandSemantics(root *cobra.Command) error {
 	stream := commands[streamCommandName]
 	patchConfig := commands[patchConfigCommandName]
 	if err := errors.Join(
-		ax.WithFlagEnum(stream, "count", "1", "2", "3", "5", "10"),
-		ax.WithFlagExample(patchConfig, "patch", `[{"op":"replace","path":"/name","value":"Ada"}]`),
-		ax.WithCapability(root, ax.CapabilityReadOnly, ""),
-		ax.WithCapability(stream, ax.CapabilityReadOnly, ""),
-		ax.WithCapability(patchConfig, ax.CapabilityMutate, "rewrites the file in place, preserving comments"),
-		ax.WithCapability(commands[fetchCommandName], ax.CapabilityExternalNetwork, ""),
-		ax.WithCapability(commands[failCommandName], ax.CapabilityReadOnly, ""),
-		ax.WithCapability(commands[authzCommandName], ax.CapabilityReadOnly, ""),
-		ax.WithCapability(commands[crashCommandName], ax.CapabilityReadOnly, ""),
-		ax.WithCapability(commands[confirmCommandName], ax.CapabilityMutate,
+		ax.DeclareFlagEnum(stream, "count", "1", "2", "3", "5", "10"),
+		ax.DeclareFlagExample(patchConfig, "patch", `[{"op":"replace","path":"/name","value":"Ada"}]`),
+		ax.DeclareCapability(root, ax.CapabilityReadOnly, ""),
+		ax.DeclareCapability(stream, ax.CapabilityReadOnly, ""),
+		ax.DeclareCapability(patchConfig, ax.CapabilityMutate, "rewrites the file in place, preserving comments"),
+		ax.DeclareCapability(commands[fetchCommandName], ax.CapabilityExternalNetwork, ""),
+		ax.DeclareCapability(commands[failCommandName], ax.CapabilityReadOnly, ""),
+		ax.DeclareCapability(commands[authzCommandName], ax.CapabilityReadOnly, ""),
+		ax.DeclareCapability(commands[crashCommandName], ax.CapabilityReadOnly, ""),
+		ax.DeclareCapability(commands[confirmCommandName], ax.CapabilityMutate,
 			"confirmation-gated; requires --yes or an interactive yes"),
 	); err != nil {
 		return fmt.Errorf("declare command semantics: %w", err)

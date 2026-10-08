@@ -315,11 +315,11 @@ func TestWalkCommandsVisitsEveryDescendant(t *testing.T) {
 }
 
 // foreignValue re-wraps an existing pflag.Value, standing in for any wrapper an
-// adopter installs after WithFlagEnum.
+// adopter installs after AddFlagEnum.
 type foreignValue struct{ pflag.Value }
 
 func TestCollectFlagsEnum(t *testing.T) {
-	newTree := func(t *testing.T) (*cobra.Command, *cobra.Command) {
+	newTree := func(t *testing.T) *cobra.Command {
 		t.Helper()
 		root := &cobra.Command{Use: "app", RunE: noopRunE}
 		root.PersistentFlags().String("region", "us", "region")
@@ -327,13 +327,13 @@ func TestCollectFlagsEnum(t *testing.T) {
 		child.Flags().String("output", "json", "output")
 		child.Flags().String("plain", "", "no enum")
 		root.AddCommand(child)
-		if err := DeclareFlagEnum(root, "region", []string{"us", "eu"}); err != nil {
+		if err := AddFlagEnum(root, "region", []string{"us", "eu"}); err != nil {
 			t.Fatalf("declare region: %v", err)
 		}
-		if err := DeclareFlagEnum(child, "output", []string{"yaml", "json", "table"}); err != nil {
+		if err := AddFlagEnum(child, "output", []string{"yaml", "json", "table"}); err != nil {
 			t.Fatalf("declare output: %v", err)
 		}
-		return root, child
+		return child
 	}
 	byName := func(flags []Flag) map[string][]Flag {
 		out := map[string][]Flag{}
@@ -344,7 +344,7 @@ func TestCollectFlagsEnum(t *testing.T) {
 	}
 
 	t.Run("author order, nil when undeclared, inherited once", func(t *testing.T) {
-		_, child := newTree(t)
+		child := newTree(t)
 		flags := byName(CollectFlags(child))
 		if got := flags["output"][0].Enum; !reflect.DeepEqual(got, []string{"yaml", "json", "table"}) {
 			t.Fatalf("output Enum = %v, want author order", got)
@@ -358,7 +358,7 @@ func TestCollectFlagsEnum(t *testing.T) {
 	})
 
 	t.Run("mutated default fails closed", func(t *testing.T) {
-		_, child := newTree(t)
+		child := newTree(t)
 		child.Flags().Lookup("output").DefValue = "xml"
 		if got := byName(CollectFlags(child))["output"][0].Enum; got != nil {
 			t.Fatalf("Enum = %v, want nil after DefValue left the set", got)
@@ -366,7 +366,7 @@ func TestCollectFlagsEnum(t *testing.T) {
 	})
 
 	t.Run("foreign re-wrap fails closed", func(t *testing.T) {
-		_, child := newTree(t)
+		child := newTree(t)
 		flag := child.Flags().Lookup("output")
 		flag.Value = foreignValue{flag.Value}
 		if got := byName(CollectFlags(child))["output"][0].Enum; got != nil {
@@ -385,8 +385,8 @@ func TestCollectFlagsExample(t *testing.T) {
 		child.Flags().String("output", "json", "output")
 		child.Flags().String("plain", "", "no example")
 		root.AddCommand(child)
-		if err := DeclareFlagEnum(child, "output", []string{"json", "table"}); err != nil {
-			t.Fatalf("DeclareFlagEnum: %v", err)
+		if err := AddFlagEnum(child, "output", []string{"json", "table"}); err != nil {
+			t.Fatalf("AddFlagEnum: %v", err)
 		}
 		for _, declared := range []struct {
 			cmd           *cobra.Command
@@ -396,8 +396,8 @@ func TestCollectFlagsExample(t *testing.T) {
 			{child, "n", "5"},
 			{child, "output", "table"},
 		} {
-			if err := DeclareFlagExample(declared.cmd, declared.flag, declared.example); err != nil {
-				t.Fatalf("DeclareFlagExample(%s): %v", declared.flag, err)
+			if err := AddFlagExample(declared.cmd, declared.flag, declared.example); err != nil {
+				t.Fatalf("AddFlagExample(%s): %v", declared.flag, err)
 			}
 		}
 		return root, child

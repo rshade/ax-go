@@ -1939,12 +1939,12 @@ func TestExecuteRejectsOutOfSetEnum(t *testing.T) {
 				root.AddCommand(deploy)
 				root.SetArgs(tc.args)
 				for _, declare := range []error{
-					WithFlagEnum(root, "region", "us", "eu"),
-					WithFlagEnum(deploy, "output", "json", "table"),
-					WithFlagEnum(deploy, "n", "1", "3"),
+					DeclareFlagEnum(root, "region", "us", "eu"),
+					DeclareFlagEnum(deploy, "output", "json", "table"),
+					DeclareFlagEnum(deploy, "n", "1", "3"),
 				} {
 					if declare != nil {
-						t.Fatalf("WithFlagEnum: %v", declare)
+						t.Fatalf("DeclareFlagEnum: %v", declare)
 					}
 				}
 
