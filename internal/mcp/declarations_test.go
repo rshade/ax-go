@@ -10,7 +10,7 @@ import (
 )
 
 // TestBuildAggregatesDeclarationsBeyondCallableTools pins that prompts and
-// resources come from every non-hidden command — including non-runnable groups
+// resources come from the whole declaration tree — including non-runnable groups
 // and excluded commands that never become tools — in walk then declaration
 // order, keeping the first of a duplicated key.
 func TestBuildAggregatesDeclarationsBeyondCallableTools(t *testing.T) {

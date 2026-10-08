@@ -5,12 +5,14 @@ import (
 	"errors"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/spf13/cobra"
 
 	"github.com/rshade/ax-go/contract"
 	"github.com/rshade/ax-go/internal/mcp"
+	internalschema "github.com/rshade/ax-go/internal/schema"
 	"github.com/rshade/ax-go/internal/testutil"
 )
 
@@ -49,6 +51,17 @@ func TestDeclareRejectsInvalidInputWithEnvelope(t *testing.T) {
 			wantField: "uri",
 			wantRsn:   "not_absolute",
 		},
+		{
+			name: "prompt over a hand-corrupted annotation",
+			declare: func() error {
+				cmd := &cobra.Command{Use: "app", Annotations: map[string]string{
+					"github.com/rshade/ax-go/schema/prompts": "{not json",
+				}}
+				return DeclarePrompt(cmd, Prompt{Name: "p", Template: "t"})
+			},
+			wantField: "annotation",
+			wantRsn:   "corrupt_annotation",
+		},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -66,17 +79,82 @@ func TestDeclareRejectsInvalidInputWithEnvelope(t *testing.T) {
 			if envelope.Context["field"] != tc.wantField || envelope.Context["reason"] != tc.wantRsn {
 				t.Fatalf("context = %v, want field %q reason %q", envelope.Context, tc.wantField, tc.wantRsn)
 			}
+			if envelope.ActionableFix == "" {
+				t.Fatal("invalid_schema_declaration carries no actionable_fix")
+			}
 		})
 	}
 }
 
-func TestDeclareAcceptsValidInput(t *testing.T) {
-	cmd := &cobra.Command{Use: "app"}
-	if err := DeclarePrompt(cmd, Prompt{Name: "p", Template: "t"}); err != nil {
-		t.Fatalf("DeclarePrompt = %v", err)
+func TestDeclarationErrorBoundsEchoedKey(t *testing.T) {
+	uri := "app://" + strings.Repeat("a", 1<<20)
+	err := DeclareResource(&cobra.Command{Use: "app"}, Resource{URI: uri, Name: "x"})
+	if err == nil {
+		t.Fatal("DeclareResource accepted a 1 MiB URI")
 	}
-	if err := DeclareResource(cmd, Resource{URI: "app://x", Name: "x"}); err != nil {
-		t.Fatalf("DeclareResource = %v", err)
+	if got := len(err.Error()); got > 512 {
+		t.Fatalf("error message is %d bytes; an oversized URI must not be echoed in full", got)
+	}
+}
+
+// TestPromptConvertersCarryEveryField guards the field-by-field Prompt
+// converters: a field added to the public, internal, and MCP Prompt types
+// compiles without touching them, so this fails unless every field round-trips
+// into both projections.
+func TestPromptConvertersCarryEveryField(t *testing.T) {
+	prompt := Prompt{Arguments: []PromptArgument{{}}}
+	fillStrings(reflect.ValueOf(&prompt).Elem())
+
+	root := &cobra.Command{Use: "app"}
+	prompt.Template = "uses {{" + prompt.Arguments[0].Name + "}}"
+	mustDeclare(t, DeclarePrompt(root, prompt))
+
+	if got := BuildSchema(root).Command.Prompts; !reflect.DeepEqual(got, []Prompt{prompt}) {
+		t.Fatalf("ax-native projection lost a field:\ngot:  %+v\nwant: %+v", got, prompt)
+	}
+	mcpPrompt := BuildMCPSchema(root).Prompts[0]
+	assertSameFields(t, reflect.ValueOf(prompt), reflect.ValueOf(mcpPrompt))
+}
+
+func fillStrings(v reflect.Value) {
+	for i := range v.NumField() {
+		field := v.Field(i)
+		switch kind := field.Kind(); {
+		case kind == reflect.String:
+			field.SetString("x" + v.Type().Field(i).Name)
+		case kind == reflect.Bool:
+			field.SetBool(true)
+		case kind == reflect.Slice:
+			for j := range field.Len() {
+				fillStrings(field.Index(j))
+			}
+		}
+	}
+}
+
+func assertSameFields(t *testing.T, want, got reflect.Value) {
+	t.Helper()
+	if want.NumField() != got.NumField() {
+		t.Fatalf("%s has %d fields, %s has %d", want.Type(), want.NumField(), got.Type(), got.NumField())
+	}
+	for i := range want.NumField() {
+		name := want.Type().Field(i).Name
+		gotField := got.FieldByName(name)
+		if !gotField.IsValid() {
+			t.Fatalf("%s.%s has no counterpart in %s", want.Type(), name, got.Type())
+		}
+		if want.Field(i).Kind() == reflect.Slice {
+			if want.Field(i).Len() != gotField.Len() {
+				t.Fatalf("%s.%s length differs", want.Type(), name)
+			}
+			for j := range want.Field(i).Len() {
+				assertSameFields(t, want.Field(i).Index(j), gotField.Index(j))
+			}
+			continue
+		}
+		if want.Field(i).Interface() != gotField.Interface() {
+			t.Fatalf("%s.%s = %v in the MCP projection, want %v", want.Type(), name, gotField, want.Field(i))
+		}
 	}
 }
 
@@ -179,6 +257,7 @@ func TestSchemaFailsClosedOnDuplicateDeclaration(t *testing.T) {
 	cases := []struct {
 		name    string
 		declare func(t *testing.T, first, second *cobra.Command)
+		kept    func(MCPSchema) string
 		golden  string
 	}{
 		{
@@ -187,6 +266,7 @@ func TestSchemaFailsClosedOnDuplicateDeclaration(t *testing.T) {
 				mustDeclare(t, DeclarePrompt(first, Prompt{Name: "triage", Template: "first"}))
 				mustDeclare(t, DeclarePrompt(second, Prompt{Name: "triage", Template: "second"}))
 			},
+			kept:   func(s MCPSchema) string { return s.Prompts[0].Template },
 			golden: "schema_duplicate_declaration.golden.json",
 		},
 		{
@@ -195,6 +275,7 @@ func TestSchemaFailsClosedOnDuplicateDeclaration(t *testing.T) {
 				mustDeclare(t, DeclareResource(first, Resource{URI: "app://docs", Name: "first"}))
 				mustDeclare(t, DeclareResource(second, Resource{URI: "app://docs", Name: "second"}))
 			},
+			kept:   func(s MCPSchema) string { return s.Resources[0].Name },
 			golden: "schema_duplicate_resource_declaration.golden.json",
 		},
 	}
@@ -202,41 +283,63 @@ func TestSchemaFailsClosedOnDuplicateDeclaration(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			root := newSchemaTestCommand()
 			tc.declare(t, root, root.Commands()[0])
+			assertSchemaFailsClosed(t, root, tc.golden)
 
-			for _, format := range []string{"--as=ax", "--as=mcp"} {
-				stdout, err := runSchema(t, root, format)
-				if len(stdout) != 0 {
-					t.Fatalf("%s wrote stdout on a duplicate: %s", format, stdout)
-				}
-				if got := contract.ErrorExitCode(err); got != contract.ExitValidation {
-					t.Fatalf("%s exit code = %d, want %d (err %v)", format, got, contract.ExitValidation, err)
-				}
-				var stderr bytes.Buffer
-				if writeErr := contract.WriteError(&stderr, err); writeErr != nil {
-					t.Fatalf("WriteError: %v", writeErr)
-				}
-				assertGolden(
-					t,
-					filepath.Join("..", "testdata", tc.golden),
-					testutil.MaskNonDeterministic(stderr.Bytes()),
-				)
+			if got := tc.kept(BuildMCPSchema(root)); got != "first" {
+				t.Fatalf("BuildMCPSchema kept %q, want the first declaration in walk order", got)
 			}
-
-			first := func(schema MCPSchema) string {
-				if len(schema.Prompts) > 0 {
-					return schema.Prompts[0].Template
-				}
-				return schema.Resources[0].Name
-			}(BuildMCPSchema(root))
-			if first != "first" ||
-				len(
-					BuildSchema(root).Command.Commands[0].Prompts,
-				)+len(
-					BuildSchema(root).Command.Commands[0].Resources,
-				) != 0 {
-				t.Fatalf("builders did not keep the first declaration in walk order (first = %q)", first)
+			if child := BuildSchema(root).Command.Commands[0]; child.Prompts != nil || child.Resources != nil {
+				t.Fatalf("BuildSchema kept the second declaration on %q", child.Use)
 			}
 		})
+	}
+}
+
+func assertSchemaFailsClosed(t *testing.T, root *cobra.Command, golden string) {
+	t.Helper()
+
+	for _, format := range []string{"--as=ax", "--as=mcp"} {
+		stdout, err := runSchema(t, root, format)
+		if len(stdout) != 0 {
+			t.Fatalf("%s wrote stdout on a failed declaration check: %s", format, stdout)
+		}
+		if got := contract.ErrorExitCode(err); got != contract.ExitValidation {
+			t.Fatalf("%s exit code = %d, want %d (err %v)", format, got, contract.ExitValidation, err)
+		}
+		var stderr bytes.Buffer
+		if writeErr := contract.WriteError(&stderr, err); writeErr != nil {
+			t.Fatalf("WriteError: %v", writeErr)
+		}
+		assertGolden(t, filepath.Join("..", "testdata", golden), testutil.MaskNonDeterministic(stderr.Bytes()))
+	}
+}
+
+func TestSchemaFailsClosedOnCorruptAnnotation(t *testing.T) {
+	root := newSchemaTestCommand()
+	root.Commands()[0].Annotations = map[string]string{
+		"github.com/rshade/ax-go/schema/resources": `[{"uri":"relative","name":"hand-written"}]`,
+	}
+	assertSchemaFailsClosed(t, root, "schema_corrupt_declaration.golden.json")
+}
+
+// TestDeclarationProjectionsAgreeUnderHiddenRoot pins format parity when the
+// root itself is hidden: BuildCommand keeps a hidden root, so its declarations
+// must reach both projections and the duplicate check.
+func TestDeclarationProjectionsAgreeUnderHiddenRoot(t *testing.T) {
+	root := newSchemaTestCommand()
+	root.Hidden = true
+	mustDeclare(t, DeclarePrompt(root, Prompt{Name: "root-prompt", Template: "t"}))
+	mustDeclare(t, DeclareResource(root.Commands()[0], Resource{URI: "app://run", Name: "run"}))
+
+	ax, mcpSchema := BuildSchema(root), BuildMCPSchema(root)
+	if len(ax.Command.Prompts) != 1 || len(mcpSchema.Prompts) != 1 || len(mcpSchema.Resources) != 1 {
+		t.Fatalf("projections disagree: ax prompts %+v, mcp prompts %+v, mcp resources %+v",
+			ax.Command.Prompts, mcpSchema.Prompts, mcpSchema.Resources)
+	}
+
+	mustDeclare(t, DeclarePrompt(root.Commands()[0], Prompt{Name: "root-prompt", Template: "u"}))
+	if _, err := runSchema(t, root, "--as=mcp"); contract.ErrorExitCode(err) != contract.ExitValidation {
+		t.Fatalf("duplicate under a hidden root: err = %v, want validation_error exit 2", err)
 	}
 }
 
@@ -318,10 +421,34 @@ func TestDeclarationsAreCapturedByValue(t *testing.T) {
 	prompt.Template = "mutated"
 	resource.URI = "app://mutated"
 
-	for range 2 {
-		got, err := runSchema(t, root, "--as=mcp")
-		if err != nil || !bytes.Equal(got, want) {
-			t.Fatalf("projection changed after caller mutation (err %v)\ngot:  %s\nwant: %s", err, got, want)
+	got, err := runSchema(t, root, "--as=mcp")
+	if err != nil || !bytes.Equal(got, want) {
+		t.Fatalf("projection changed after caller mutation (err %v)\ngot:  %s\nwant: %s", err, got, want)
+	}
+}
+
+// TestEveryDeclarationReasonHasAFix keeps actionable_fix populated: a reason
+// added without a remedy would ship invalid_schema_declaration envelopes that
+// tell an agent nothing about how to recover.
+func TestEveryDeclarationReasonHasAFix(t *testing.T) {
+	for _, reason := range []internalschema.Reason{
+		internalschema.ReasonNilCommand,
+		internalschema.ReasonRequired,
+		internalschema.ReasonInvalidCharset,
+		internalschema.ReasonInvalidUTF8,
+		internalschema.ReasonDuplicate,
+		internalschema.ReasonUndeclaredPlaceholder,
+		internalschema.ReasonNotAbsolute,
+		internalschema.ReasonMalformed,
+		internalschema.ReasonTooLong,
+		internalschema.ReasonInvalidCharacter,
+		internalschema.ReasonCorruptAnnotation,
+	} {
+		if declarationFix(reason) == "" {
+			t.Errorf("reason %q has no actionable_fix", reason)
 		}
+	}
+	if fix := declarationFix("unknown_reason"); fix != "" {
+		t.Errorf("unknown reason fix = %q, want empty", fix)
 	}
 }

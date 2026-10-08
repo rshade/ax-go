@@ -128,6 +128,17 @@ description: "Task list for feature 028: MCP prompts and static resources in the
 
 ---
 
+## Phase 8: Review Remediation (speckit-review-run on PR #266)
+
+- [X] T037 Make `WalkDeclarationCommands` visit the root unconditionally and prune only hidden children, then replace the hidden-root test with a `BuildCommand` parity test and add hidden-root duplicate and projection-parity tests in `internal/schema/declarations.go`, `internal/schema/declarations_test.go`, and `schema/declarations_test.go`
+- [X] T038 Allow spaces in a resource MIME type (control characters only), split the `malformed` reason from `not_absolute`, and add the matching cases in `internal/schema/declarations.go` and `internal/schema/declarations_test.go`
+- [X] T039 Refuse to rewrite a corrupt declaration annotation (`corrupt_annotation`), add `FindCorrupt`, fail `__schema` closed on it, and pin `testdata/schema_corrupt_declaration.golden.json` in `internal/schema/declarations.go`, `schema/schema.go`, `schema/declarations.go`, and `schema/declarations_test.go`
+- [X] T040 Add `FuzzTemplatePlaceholders` (an oracle against the original scanner, plus round-trip) and `FuzzValidateResource`, and make the scanner linear, in `internal/schema/declarations.go` and `internal/schema/declarations_test.go`
+- [X] T041 Bound the key echoed in error messages, add a reason-keyed `actionable_fix`, type `Reason`/`Kind`, collapse the converters into `convertSlice`, and add a Prompt field-parity test in `schema/declarations.go` and `schema/declarations_test.go`
+- [X] T042 Check FR-011 over the wire (empty `prompts/list`/`resources/list`, matching live `tools/list`) in `internal/mcpserver/server_test.go`, stamp tool and version on the early integration envelope in `examples/integration/main.go`, and remove redundant tests
+- [X] T043 Correct the comments and docs that overstated the walk's pruning or under-listed the rules in `schema/doc.go`, `schema/schema.go`, `schema.go`, `internal/mcp/mcp.go`, `README.md`, and `docs/src/content/docs/guides/expose-schema.md`, and update `spec.md` (FR-004, FR-004b, FR-007), `data-model.md`, `contracts/`, and `research.md` R11
+- [X] T044 Re-run `speckit-analyze` and every repository gate, then push to PR #266
+
 ## Dependencies & Execution Order
 
 - **Setup (T001)** → **Foundational (T002–T004)** → story phases.

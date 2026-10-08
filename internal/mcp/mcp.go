@@ -47,8 +47,9 @@ const (
 )
 
 // Schema is the internal MCP-compatible adapter shape. Prompts and Resources
-// are static declarations aggregated from the whole non-hidden tree; they are
-// nil when nothing is declared.
+// are static declarations aggregated over internalschema.WalkDeclarationCommands
+// (the root plus every command not under a hidden child); they are nil when
+// nothing is declared.
 type Schema struct {
 	Tools     []Tool
 	Prompts   []internalschema.Prompt

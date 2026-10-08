@@ -13,8 +13,10 @@ func DeclareResource(cmd *cobra.Command, resource Resource) error
   offending field (`cmd`, `name`, `template`, `arguments[i].name`, `uri`, ...),
   and `context.reason` is a stable, lowercase snake_case reason (`nil_command`,
   `required`, `invalid_charset`, `invalid_utf8`, `duplicate`,
-  `undeclared_placeholder`, `not_absolute`, `too_long`, `invalid_character`).
-  The command is left unchanged.
+  `undeclared_placeholder`, `not_absolute`, `malformed`, `too_long`,
+  `invalid_character`, `corrupt_annotation`). `actionable_fix` gives a
+  reason-specific remedy, and the message echoes at most 128 bytes of the
+  key. The command is left unchanged.
 
 ## `__schema` (ax-native), additive
 
@@ -43,7 +45,16 @@ Envelope key order follows the `contract.Error` struct. The example is
 illustrative, and `testdata/schema_duplicate_declaration.golden.json` is
 authoritative. The resource variant reads `duplicate resource URI ...` with `kind:"resource"`.
 
+## Corrupt annotation failure (`__schema`, both formats)
+
+A declaration annotation written by hand that does not decode, or holds an
+invalid entry, makes `__schema` exit `2` with empty stdout and one
+`validation_error` envelope whose context carries `kind`, `key` (the annotation
+key), `reason: "corrupt_annotation"`, and `commands` (the one offending path).
+`testdata/schema_corrupt_declaration.golden.json` is authoritative.
+
 ## Live `mcp-server` (unchanged in Phase 1)
 
-The `initialize` result advertises no `prompts` or `resources` capability, and
-`tools/list` is unchanged, whatever the tree declares.
+The `initialize` result advertises no `prompts` or `resources` capability,
+`prompts/list` and `resources/list` return empty lists, and `tools/list` is
+unchanged, whatever the tree declares.

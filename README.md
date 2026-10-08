@@ -311,9 +311,10 @@ if err := ax.DeclareResource(root, ax.Resource{
 Declarations appear on their command in `__schema` and in top-level `prompts`
 and `resources` arrays in `__schema --as=mcp`. Trees that declare none emit
 exactly the output they did before. Each `{{name}}` placeholder must name a
-declared argument. A resource needs an absolute URI and carries metadata only.
-A prompt name or resource URI declared on two commands makes `__schema` fail
-with a `validation_error` (exit `2`). The live `mcp-server` does not serve
+declared argument. A resource needs a URI with a scheme and carries metadata
+only. A prompt name or resource URI declared on two commands, or a
+declaration annotation written by hand that does not decode, makes `__schema`
+fail with a `validation_error` (exit `2`). The live `mcp-server` does not serve
 prompts or resources yet; that runtime phase is deferred
 ([`specs/028-mcp-prompts-resources/`](specs/028-mcp-prompts-resources/spec.md)).
 

@@ -180,22 +180,38 @@ top-level arrays, in command-tree order:
 ```
 
 The rules are checked when you declare, and a bad declaration returns an
-`ax.Error` with `error_code` `invalid_schema_declaration` (exit `2`):
+`*ax.Error` with `error_code` `invalid_schema_declaration` (exit `2`). Its
+`context` names the `field` and a stable `reason`, and `actionable_fix` says
+what to change:
 
-- Names (prompt and argument) use only letters, digits, `_`, `.`, and `-`.
+- A prompt needs a name and a template. Names (prompt and argument) use only
+  letters, digits, `_`, `.`, and `-`, and argument names are unique within a
+  prompt.
 - Every `{{name}}` in a template must name a declared argument. Other brace
   text, such as `{{ name }}` with spaces, is left as literal text.
-- A resource URI must be absolute (`scheme://...`), at most 2048 bytes, with no
-  spaces or control characters. Resources carry metadata only, never content
-  or live state. For now an agent can discover a resource but cannot read it;
-  content arrives when `mcp-server` serves resources. ax-go never inlines a
-  truncated body, because an agent cannot tell a fragment from the whole.
+- A resource needs a name and a URI. The URI must carry a scheme
+  (`yourcli://docs/x` or `urn:yourcli:x`), parse, stay within 2048 bytes, and
+  contain no spaces or control characters. A MIME type may contain spaces, as
+  in `text/plain; charset=utf-8`, but no control characters.
+- A prompt name or resource URI already declared on the same command is
+  rejected, and all text must be valid UTF-8.
 
-Declarations on a hidden command are dropped, like the command itself. A group
-command or a command marked with `mcp.Exclude` keeps its declarations, because
-those rules only decide which commands become tools. If two commands declare
-the same prompt name or resource URI, `__schema` fails with a
-`validation_error` (exit `2`) that names both commands.
+Resources carry metadata only, never content or live state. For now an agent
+can discover a resource but cannot read it; content arrives when `mcp-server`
+serves resources. ax-go never inlines a truncated body, because an agent cannot
+tell a fragment from the whole.
+
+Declarations under a hidden command are dropped, like the command itself. The
+root command always keeps its own, even when it is hidden, exactly as
+`__schema` keeps a hidden root. A group command or a command marked with
+`mcp.Exclude` keeps its declarations, because those rules only decide which
+commands become tools.
+
+`__schema` refuses to emit a silently reduced contract. It fails with a
+`validation_error` (exit `2`) when two commands declare the same prompt name or
+resource URI, naming both commands, and when a declaration annotation was
+written by hand and does not decode cleanly. Declare only through
+`ax.DeclarePrompt` and `ax.DeclareResource`.
 
 :::note
 `mcp-server` does not serve prompts or resources yet. For now they live in the
