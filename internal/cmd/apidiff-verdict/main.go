@@ -212,11 +212,11 @@ func isTypeRelocation(item string) bool {
 	if !found {
 		return false
 	}
-	dot := strings.LastIndex(suffix, ".")
-	if dot < 0 {
+	pkgPath, after, ok := strings.CutLast(suffix, ".")
+	if !ok {
 		return false
 	}
-	pkgPath, target := suffix[:dot], stripTypeParams(suffix[dot+1:])
+	target := stripTypeParams(after)
 	// A package path has no dots (a dotted first segment means another module's
 	// domain), and the target must be a bare type name.
 	if strings.Contains(pkgPath, ".") || !isBareIdentifier(target) {
@@ -253,8 +253,8 @@ func isOptionPrefixDrop(before, target string) bool {
 // part renders differently on each side purely because one is a declaration and
 // the other an instantiation.
 func stripTypeParams(s string) string {
-	if idx := strings.Index(s, "["); idx >= 0 {
-		return s[:idx]
+	if before, _, ok := strings.Cut(s, "["); ok {
+		return before
 	}
 	return s
 }
@@ -283,21 +283,20 @@ func isBareIdentifier(s string) bool {
 // of any other shape (removed, added, and the various member-level diagnostics)
 // return ok false and are therefore always treated as breaking.
 func parseChangedFinding(item string) (string, string, string, bool) {
-	colon := strings.Index(item, ": changed from ")
-	if colon < 0 {
+	rawName, rest, ok := strings.Cut(item, ": changed from ")
+	if !ok {
 		return "", "", "", false
 	}
-	name := strings.TrimSpace(item[:colon])
-	rest := item[colon+len(": changed from "):]
+	name := strings.TrimSpace(rawName)
 
 	// Split on the LAST " to " so a signature containing the substring does not
 	// truncate the comparison.
-	sep := strings.LastIndex(rest, " to ")
-	if sep < 0 {
+	rawBefore, rawAfter, ok := strings.CutLast(rest, " to ")
+	if !ok {
 		return "", "", "", false
 	}
-	before := strings.TrimSpace(rest[:sep])
-	after := strings.TrimSpace(rest[sep+len(" to "):])
+	before := strings.TrimSpace(rawBefore)
+	after := strings.TrimSpace(rawAfter)
 	if name == "" || before == "" || after == "" {
 		return "", "", "", false
 	}

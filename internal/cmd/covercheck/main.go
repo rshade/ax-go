@@ -274,13 +274,13 @@ func parseProfileLine(line string) (string, int, int, error) {
 		return "", 0, 0, fmt.Errorf("malformed coverage line %q: want %d fields", line, profileFieldCount)
 	}
 	block := fields[0]
-	colon := strings.LastIndex(block, ":")
-	if colon < 0 {
+	before, _, ok := strings.CutLast(block, ":")
+	if !ok {
 		return "", 0, 0, fmt.Errorf("malformed coverage block %q: missing position separator", block)
 	}
-	file := block[:colon]
-	slash := strings.LastIndex(file, "/")
-	if slash < 0 {
+	file := before
+	pkgDir, _, hasDir := strings.CutLast(file, "/")
+	if !hasDir {
 		return "", 0, 0, fmt.Errorf("malformed coverage path %q: missing package separator", file)
 	}
 	numStmt, err := strconv.Atoi(fields[1])
@@ -297,7 +297,7 @@ func parseProfileLine(line string) (string, int, int, error) {
 	if count < 0 {
 		return "", 0, 0, fmt.Errorf("negative execution count in %q", line)
 	}
-	return file[:slash], numStmt, count, nil
+	return pkgDir, numStmt, count, nil
 }
 
 // percent returns covered/total as a percentage, or 0 when total is 0.

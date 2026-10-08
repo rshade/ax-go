@@ -414,7 +414,7 @@ func TestParseAudit(t *testing.T) {
 }
 
 func miniAuditRecord(id string) string {
-	kind := strings.SplitN(id, ":", 2)[0]
+	kind, _, _ := strings.Cut(id, ":")
 	name := strings.SplitN(id, ":", 2)[1]
 	sig := "func()"
 	if kind == "const" {

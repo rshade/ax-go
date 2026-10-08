@@ -135,8 +135,7 @@ func applyOptions(ctx context.Context, opts []Option) (options, error) {
 }
 
 func normalizeReadError(ctx context.Context, err error) error {
-	var invalidMax internalconfig.InvalidMaxBytesError
-	if errors.As(err, &invalidMax) {
+	if invalidMax, ok := errors.AsType[internalconfig.InvalidMaxBytesError](err); ok {
 		return contract.NewError(
 			ctx,
 			"config_max_bytes_invalid",
@@ -147,8 +146,7 @@ func normalizeReadError(ctx context.Context, err error) error {
 		)
 	}
 
-	var tooLarge internalconfig.TooLargeError
-	if errors.As(err, &tooLarge) {
+	if tooLarge, ok := errors.AsType[internalconfig.TooLargeError](err); ok {
 		return contract.NewError(
 			ctx,
 			"config_too_large",
@@ -162,8 +160,7 @@ func normalizeReadError(ctx context.Context, err error) error {
 }
 
 func normalizeDecodeError(ctx context.Context, decodeErr error) error {
-	var invalidUnmarshal *json.InvalidUnmarshalError
-	if errors.As(decodeErr, &invalidUnmarshal) {
+	if _, ok := errors.AsType[*json.InvalidUnmarshalError](decodeErr); ok {
 		return decodeErr
 	}
 
@@ -178,8 +175,7 @@ func normalizeDecodeError(ctx context.Context, decodeErr error) error {
 }
 
 func normalizePatchError(ctx context.Context, err error) error {
-	var parseErr *internalconfig.HujsonParseError
-	if errors.As(err, &parseErr) {
+	if parseErr, ok := errors.AsType[*internalconfig.HujsonParseError](err); ok {
 		return contract.NewError(
 			ctx,
 			"config_invalid",
@@ -190,8 +186,7 @@ func normalizePatchError(ctx context.Context, err error) error {
 		)
 	}
 
-	var patchErr *internalconfig.PatchApplyError
-	if errors.As(err, &patchErr) {
+	if patchErr, ok := errors.AsType[*internalconfig.PatchApplyError](err); ok {
 		return contract.NewError(
 			ctx,
 			"config_patch_invalid",

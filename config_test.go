@@ -47,8 +47,7 @@ func TestParseConfigRejectsOversizedInput(t *testing.T) {
 		t.Fatal("ParseConfig returned nil error for oversized input")
 	}
 
-	var axErr *Error
-	if !errors.As(err, &axErr) {
+	if _, ok := errors.AsType[*Error](err); !ok {
 		t.Fatalf("ParseConfig error type = %T, want *Error", err)
 	}
 	if code := ErrorExitCode(err); code != ExitValidation {
@@ -112,8 +111,7 @@ func TestParseConfigHonorsMaxConfigBytesOption(t *testing.T) {
 			if err == nil {
 				t.Fatal("ParseConfig returned nil error")
 			}
-			var axErr *Error
-			if !errors.As(err, &axErr) {
+			if _, ok := errors.AsType[*Error](err); !ok {
 				t.Fatalf("ParseConfig error type = %T, want *Error", err)
 			}
 			if code := ErrorExitCode(err); code != ExitValidation {
@@ -160,8 +158,7 @@ func TestParseConfigClassifiesInvalidConfigAsValidation(t *testing.T) {
 			}{},
 			checkChain: func(t *testing.T, err error) {
 				t.Helper()
-				var typeErr *json.UnmarshalTypeError
-				if !errors.As(err, &typeErr) {
+				if _, ok := errors.AsType[*json.UnmarshalTypeError](err); !ok {
 					t.Fatal("errors.As(*json.UnmarshalTypeError) = false, want the decode error preserved in the chain")
 				}
 			},
@@ -205,8 +202,7 @@ func TestParseConfigLeavesInvalidDestinationAsProgrammerError(t *testing.T) {
 			}
 			assertNotAxError(t, err)
 
-			var invalidUnmarshal *json.InvalidUnmarshalError
-			if !errors.As(err, &invalidUnmarshal) {
+			if _, ok := errors.AsType[*json.InvalidUnmarshalError](err); !ok {
 				t.Fatalf("errors.As(*json.InvalidUnmarshalError) = false for %T", err)
 			}
 			if got := ErrorExitCode(err); got != ExitInternal {
@@ -228,8 +224,7 @@ func TestParseConfigFileHonorsMaxConfigBytesOption(t *testing.T) {
 		t.Fatal("ParseConfigFile returned nil error")
 	}
 
-	var axErr *Error
-	if !errors.As(err, &axErr) {
+	if _, ok := errors.AsType[*Error](err); !ok {
 		t.Fatalf("ParseConfigFile error type = %T, want *Error", err)
 	}
 	if code := ErrorExitCode(err); code != ExitValidation {
@@ -713,8 +708,7 @@ func assertNotConfigTooLarge(t *testing.T, err error) {
 func assertNotAxError(t *testing.T, err error) {
 	t.Helper()
 
-	var axErr *Error
-	if errors.As(err, &axErr) {
+	if _, ok := errors.AsType[*Error](err); ok {
 		t.Fatalf("error type = %T, want non-*Error", err)
 	}
 }
@@ -922,12 +916,10 @@ func TestPatchConfigFileConcurrentPatchesKeepFileValid(t *testing.T) {
 	var wg sync.WaitGroup
 	errs := make([]error, writers)
 	for i := range writers {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			patch := fmt.Appendf(nil, `[{"op":"replace","path":"/port","value":%d}]`, 1000+i)
 			errs[i] = PatchConfigFile(context.Background(), path, patch)
-		}()
+		})
 	}
 	wg.Wait()
 

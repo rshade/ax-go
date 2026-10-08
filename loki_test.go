@@ -236,11 +236,11 @@ func TestLokiWriter_BufferFull(t *testing.T) {
 // log lines while Flush is called concurrently must not produce data races.
 // Requires -race. SC-004 / Constitution Principle IX (resource safety).
 func TestLokiWriter_Race(t *testing.T) {
-	var received int64
+	var received atomic.Int64
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == http.MethodPost {
 			_, _ = io.ReadAll(r.Body)
-			atomic.AddInt64(&received, 1)
+			received.Add(1)
 		}
 		w.WriteHeader(http.StatusNoContent)
 	}))
@@ -257,13 +257,11 @@ func TestLokiWriter_Race(t *testing.T) {
 
 	var wg sync.WaitGroup
 	for range 10 {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			for range 50 {
 				l.Info(context.Background()).Msg("race test")
 			}
-		}()
+		})
 	}
 
 	// Flush concurrently with the writes.

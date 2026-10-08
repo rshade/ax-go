@@ -115,8 +115,7 @@ func TestHTTPClientRejectsInvalidTLSCert(t *testing.T) {
 		t.Fatal("HTTPClient should reject self-signed cert; got nil error")
 	}
 	// Confirm the failure is a typed x509 certificate error, not a generic network error.
-	var urlErr *url.Error
-	if !errors.As(err, &urlErr) {
+	if _, ok := errors.AsType[*url.Error](err); !ok {
 		t.Fatalf("expected *url.Error wrapping TLS failure, got: %v", err)
 	}
 	var certErr x509.CertificateInvalidError

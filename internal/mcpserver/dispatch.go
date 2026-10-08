@@ -478,8 +478,7 @@ func (d *dispatcher) errorResult(ctx context.Context, err error) *sdk.CallToolRe
 // toAxError normalizes any dispatch error into the ax.Error envelope, attaching
 // the server's tool name and version and the active trace ID.
 func (d *dispatcher) toAxError(ctx context.Context, err error) *contract.Error {
-	var axErr *contract.Error
-	if errors.As(err, &axErr) {
+	if axErr, ok := errors.AsType[*contract.Error](err); ok {
 		if axErr.Tool == "" {
 			axErr.Tool = d.serverName
 		}

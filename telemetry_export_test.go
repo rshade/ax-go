@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 	"time"
 
@@ -209,7 +210,7 @@ func TestExecuteExportsSpansBeforeExit(t *testing.T) {
 				t.Fatalf("Execute exit code = %d, want %d; stderr=%s", code, ExitSuccess, stderr)
 			}
 			export := receiver.next(t)
-			if !containsString(export.traceIDs, tc.wantTraceID) {
+			if !slices.Contains(export.traceIDs, tc.wantTraceID) {
 				t.Fatalf("exported trace IDs = %v, want %q", export.traceIDs, tc.wantTraceID)
 			}
 		})
@@ -275,15 +276,6 @@ func TestExecuteExportsServiceResourceIdentity(t *testing.T) {
 	}
 }
 
-func containsString(values []string, want string) bool {
-	for _, value := range values {
-		if value == want {
-			return true
-		}
-	}
-	return false
-}
-
 // TestExecuteErrorCommandExportsSpanWithErrorStatus verifies that when a Cobra
 // command returns an error, Execute sets span status to codes.Error before the
 // span is flushed to the OTLP collector (execute.go: span.SetStatus).
@@ -331,13 +323,7 @@ func TestExecuteErrorCommandExportsSpanWithErrorStatus(t *testing.T) {
 			export.names,
 		)
 	}
-	hasError := false
-	for _, sc := range export.statusCodes {
-		if sc == tracepb.Status_STATUS_CODE_ERROR {
-			hasError = true
-			break
-		}
-	}
+	hasError := slices.Contains(export.statusCodes, tracepb.Status_STATUS_CODE_ERROR)
 	if !hasError {
 		t.Fatalf(
 			"no span with STATUS_CODE_ERROR; status codes=%v names=%v — Execute must call span.SetStatus(codes.Error) on failure",

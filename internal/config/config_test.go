@@ -162,8 +162,7 @@ func TestReadBoundedEnforcesLimitAtReadBoundary(t *testing.T) {
 		reader := newTripwireReader(t, strings.NewReader(strings.Repeat(" ", int(capBytes*100))), capBytes+1)
 
 		_, err := ReadBounded(context.Background(), reader, capBytes)
-		var tooLarge TooLargeError
-		if !errors.As(err, &tooLarge) {
+		if _, ok := errors.AsType[TooLargeError](err); !ok {
 			t.Fatalf("ReadBounded error = %v, want TooLargeError", err)
 		}
 		if reader.read > capBytes+1 {
@@ -191,8 +190,7 @@ func TestReadBoundedEnforcesLimitAtReadBoundary(t *testing.T) {
 			reader := &readCalledReader{}
 
 			_, err := ReadBounded(context.Background(), reader, maxBytes)
-			var invalid InvalidMaxBytesError
-			if !errors.As(err, &invalid) {
+			if _, ok := errors.AsType[InvalidMaxBytesError](err); !ok {
 				t.Fatalf("ReadBounded(%d) error = %v, want InvalidMaxBytesError", maxBytes, err)
 			}
 			if reader.called {
@@ -242,8 +240,7 @@ func TestReadBoundedLargeCapGrowth(t *testing.T) {
 		payload := strings.Repeat("a", int(capBytes)+1)
 
 		_, err := ReadBounded(context.Background(), strings.NewReader(payload), capBytes)
-		var tooLarge TooLargeError
-		if !errors.As(err, &tooLarge) {
+		if _, ok := errors.AsType[TooLargeError](err); !ok {
 			t.Fatalf("ReadBounded error = %v, want TooLargeError", err)
 		}
 	})
@@ -312,8 +309,7 @@ func (c controlledDeadlineContext) Value(any) any {
 func assertNotTooLargeError(t *testing.T, err error) {
 	t.Helper()
 
-	var tooLarge TooLargeError
-	if errors.As(err, &tooLarge) {
+	if _, ok := errors.AsType[TooLargeError](err); ok {
 		t.Fatalf("ReadBounded error = %v, want non-TooLargeError", err)
 	}
 }

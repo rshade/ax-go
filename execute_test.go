@@ -399,7 +399,7 @@ func TestExecuteFlushFuncOptionResolution(t *testing.T) {
 func TestExecuteFlushFailureIsSanitizedAndFailOpen(t *testing.T) {
 	var unsafeMessage strings.Builder
 	unsafeMessage.WriteString("push failed")
-	for control := byte(0); control < 0x20; control++ {
+	for control := range byte(0x20) {
 		unsafeMessage.WriteByte(control)
 	}
 	unsafeMessage.WriteByte(0x7f)
