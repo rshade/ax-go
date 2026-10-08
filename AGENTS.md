@@ -201,6 +201,13 @@ reach. `axtest.Run` is not an assertion; a subtest whose only call is
 `axtest.Run` is reported. The fixture at `.slop/testdata/` is excluded from
 `make slop`.
 
+`make clone-report` runs `dupl -t 100` from the mise pin (`github.com/mibk/dupl`
+1.1.0, via `mise exec`) over `*_test.go`. It prints each pair once and exits 0.
+It is not a dependency of `make ci`. The recorded baseline is 8 intentional
+pairs: root/subpackage facade tests, plus the array and map golden locator
+tests in `examples/integration/golden_test.go`. `.golangci.yml` still excludes
+`dupl` from test files; this target does not change that.
+
 ### Internal Reachability Gate
 
 Run `make dead-check` before handing work back. It is included in `make ci`

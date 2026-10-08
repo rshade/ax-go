@@ -250,6 +250,11 @@ func TestDeleteJSONLocatorsArrayElement(t *testing.T) {
 	}
 }
 
+// TestDeleteJSONLocatorsMapValue mirrors TestDeleteJSONLocatorsArrayElement.
+// The bodies match on purpose: one locator shape has to mask every array
+// element and every map value, and collapsing them would hide a divergence
+// between those two walks.
+//
 // TestDeleteJSONLocatorsMapValue guards against a regression where a locator
 // descending through a map value field (e.g. "data.items.id", the same
 // no-index-segment format research.md D3 uses for map keys) hard-failed or

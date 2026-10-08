@@ -176,6 +176,33 @@ slop:
 		if [ $$status -eq 0 ] || [ $$status -eq 1 ]; then exit 0; fi; \
 		exit $$status
 
+# clone-report is not a member of ci. dupl is pinned in mise.toml and run
+# through mise exec so a PATH binary cannot win. -t 100 is where
+# table-driven similarity stops dominating. -plumbing prints each pair
+# twice; the awk prints each pair once. The target exits 0 when dupl
+# runs. Recorded baseline 2026-10-08: 8 pairs, all intentional (facade
+# parity, or the array-vs-map golden locators). A live count that
+# differs from 8 is drift.
+.PHONY: clone-report
+clone-report:
+	@command -v mise >/dev/null 2>&1 || (echo "mise not found. Install: https://mise.jdx.dev/"; exit 1)
+	@echo "Test clone report: dupl -t 100 over *_test.go. Not a CI gate."
+	@echo "Recorded baseline: 8 pairs (2026-10-08), all intentional."
+	@bash -c 'set -o pipefail; find . -name "*_test.go" -print0 | xargs -0 -r mise exec -- dupl -t 100 -plumbing | awk '\'' \
+	  BEGIN { n = 0 } \
+	  { \
+	    split($$0, parts, ": duplicate of "); \
+	    if (parts[2] == "") next; \
+	    a = parts[1]; b = parts[2]; \
+	    if (a > b) { t = a; a = b; b = t } \
+	    key = a " <-> " b; \
+	    if (!(key in seen)) { seen[key] = 1; order[++n] = key } \
+	  } \
+	  END { \
+	    print n " pairs"; \
+	    for (i = 1; i <= n; i++) print order[i]; \
+	  }'\'''
+
 .PHONY: dead-check
 dead-check:
 	@go run ./internal/cmd/deadcheck
@@ -260,7 +287,7 @@ ensure: ensure-mise-tools ensure-markdownlint
 # and every workflow file.
 .PHONY: ensure-mise-tools
 ensure-mise-tools:
-	@echo "==> Go, golangci-lint, actionlint, govulncheck, deadcode (pinned in mise.toml)"
+	@echo "==> Go, golangci-lint, actionlint, govulncheck, deadcode, dupl (pinned in mise.toml)"
 	@command -v mise >/dev/null 2>&1 || \
 		(echo "    mise not found. Install: https://mise.jdx.dev/installing-mise.html"; exit 1)
 	mise install
@@ -297,6 +324,7 @@ help:
 	@echo "  size-check    - Enforce the isolated logging binary ceiling and reduction ratio"
 	@echo "  dead-check    - Gate unreachable unexported/internal functions across build tags (tests included)"
 	@echo "  slop          - Report assertion-free subtests (not part of ci; does not fail the build)"
+	@echo "  clone-report  - Report *_test.go clones at dupl -t 100 (not part of ci; does not fail the build)"
 	@echo "  lint          - Run golangci-lint per build-tag combination, markdownlint, actionlint"
 	@echo "  lint-actions  - Run actionlint on GitHub workflows"
 	@echo "  validate      - Check gofmt, go mod tidy, and go vet across the build-tag matrix"
