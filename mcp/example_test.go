@@ -41,6 +41,29 @@ func ExampleNewCommand() {
 	// Output: mcp-server
 }
 
+// ExampleWithInstructions declares a resource whose static content holds the
+// long reference text, and sends a short instructions string at initialize that
+// points the agent at it. The content is served by resources/read and never
+// appears in the schema, which lists metadata only.
+func ExampleWithInstructions() {
+	root := &cobra.Command{Use: "mycli", Short: "a demo CLI"}
+	_ = schema.DeclareResource(root, schema.Resource{
+		URI:      "mycli://docs/guide",
+		Name:     "guide",
+		MIMEType: "text/markdown",
+		Content:  "# Guide\nRun `mycli status` before anything else.\n",
+	})
+	root.AddCommand(mcp.NewCommand(root,
+		mcp.WithVersion("v1.0.0"),
+		mcp.WithInstructions("Read mycli://docs/guide before calling any tool."),
+	))
+
+	for _, resource := range schema.BuildMCPSchema(root).Resources {
+		fmt.Println(resource.URI, resource.MIMEType)
+	}
+	// Output: mycli://docs/guide text/markdown
+}
+
 // ExampleExclude keeps a TUI root and a blocking "serve" command out of the
 // MCP tool set while their siblings and children stay callable. Exclusion is a
 // mark on the command tree, so "__schema --as=mcp" and a live "mcp-server"

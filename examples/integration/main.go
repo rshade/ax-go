@@ -216,7 +216,10 @@ func newRootCommand(
 
 	// Opt in to the MCP server: `ax-integration mcp-server` exposes this CLI's
 	// command tree as a live MCP server with no per-tool work (feature 011).
-	root.AddCommand(mcp.NewCommand(root, mcp.WithVersion(resolved)))
+	root.AddCommand(mcp.NewCommand(root,
+		mcp.WithVersion(resolved),
+		mcp.WithInstructions(agentInstructions),
+	))
 
 	return root, func(ctx context.Context) error {
 		loggerMu.RLock()
@@ -226,10 +229,28 @@ func newRootCommand(
 	}
 }
 
+// agentInstructions is the short string the live mcp-server sends at
+// initialize (feature 030). It only points at the resource that carries the
+// long reference text, so an agent learns where to look without the repo.
+const agentInstructions = "Read the ax-integration://docs/exit-codes resource before interpreting a failed " +
+	"tool call, then use the greet-then-stream prompt as the manual entry point."
+
+// exitCodesDoc is the static content of the exit-codes resource: long reference
+// text lives in resource content, which "__schema" never projects, rather than
+// in a prompt template, which it does.
+const exitCodesDoc = `ax-integration exit codes
+0  success
+1  unknown or internal error
+2  validation or bad input
+3  network error or timeout
+4  authentication or permission failure
+`
+
 // declareAgentContext attaches a workflow prompt and a static reference
 // resource to root. Both appear in "__schema" on the root command and in the
-// top-level prompts/resources arrays of "__schema --as=mcp" (feature 028); the
-// live mcp-server does not serve them yet.
+// top-level prompts/resources arrays of "__schema --as=mcp" (feature 028), and
+// the live mcp-server serves them through prompts/get and resources/read
+// (feature 030).
 func declareAgentContext(root *cobra.Command) error {
 	if err := ax.DeclarePrompt(root, ax.Prompt{
 		Name:        "greet-then-stream",
@@ -249,6 +270,7 @@ func declareAgentContext(root *cobra.Command) error {
 		Title:       "Exit codes",
 		Description: "0 success, 1 internal, 2 validation, 3 network or timeout, 4 auth or permission.",
 		MIMEType:    "text/plain",
+		Content:     exitCodesDoc,
 	})
 }
 

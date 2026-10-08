@@ -19,6 +19,13 @@ const (
 	// never inflate __schema without limit (Constitution IX).
 	maxResourceURIBytes = 2048
 
+	// maxResourceContentBytes and maxTemplateBytes bound adopter-supplied text
+	// that the live mcp-server holds in memory and returns to every client
+	// (Constitution IX). Both clear a skill-sized document (go-decide's is
+	// 6.6 KB) by a wide margin.
+	maxResourceContentBytes = 1 << 20
+	maxTemplateBytes        = 64 << 10
+
 	openDelim  = "{{"
 	closeDelim = "}}"
 )
@@ -62,6 +69,7 @@ const (
 	fieldName       = "name"
 	fieldURI        = "uri"
 	fieldAnnotation = "annotation"
+	fieldTemplate   = "template"
 )
 
 // Prompt is the internal prompt declaration and its annotation encoding.
@@ -82,13 +90,15 @@ type PromptArgument struct {
 }
 
 // Resource is the internal resource declaration and its annotation encoding.
-// It deliberately has no content field: Phase 1 resources are metadata only.
+// Content is static text served by resources/read; it is stored in the
+// annotation but never projected into __schema.
 type Resource struct {
 	URI         string `json:"uri"`
 	Name        string `json:"name"`
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
 	MIMEType    string `json:"mime_type,omitempty"`
+	Content     string `json:"content,omitempty"`
 }
 
 // Violation identifies the first rule a declaration breaks. Field uses the
@@ -141,14 +151,17 @@ func ValidatePrompt(prompt Prompt) *Violation {
 	}
 
 	if prompt.Template == "" {
-		return &Violation{Field: "template", Reason: ReasonRequired}
+		return &Violation{Field: fieldTemplate, Reason: ReasonRequired}
 	}
-	if v := checkUTF8("template", prompt.Template); v != nil {
+	if len(prompt.Template) > maxTemplateBytes {
+		return &Violation{Field: fieldTemplate, Reason: ReasonTooLong}
+	}
+	if v := checkUTF8(fieldTemplate, prompt.Template); v != nil {
 		return v
 	}
 	for _, name := range templatePlaceholders(prompt.Template) {
 		if _, ok := declared[name]; !ok {
-			return &Violation{Field: "template", Reason: ReasonUndeclaredPlaceholder}
+			return &Violation{Field: fieldTemplate, Reason: ReasonUndeclaredPlaceholder}
 		}
 	}
 	return nil
@@ -158,6 +171,7 @@ func ValidatePrompt(prompt Prompt) *Violation {
 // valid. A URI must be at most maxResourceURIBytes, free of whitespace and
 // control characters, parseable, and carry a non-empty scheme. A MIME type may
 // contain spaces (as in "text/plain; charset=utf-8") but no control characters.
+// Content must be valid UTF-8 and at most maxResourceContentBytes.
 func ValidateResource(resource Resource) *Violation {
 	if v := checkURI(resource.URI); v != nil {
 		return v
@@ -178,7 +192,10 @@ func ValidateResource(resource Resource) *Violation {
 	if strings.ContainsFunc(resource.MIMEType, unicode.IsControl) {
 		return &Violation{Field: "mime_type", Reason: ReasonInvalidCharacter}
 	}
-	return nil
+	if len(resource.Content) > maxResourceContentBytes {
+		return &Violation{Field: "content", Reason: ReasonTooLong}
+	}
+	return checkUTF8("content", resource.Content)
 }
 
 // AddPrompt validates prompt and appends it to cmd's prompt annotation,
@@ -302,36 +319,67 @@ func (d *Deduper) FirstResources(resources []Resource) []Resource {
 
 // templatePlaceholders returns the argument names referenced by template, in
 // order of appearance, including repeats. A placeholder is exactly "{{name}}"
-// where name satisfies validName; any other brace text is literal. Each "{{"
-// is paired with the next "}}" and accepted only when the whole span between
-// them is a valid name, so "{{{x}}}" is literal (its span is "{x"). A rejected
-// "{{" resumes the scan just after itself, so a literal never hides a later
-// placeholder.
+// where name satisfies validName; any other brace text is literal. See
+// scanPlaceholders for how spans are paired.
+func templatePlaceholders(template string) []string {
+	var names []string
+	scanPlaceholders(template, func(_, _ int, name string) { names = append(names, name) })
+	return names
+}
+
+// RenderTemplate returns template with every "{{name}}" placeholder replaced by
+// values[name]; a name absent from values renders as empty text. All other text,
+// including brace text that is not a placeholder, is copied verbatim. It is a
+// single pass over template, so a substituted value is never re-scanned and an
+// argument cannot inject another placeholder. It shares scanPlaceholders with
+// validation, so a span is a placeholder in rendering exactly when it is one
+// when the prompt was declared.
+func RenderTemplate(template string, values map[string]string) string {
+	var out strings.Builder
+	copied := 0
+	scanPlaceholders(template, func(start, end int, name string) {
+		out.WriteString(template[copied:start])
+		out.WriteString(values[name])
+		copied = end
+	})
+	out.WriteString(template[copied:])
+	return out.String()
+}
+
+// scanPlaceholders calls visit for each placeholder in template, in order, with
+// the byte offsets [start, end) of the whole "{{name}}" span and its name. Each
+// "{{" is paired with the next "}}" and accepted only when the whole span
+// between them is a valid name, so "{{{x}}}" is literal (its span is "{x"). A
+// rejected "{{" resumes the scan just after itself, so a literal never hides a
+// later placeholder.
 //
 // Every "{{" the scan reaches inside a rejected span pairs with that span's
 // "}}", and each but the last encloses another "{{", so only the last can be
 // valid. The scan jumps straight to that last reachable "{{" instead of
 // re-searching for "}}" from each one, which keeps it linear on brace runs.
-func templatePlaceholders(template string) []string {
-	var names []string
-	for rest := template; ; {
-		open := strings.Index(rest, openDelim)
+func scanPlaceholders(template string, visit func(start, end int, name string)) {
+	pos := 0
+	for {
+		open := strings.Index(template[pos:], openDelim)
 		if open < 0 {
-			return names
+			return
 		}
-		rest = rest[open+len(openDelim):]
-		end := strings.Index(rest, closeDelim)
-		if end < 0 {
-			return names
+		open += pos
+		bodyStart := open + len(openDelim)
+		length := strings.Index(template[bodyStart:], closeDelim)
+		if length < 0 {
+			return
 		}
-		span := rest[:end]
+		span := template[bodyStart : bodyStart+length]
 		if validName(span) {
-			names = append(names, span)
-			rest = rest[end+len(closeDelim):]
+			end := bodyStart + length + len(closeDelim)
+			visit(open, end, span)
+			pos = end
 			continue
 		}
+		pos = bodyStart
 		if last := lastReachableOpen(span); last >= 0 {
-			rest = rest[last:]
+			pos += last
 		}
 	}
 }

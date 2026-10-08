@@ -158,6 +158,16 @@ conflicts with the constitution, the constitution wins.
   superseding decision. Do not introduce parallel-pluggable logger backends, an
   `ax.WithLogger(...)`-style runtime selection API, or a second concrete
   logger implementation (Constitution Principle VI).
+- `mcp-server` serves the prompts and static resources declared with
+  `schema.DeclarePrompt` / `schema.DeclareResource` (`internal/mcpserver/prompts.go`,
+  `resources.go`) from `schema.CollectDeclarations`, the aggregation
+  `__schema --as=mcp` projects, and registers each only when declared so an
+  empty tree keeps the v0.8.0 handshake (pinned by
+  `testdata/mcp_initialize_baseline.golden.json`). `Resource.Content` is static
+  text carried in the annotation and never projected (`json:"-"` on the public
+  type). The SDK pages lists sorted by name/URI, so `listorder.go` restores walk
+  order. `mcp.WithInstructions` is capped at 8 KiB, templates at 64 KiB, resource
+  content at 1 MiB (spec 030).
 - Stability and deprecation are governed by Constitution Principle XI
   (**Stability & SemVer**) and Principle XII (**Deprecation Lifecycle**).
   Pre-v1.0 (`0.x`): a `0.x.PATCH` release is bug-fixes-only and always safe to

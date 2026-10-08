@@ -3,7 +3,6 @@ package schema
 import (
 	"context"
 	"fmt"
-	"unicode/utf8"
 
 	"github.com/spf13/cobra"
 
@@ -22,8 +21,11 @@ const invalidDeclarationCode = "invalid_schema_declaration"
 // it must name a declared argument, and any other brace text (including
 // "{{ name }}" with spaces) is literal. All text must be valid UTF-8.
 // Declarations on a hidden command, or in a hidden subtree, are not projected.
-// Phase 1 is a declaration only: the live mcp-server does not serve prompts
-// yet.
+// The live mcp-server serves the prompt: prompts/get replaces each declared
+// "{{name}}" with the argument's value, and an absent optional argument
+// renders as empty text. A template is at most 64 KiB; keep it short, because
+// it is part of the __schema contract, and put long reference text in a
+// resource's content instead.
 type Prompt struct {
 	Name        string           `json:"name"`
 	Title       string           `json:"title,omitempty"`
@@ -42,21 +44,28 @@ type PromptArgument struct {
 }
 
 // Resource is static, read-only reference context declared on a command with
-// DeclareResource. It carries metadata only — there is deliberately no content
-// field, and no field can hold a callback or live state: resources never
-// expose run records (Constitution Principle VI).
+// DeclareResource. Content is fixed text captured at declaration time and
+// served by the live mcp-server's resources/read; no field can hold a callback
+// or live state, so resources never expose run records (Constitution
+// Principle VI).
 //
 // URI is required, at most 2048 bytes, free of whitespace and control
 // characters, parseable, and must carry a scheme ("app://docs/x", "urn:app:x").
 // Name is required. MIMEType may contain spaces ("text/plain; charset=utf-8")
-// but no control characters. All text must be valid UTF-8. Declarations on a
-// hidden command, or in a hidden subtree, are not projected.
+// but no control characters. All text must be valid UTF-8. Content is at most
+// 1 MiB; a resource declared without content is still listed, and
+// resources/read returns an empty body with the declared MIME type. Content is
+// never projected into __schema or __schema --as=mcp, which keeps long
+// reference text out of the discovery payload: keep prompt templates short and
+// put long reference text in resource content. Declarations on a hidden
+// command, or in a hidden subtree, are not projected.
 type Resource struct {
 	URI         string `json:"uri"`
 	Name        string `json:"name"`
 	Title       string `json:"title,omitempty"`
 	Description string `json:"description,omitempty"`
 	MIMEType    string `json:"mime_type,omitempty"`
+	Content     string `json:"-"`
 }
 
 // MCPPrompt is a Prompt in the __schema --as=mcp adapter: the MCP prompts/list
@@ -117,10 +126,6 @@ func DeclareResource(cmd *cobra.Command, resource Resource) error {
 	)
 }
 
-// maxKeyInMessage bounds how much of an adopter-supplied key an error message
-// echoes, so a too_long URI cannot inflate the envelope on stderr.
-const maxKeyInMessage = 128
-
 func declarationError(kind internalschema.Kind, key string, violation *internalschema.Violation) error {
 	if violation == nil {
 		return nil
@@ -130,7 +135,13 @@ func declarationError(kind internalschema.Kind, key string, violation *internals
 	return contract.NewError(
 		context.Background(),
 		invalidDeclarationCode,
-		fmt.Sprintf("invalid %s declaration %q: %s %s", kind, truncateKey(key), violation.Field, violation.Reason),
+		fmt.Sprintf(
+			"invalid %s declaration %q: %s %s",
+			kind,
+			internalschema.TruncateKey(key),
+			violation.Field,
+			violation.Reason,
+		),
 		contract.WithErrorExitCode(contract.ExitValidation),
 		contract.WithActionableFix(violationFix(violation)),
 		contract.WithErrorContext(map[string]any{
@@ -146,10 +157,10 @@ func violationFix(violation *internalschema.Violation) string {
 	if violation.Reason == internalschema.ReasonDuplicate && violation.Field == "values" {
 		return `Remove enum values that are equal after canonicalisation, such as "3" and "03".`
 	}
-	return declarationFix(violation.Reason)
+	return declarationFix(violation.Reason, violation.Field)
 }
 
-func declarationFix(reason internalschema.Reason) string {
+func declarationFix(reason internalschema.Reason, field string) string {
 	switch reason {
 	case internalschema.ReasonNilCommand:
 		return "Declare on a non-nil *cobra.Command."
@@ -168,11 +179,11 @@ func declarationFix(reason internalschema.Reason) string {
 	case internalschema.ReasonMalformed:
 		return "Fix the URI so it parses, including any percent-escapes."
 	case internalschema.ReasonTooLong:
-		return "Shorten the URI to at most 2048 bytes."
+		return tooLongFix(field)
 	case internalschema.ReasonInvalidCharacter:
 		return "Remove whitespace and control characters (a MIME type may contain spaces)."
 	case internalschema.ReasonCorruptAnnotation:
-		return corruptAnnotationFix
+		return internalschema.CorruptAnnotationFix
 	case internalschema.ReasonFlagNotFound:
 		return "Define the flag on the command (Flags or PersistentFlags) before declaring it."
 	case internalschema.ReasonUnsupportedType:
@@ -188,64 +199,15 @@ func declarationFix(reason internalschema.Reason) string {
 	}
 }
 
-const corruptAnnotationFix = "Declare prompts and resources only with DeclarePrompt and " +
-	"DeclareResource; never write the github.com/rshade/ax-go/schema/* annotations by hand."
-
-// treeDeclarationError maps a problem found by walking the tree — a duplicate
-// key or a corrupt annotation — to the validation_error envelope __schema
-// returns (exit 2).
-func treeDeclarationError(ctx context.Context, conflict *internalschema.Conflict) error {
-	if conflict.Reason == internalschema.ReasonCorruptAnnotation {
-		return contract.NewError(
-			ctx,
-			"validation_error",
-			fmt.Sprintf("corrupt %s annotation on command %q", conflict.Kind, conflict.Commands[0]),
-			contract.WithErrorExitCode(contract.ExitValidation),
-			contract.WithActionableFix(corruptAnnotationFix),
-			contract.WithErrorContext(map[string]any{
-				"kind":     string(conflict.Kind),
-				"key":      conflict.Key,
-				"reason":   string(conflict.Reason),
-				"commands": conflict.Commands,
-			}),
-		)
-	}
-
-	var label string
-	switch conflict.Kind {
-	case internalschema.KindPrompt:
-		label = "prompt name"
-	case internalschema.KindResource:
-		label = "resource URI"
-	case internalschema.KindFlagEnum, internalschema.KindFlagExample, internalschema.KindCapability:
-		// Flag and capability declarations are per-command and never conflict.
-		label = string(conflict.Kind)
+func tooLongFix(field string) string {
+	switch field {
+	case "content":
+		return "Shorten the resource content to at most 1 MiB."
+	case "template":
+		return "Shorten the template to at most 64 KiB; move long reference text into resource content."
 	default:
-		label = string(conflict.Kind)
+		return "Shorten the URI to at most 2048 bytes."
 	}
-	return contract.NewError(
-		ctx,
-		"validation_error",
-		fmt.Sprintf("duplicate %s %q declared on more than one command", label, truncateKey(conflict.Key)),
-		contract.WithErrorExitCode(contract.ExitValidation),
-		contract.WithActionableFix("Rename or remove one of the duplicate declarations."),
-		contract.WithErrorContext(map[string]any{
-			"kind":     string(conflict.Kind),
-			"key":      conflict.Key,
-			"commands": conflict.Commands,
-		}),
-	)
-}
-
-func truncateKey(key string) string {
-	if len(key) <= maxKeyInMessage {
-		return key
-	}
-	cut := maxKeyInMessage
-	for cut > 0 && !utf8.RuneStart(key[cut]) {
-		cut--
-	}
-	return key[:cut] + "…"
 }
 
 func toInternalPrompt(prompt Prompt) internalschema.Prompt {
@@ -287,9 +249,20 @@ func toMCPPrompt(prompt internalschema.Prompt) MCPPrompt {
 	}
 }
 
-func fromInternalResource(resource internalschema.Resource) Resource { return Resource(resource) }
+func fromInternalResource(resource internalschema.Resource) Resource {
+	resource.Content = ""
+	return Resource(resource)
+}
 
-func toMCPResource(resource internalschema.Resource) MCPResource { return MCPResource(resource) }
+func toMCPResource(resource internalschema.Resource) MCPResource {
+	return MCPResource{
+		URI:         resource.URI,
+		Name:        resource.Name,
+		Title:       resource.Title,
+		Description: resource.Description,
+		MIMEType:    resource.MIMEType,
+	}
+}
 
 // convertSlice maps src element-wise, preserving nil so omitempty fields stay
 // absent for a command that declares nothing.

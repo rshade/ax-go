@@ -21,6 +21,16 @@
 // verbatim stdout payload on success and the ax.Error envelope on failure,
 // while the server keeps serving.
 //
+// The server also serves the prompts and static resources declared with
+// schema.DeclarePrompt and schema.DeclareResource, registered from the same
+// aggregation "__schema --as=mcp" projects so the two cannot diverge, and
+// advertised only when something is declared. prompts/get renders a template
+// with the caller's arguments; resources/read returns the declared static
+// content. WithInstructions sends a short string at initialize that points an
+// agent at the resources and tools to reach for. A duplicate prompt name or
+// resource URI, or a corrupt declaration annotation, fails startup with the
+// same validation error "__schema" reports.
+//
 // The server runs over stdio (the default) or a streamable HTTP transport that
 // binds loopback by default and fails closed against accidental public exposure
 // unless WithAllowNonLoopback is set. Stream separation is preserved: MCP

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"strings"
 	"testing"
 	"time"
 
@@ -11,6 +12,7 @@ import (
 	"github.com/spf13/cobra"
 
 	ax "github.com/rshade/ax-go"
+	"github.com/rshade/ax-go/contract"
 	"github.com/rshade/ax-go/mcp"
 )
 
@@ -239,6 +241,21 @@ func TestServeRejectsPlaceholderVersion(t *testing.T) {
 			}
 			if code := ax.ErrorExitCode(err); code != ax.ExitValidation {
 				t.Errorf("exit code = %d, want %d", code, ax.ExitValidation)
+			}
+		})
+	}
+}
+
+func TestWithInstructionsFailsClosedAtStartup(t *testing.T) {
+	root := &cobra.Command{Use: "app"}
+	for name, text := range map[string]string{
+		"invalid utf8": string([]byte{0xff}),
+		"over the cap": strings.Repeat("a", 8<<10+1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := mcp.Serve(context.Background(), root, mcp.WithVersion("v1.0.0"), mcp.WithInstructions(text))
+			if code := contract.ErrorExitCode(err); code != contract.ExitValidation {
+				t.Fatalf("Serve error = %v (exit %d), want a validation error with exit 2", err, code)
 			}
 		})
 	}

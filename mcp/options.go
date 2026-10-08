@@ -26,6 +26,7 @@ type options struct {
 	httpAddr         string
 	allowNonLoopback bool
 	version          string
+	instructions     string
 }
 
 // defaultHTTPAddr is the loopback default bind address for the HTTP transport.
@@ -81,5 +82,18 @@ func WithAllowNonLoopback(allow bool) Option {
 func WithVersion(version string) Option {
 	return func(o *options) {
 		o.version = version
+	}
+}
+
+// WithInstructions sets a short server-instructions string delivered in the MCP
+// initialize result's instructions field, which clients such as Claude Code
+// inject into the agent's context at connect. Use it to point the agent at the
+// resources and tools to reach for; leave long text to a declared resource's
+// content (schema.Resource.Content). The text must be valid UTF-8 and at most
+// 8 KiB, or startup fails closed with a validation error (exit 2). Instructions
+// are a runtime string and are not part of __schema.
+func WithInstructions(text string) Option {
+	return func(o *options) {
+		o.instructions = text
 	}
 }

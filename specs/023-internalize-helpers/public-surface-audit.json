@@ -2017,6 +2017,25 @@
       "downstream_evidence": []
     },
     {
+      "id": "field:Resource.Content",
+      "kind": "field",
+      "owner": "Resource",
+      "name": "Content",
+      "signature": "string",
+      "classification": "supported",
+      "rationale": "Static resource body served by the live mcp-server's resources/read; never projected into __schema (spec 030).",
+      "disposition": "keep-public",
+      "internal_target": "",
+      "replacement": "",
+      "compatibility_strategy": "Keep the additive declaration field stable.",
+      "lifecycle": "live",
+      "first_published": "",
+      "deprecated_in": "",
+      "removed_in": "",
+      "downstream_checked_at": "",
+      "downstream_evidence": []
+    },
+    {
       "id": "field:Resource.Description",
       "kind": "field",
       "owner": "Resource",

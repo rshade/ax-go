@@ -152,10 +152,10 @@ func NewSchemaCommand(root *cobra.Command, opts ...Option) *cobra.Command {
 			root.Name(), root.Name()),
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			if conflict := internalschema.FindCorrupt(root); conflict != nil {
-				return treeDeclarationError(cmd.Context(), conflict)
+				return internalschema.TreeDeclarationError(cmd.Context(), conflict)
 			}
 			if conflict := internalschema.FindDuplicate(root); conflict != nil {
-				return treeDeclarationError(cmd.Context(), conflict)
+				return internalschema.TreeDeclarationError(cmd.Context(), conflict)
 			}
 			switch as {
 			case "", "ax":

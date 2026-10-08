@@ -3,6 +3,7 @@ package mcpserver
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"maps"
 	"os"
@@ -10,6 +11,7 @@ import (
 	"reflect"
 	"regexp"
 	"slices"
+	"strings"
 	"testing"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -243,14 +245,23 @@ func TestInitializeAndToolsListOverInMemory(t *testing.T) {
 	}
 }
 
-// TestDeclarationsAreNotServedInPhaseOne pins the Phase 2 trigger boundary
-// (spec 028 FR-011) over the wire: prompt and resource declarations on the
-// command tree are projected by __schema only. The live server registers
-// neither, so initialize advertises no prompts or resources capability,
-// prompts/list and resources/list return nothing, and the tools/list response
-// names exactly the tools of the same tree without declarations.
-func TestDeclarationsAreNotServedInPhaseOne(t *testing.T) {
+// TestCapabilitiesAdvertiseOnlyWhatIsDeclared pins spec 030 FR-002/FR-008: the
+// prompts and resources capabilities appear exactly when something is declared
+// to back them, and declarations never change the tool set.
+func TestCapabilitiesAdvertiseOnlyWhatIsDeclared(t *testing.T) {
 	ctx := context.Background()
+	cases := []struct {
+		name          string
+		prompts       bool
+		resources     bool
+		wantPrompts   bool
+		wantResources bool
+	}{
+		{name: "none"},
+		{name: "prompts only", prompts: true, wantPrompts: true},
+		{name: "resources only", resources: true, wantResources: true},
+		{name: "both", prompts: true, resources: true, wantPrompts: true, wantResources: true},
+	}
 	liveToolNames := func(root *cobra.Command) []string {
 		t.Helper()
 		res, err := newInMemorySession(t, newTestServer(t, root)).ListTools(ctx, nil)
@@ -263,36 +274,161 @@ func TestDeclarationsAreNotServedInPhaseOne(t *testing.T) {
 		}
 		return names
 	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := fixedRoot()
+			if tc.prompts {
+				mustAddPromptTo(t, root, "triage")
+			}
+			if tc.resources {
+				mustAddResourceTo(t, root, "demo://docs")
+			}
 
-	root := fixedRoot()
-	if v := internalschema.AddPrompt(root, internalschema.Prompt{Name: "triage", Template: "t"}); v != nil {
+			caps := newInMemorySession(t, newTestServer(t, root)).InitializeResult().Capabilities
+			if caps == nil {
+				t.Fatal("initialize result missing capabilities")
+			}
+			if got := caps.Prompts != nil; got != tc.wantPrompts {
+				t.Errorf("prompts capability advertised = %v, want %v", got, tc.wantPrompts)
+			}
+			if got := caps.Resources != nil; got != tc.wantResources {
+				t.Errorf("resources capability advertised = %v, want %v", got, tc.wantResources)
+			}
+			if got, want := liveToolNames(root), liveToolNames(fixedRoot()); !slices.Equal(got, want) {
+				t.Fatalf("declarations changed the live tool set: got %v, want %v", got, want)
+			}
+		})
+	}
+}
+
+// TestServeFailsClosedOnDeclarationTreeConflicts pins FR-019: a duplicate
+// prompt name, a duplicate resource URI, and a corrupt declaration annotation
+// each fail Serve at startup with the validation_error envelope __schema emits
+// (exit 2), before any transport starts, so a server that starts is guaranteed
+// to serve the same set __schema projects.
+func TestServeFailsClosedOnDeclarationTreeConflicts(t *testing.T) {
+	cases := []struct {
+		name  string
+		build func(root *cobra.Command)
+		kind  string
+	}{
+		{
+			name: "duplicate prompt name",
+			build: func(root *cobra.Command) {
+				mustAddPromptTo(t, root, "triage")
+				mustAddPromptTo(t, root.Commands()[0], "triage")
+			},
+			kind: "prompt",
+		},
+		{
+			name: "duplicate resource URI",
+			build: func(root *cobra.Command) {
+				mustAddResourceTo(t, root, "demo://docs")
+				mustAddResourceTo(t, root.Commands()[0], "demo://docs")
+			},
+			kind: "resource",
+		},
+		{
+			name: "corrupt annotation",
+			build: func(root *cobra.Command) {
+				root.Annotations = map[string]string{"github.com/rshade/ax-go/schema/prompts": "{not json"}
+			},
+			kind: "prompt",
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			root := fixedRoot()
+			tc.build(root)
+
+			err := Serve(context.Background(), root, Config{Version: testServerVersion, Stderr: io.Discard})
+
+			var envelope *contract.Error
+			if !errors.As(err, &envelope) {
+				t.Fatalf("Serve error = %v, want *contract.Error", err)
+			}
+			if envelope.ErrorCode != "validation_error" || envelope.ExitCode() != contract.ExitValidation {
+				t.Fatalf("envelope = %s exit %d, want validation_error exit 2", envelope.ErrorCode, envelope.ExitCode())
+			}
+			if envelope.Context["kind"] != tc.kind {
+				t.Fatalf("context.kind = %v, want %s", envelope.Context["kind"], tc.kind)
+			}
+		})
+	}
+}
+
+func mustAddPromptTo(t *testing.T, cmd *cobra.Command, name string) {
+	t.Helper()
+	if v := internalschema.AddPrompt(cmd, internalschema.Prompt{Name: name, Template: "t"}); v != nil {
 		t.Fatalf("AddPrompt: %+v", v)
 	}
-	if v := internalschema.AddResource(root, internalschema.Resource{URI: "demo://docs", Name: "docs"}); v != nil {
+}
+
+func mustAddResourceTo(t *testing.T, cmd *cobra.Command, uri string) {
+	t.Helper()
+	if v := internalschema.AddResource(cmd, internalschema.Resource{URI: uri, Name: "n"}); v != nil {
 		t.Fatalf("AddResource: %+v", v)
 	}
+}
 
-	session := newInMemorySession(t, newTestServer(t, root))
-	caps := session.InitializeResult().Capabilities
-	if caps == nil {
-		t.Fatal("initialize result missing capabilities")
-	}
-	if caps.Prompts != nil || caps.Resources != nil {
-		t.Fatalf("capabilities advertise prompts=%v resources=%v, want neither", caps.Prompts, caps.Resources)
-	}
-	// The SDK answers prompts/list and resources/list even with nothing
-	// registered, so the boundary is that both come back empty.
-	prompts, err := session.ListPrompts(ctx, nil)
-	if err != nil || len(prompts.Prompts) != 0 {
-		t.Fatalf("prompts/list = %+v (err %v), want no prompts in Phase 1", prompts, err)
-	}
-	resources, err := session.ListResources(ctx, nil)
-	if err != nil || len(resources.Resources) != 0 {
-		t.Fatalf("resources/list = %+v (err %v), want no resources in Phase 1", resources, err)
-	}
+// TestInstructionsReachInitialize pins FR-010: configured instructions arrive
+// in the initialize result, and an unset option leaves the field absent so the
+// handshake stays what v0.8.0 sent.
+func TestInstructionsReachInitialize(t *testing.T) {
+	const text = "Read demo://docs/skill before calling any tool."
+	forEachTransport(t, fixedRoot(), Config{Instructions: text}, func(t *testing.T, session *sdk.ClientSession) {
+		if got := session.InitializeResult().Instructions; got != text {
+			t.Fatalf("instructions = %q, want %q", got, text)
+		}
+	})
+	forEachTransport(t, fixedRoot(), Config{}, func(t *testing.T, session *sdk.ClientSession) {
+		if got := session.InitializeResult().Instructions; got != "" {
+			t.Fatalf("instructions = %q, want none when the option is unset", got)
+		}
+	})
+}
 
-	if got, want := liveToolNames(root), liveToolNames(fixedRoot()); !slices.Equal(got, want) {
-		t.Fatalf("declarations changed the live tool set: got %v, want %v", got, want)
+func TestValidateInstructions(t *testing.T) {
+	cases := []struct {
+		name    string
+		text    string
+		wantErr bool
+	}{
+		{name: "empty is allowed", text: ""},
+		{name: "plain text", text: "Read demo://docs/skill first."},
+		{name: "multi-byte text", text: "café ✓ 日本"},
+		{name: "exactly at the cap", text: strings.Repeat("a", maxInstructionsBytes)},
+		{name: "one byte over the cap", text: strings.Repeat("a", maxInstructionsBytes+1), wantErr: true},
+		{name: "invalid utf8", text: "ok" + string([]byte{0xff, 0xfe}), wantErr: true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			err := validateInstructions(context.Background(), tc.text)
+			if !tc.wantErr {
+				if err != nil {
+					t.Fatalf("validateInstructions = %v, want nil", err)
+				}
+				return
+			}
+			var envelope *contract.Error
+			if !errors.As(err, &envelope) || envelope.ErrorCode != "validation_error" ||
+				envelope.ExitCode() != contract.ExitValidation {
+				t.Fatalf("validateInstructions = %v, want a validation_error envelope with exit 2", err)
+			}
+			if strings.Contains(envelope.Message, "aaaaaaaa") {
+				t.Fatalf("message echoes the instructions text: %.120s", envelope.Message)
+			}
+		})
+	}
+}
+
+func TestServeRejectsInvalidInstructionsBeforeStarting(t *testing.T) {
+	err := Serve(context.Background(), fixedRoot(), Config{
+		Version: testServerVersion, Stderr: io.Discard, Instructions: string([]byte{0xff}),
+	})
+	var envelope *contract.Error
+	if !errors.As(err, &envelope) || envelope.ExitCode() != contract.ExitValidation {
+		t.Fatalf("Serve error = %v, want a validation envelope with exit 2", err)
 	}
 }
 

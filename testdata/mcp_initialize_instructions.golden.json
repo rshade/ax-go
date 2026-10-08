@@ -1,0 +1,1 @@
+{"capabilities":{"logging":{},"prompts":{"listChanged":true},"resources":{"listChanged":true},"tools":{"listChanged":true}},"instructions":"Read demo://docs/skill before calling any tool.","protocolVersion":"2026-07-28","serverInfo":{"name":"demo","version":"v1.2.3-test"}}
