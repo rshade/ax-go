@@ -33,7 +33,7 @@ BUILD_TAG_MATRIX?=none ax_no_grpc ax_no_otlp ax_no_grpc,ax_no_otlp
 all: build
 
 .PHONY: ci
-ci: test validate lint doc-coverage surface-check size-check dead-check bench-check
+ci: test validate lint doc-coverage surface-check size-check dead-check slop-check bench-check
 
 .PHONY: build
 build:
@@ -207,6 +207,10 @@ clone-report:
 dead-check:
 	@go run ./internal/cmd/deadcheck
 
+.PHONY: slop-check
+slop-check:
+	@go run ./internal/cmd/slopcheck
+
 .PHONY: doc-coverage
 doc-coverage:
 	@echo "Checking ExampleXxx coverage on the primary API..."
@@ -306,7 +310,7 @@ clean:
 .PHONY: help
 help:
 	@echo "Available targets:"
-	@echo "  ci            - Run test, validate, lint, doc-coverage, surface-check, size-check, dead-check, bench-check"
+	@echo "  ci            - Run test, validate, lint, doc-coverage, surface-check, size-check, dead-check, slop-check, bench-check"
 	@echo "  build         - Compile the library (go build ./...)"
 	@echo "  build-example - Compile the integration example with version injection"
 	@echo "  build-example-minimal - Compile the example with -tags=ax_no_grpc,ax_no_otlp"
@@ -320,6 +324,7 @@ help:
 	@echo "  surface-update - Regenerate the exported-surface baseline for review"
 	@echo "  size-check    - Enforce the isolated logging binary ceiling and reduction ratio"
 	@echo "  dead-check    - Gate unreachable unexported/internal functions across build tags (tests included)"
+	@echo "  slop-check    - Gate struct fields assigned in literals but never read across build tags (tests included)"
 	@echo "  slop          - Report assertion-free subtests (not part of ci; does not fail the build)"
 	@echo "  clone-report  - Report *_test.go clones at dupl -t 100 (not part of ci; does not fail the build)"
 	@echo "  lint          - Run golangci-lint per build-tag combination, markdownlint, actionlint"

@@ -80,13 +80,15 @@ golangci-lint run
 make doc-coverage
 make cover-check
 make dead-check
+make slop-check
 ```
 
 All commands must exit cleanly. See [`AGENTS.md`](AGENTS.md) for the full
 development workflow and coverage floor policy.
 
 `make slop` is a separate report for assertion-free subtests. It is not part
-of `make ci`, and findings do not fail the build. ast-grep has no type
+of `make ci`, and findings do not fail the build. Do not confuse it with
+`make slop-check`, the blocking, type-aware gate for unread struct fields. ast-grep has no type
 information; read its output as a triage list, not as a gate.
 
 `make clone-report` is a separate report of `*_test.go` clones (`dupl -t 100`,

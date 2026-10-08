@@ -652,6 +652,11 @@ call on the same command tree is strict only when that call passes it.
   in every configuration. Tests count as callers, so this does not establish
   production usage; exported public API remains the surface gates' concern.
   Run `make ensure` to install the pinned tool.
+- **Unread struct fields:** `make slop-check` (also in `make ci` and CI
+  validation) fails when a composite literal assigns a struct field that no
+  code reads, such as a table-test `expectError` that no assertion consults.
+  It runs across all four build-tag configurations and counts tests as
+  readers.
 
 ## Architecture Decisions (ADRs)
 

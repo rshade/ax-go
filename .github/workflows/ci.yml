@@ -350,3 +350,7 @@ jobs:
       # deadcheck owns the four-tag intersection and includes test roots.
       - name: Check unexported and internal function reachability
         run: make dead-check
+
+      # slopcheck owns the four-tag intersection and counts tests as readers.
+      - name: Check struct fields assigned but never read
+        run: make slop-check
