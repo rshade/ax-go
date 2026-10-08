@@ -121,8 +121,9 @@ func newSchemaTestCommand() *cobra.Command {
 func TestDeclareFlagEnumAuthoringErrorContract(t *testing.T) {
 	cmd := &cobra.Command{Use: "app"}
 	cmd.Flags().Bool("force", false, "force")
-	var axErr *Error
-	if err := DeclareFlagEnum(cmd, "force", "true"); !errors.As(err, &axErr) {
+	err := DeclareFlagEnum(cmd, "force", "true")
+	axErr, ok := errors.AsType[*Error](err)
+	if !ok {
 		t.Fatalf("ax.DeclareFlagEnum error = %T %v, want *ax.Error", err, err)
 	}
 	if axErr.ErrorCode != "invalid_schema_declaration" || axErr.ExitCode() != ExitValidation {

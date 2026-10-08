@@ -25,11 +25,11 @@ const (
 // prompt/resource reasons; surfaced in the invalid_schema_declaration
 // envelope's context.reason.
 const (
-	ReasonFlagNotFound    = "flag_not_found"
-	ReasonUnsupportedType = "unsupported_type"
-	ReasonInvalidValue    = "invalid_value"
-	ReasonNotInEnum       = "not_in_enum"
-	ReasonNotVocabulary   = "not_in_vocabulary"
+	ReasonFlagNotFound    Reason = "flag_not_found"
+	ReasonUnsupportedType Reason = "unsupported_type"
+	ReasonInvalidValue    Reason = "invalid_value"
+	ReasonNotInEnum       Reason = "not_in_enum"
+	ReasonNotVocabulary   Reason = "not_in_vocabulary"
 )
 
 // Violation fields for flag and capability declarations.
@@ -252,7 +252,7 @@ func AddFlagExample(cmd *cobra.Command, name, example string) *Violation {
 // exampleProblem returns the Violation reason example fails on flag, or ""
 // when it is acceptable: it must parse as the flag's type and, under an enum,
 // be a member.
-func exampleProblem(flag *pflag.Flag, example string) string {
+func exampleProblem(flag *pflag.Flag, example string) Reason {
 	if err := ValidateValue(flag.Value.Type(), example); err != nil {
 		return ReasonInvalidValue
 	}

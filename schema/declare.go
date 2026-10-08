@@ -58,7 +58,7 @@ const (
 // After a successful call flag.Value is a wrapper, no longer the concrete
 // pflag type: do not type-assert it.
 func DeclareFlagEnum(cmd *cobra.Command, flag string, values ...string) error {
-	return declarationError("flag enum", flag, internalschema.AddFlagEnum(cmd, flag, values))
+	return declarationError(internalschema.KindFlagEnum, flag, internalschema.AddFlagEnum(cmd, flag, values))
 }
 
 // DeclareFlagExample attaches one example value to the named flag, written in CLI
@@ -77,7 +77,7 @@ func DeclareFlagEnum(cmd *cobra.Command, flag string, values ...string) error {
 // (DeclareFlagEnum) and the example is not a member. Values for custom
 // pflag.Value types are not type-checked.
 func DeclareFlagExample(cmd *cobra.Command, flag string, example string) error {
-	return declarationError("flag example", flag, internalschema.AddFlagExample(cmd, flag, example))
+	return declarationError(internalschema.KindFlagExample, flag, internalschema.AddFlagExample(cmd, flag, example))
 }
 
 // DeclareCapability classifies cmd's side effects with one class from the fixed
@@ -97,5 +97,9 @@ func DeclareFlagExample(cmd *cobra.Command, flag string, example string) error {
 // (exit 2) and context {field, reason}, leaving cmd unchanged, when cmd is nil
 // or class is not exactly one of the six Capability constants.
 func DeclareCapability(cmd *cobra.Command, class Capability, note string) error {
-	return declarationError("capability", string(class), internalschema.AddCapability(cmd, string(class), note))
+	return declarationError(
+		internalschema.KindCapability,
+		string(class),
+		internalschema.AddCapability(cmd, string(class), note),
+	)
 }

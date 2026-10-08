@@ -40,8 +40,8 @@ func mcpProperty(t *testing.T, tool MCPTool, name string) map[string]any {
 // context {field, reason}.
 func assertDeclarationError(t *testing.T, err error, field, reason string) {
 	t.Helper()
-	var contractErr *contract.Error
-	if !errors.As(err, &contractErr) {
+	contractErr, ok := errors.AsType[*contract.Error](err)
+	if !ok {
 		t.Fatalf("error = %T %v, want *contract.Error", err, err)
 	}
 	if contractErr.ErrorCode != invalidDeclarationCode || contractErr.ExitCode() != contract.ExitValidation {
@@ -55,6 +55,9 @@ func assertDeclarationError(t *testing.T, err error, field, reason string) {
 	want := map[string]any{"field": field, "reason": reason}
 	if !reflect.DeepEqual(contractErr.Context, want) {
 		t.Fatalf("context = %#v, want %#v", contractErr.Context, want)
+	}
+	if contractErr.ActionableFix == "" {
+		t.Fatalf("reason %q carries no actionable_fix", reason)
 	}
 }
 
@@ -81,6 +84,7 @@ func TestDeclareFlagEnum(t *testing.T) {
 		{"output", nil, "values", "required"},
 		{"output", []string{"table"}, "default", "not_in_enum"},
 		{"replicas", []string{"1", "x"}, "values", "invalid_value"},
+		{"replicas", []string{"3", "03"}, "values", "duplicate"},
 		{"missing", []string{"x"}, "flag", "flag_not_found"},
 	} {
 		assertDeclarationError(t, DeclareFlagEnum(cmd, bad.flag, bad.values...), bad.field, bad.reason)

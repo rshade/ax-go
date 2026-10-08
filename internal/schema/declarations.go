@@ -50,6 +50,11 @@ type Kind string
 const (
 	KindPrompt   Kind = "prompt"
 	KindResource Kind = "resource"
+	// KindFlagEnum, KindFlagExample and KindCapability name the flag and
+	// command declarations of spec 018; they never appear in a Conflict.
+	KindFlagEnum    Kind = "flag enum"
+	KindFlagExample Kind = "flag example"
+	KindCapability  Kind = "capability"
 )
 
 // Field labels shared by several Violation sites.
