@@ -436,10 +436,10 @@ first with `invalid_schema_declaration` / exit 2 and `Declare…` names. Ship
 one contract and one naming style for every fallible declaration (research.md
 R4 and R10, revised).
 
-- [ ] T056 Rewrite the authoring-error tests first: internal tests assert the returned `*Violation` (`Field`, `Reason`) for every case in contracts/declaration-api.md's reason table; public `schema` and root tests assert `errors.As` to `*contract.Error`, `ErrorCode` `invalid_schema_declaration`, `ExitCode()` 2, and `Context` `{field, reason}`. Confirm they fail.
-- [ ] T057 In `internal/schema`, rename `DeclareFlagEnum` / `DeclareFlagExample` / `DeclareCapability` to `AddFlagEnum` / `AddFlagExample` / `AddCapability` returning `*Violation`; add the reasons `flag_not_found`, `unsupported_type`, `invalid_value`, `not_in_enum` and `not_in_vocabulary` beside 028's; delete `ErrInvalidDeclaration`.
-- [ ] T058 In `schema` and root `ax`, rename the public functions to `DeclareFlagEnum` / `DeclareFlagExample` / `DeclareCapability`, route failures through `declarationError` (kinds `flag enum`, `flag example`, `capability`), and remove `ErrInvalidDeclaration` from both packages. Rename the three `ExampleWith…` functions to `ExampleDeclare…`.
-- [ ] T059 Update `examples/integration`, README.md, AGENTS.md and `examples/integration/README.md` to the new names and contract.
+- [X] T056 Rewrite the authoring-error tests first: internal tests assert the returned `*Violation` (`Field`, `Reason`) for every case in contracts/declaration-api.md's reason table; public `schema` and root tests assert `errors.As` to `*contract.Error`, `ErrorCode` `invalid_schema_declaration`, `ExitCode()` 2, and `Context` `{field, reason}`. Confirm they fail.
+- [X] T057 In `internal/schema`, rename `DeclareFlagEnum` / `DeclareFlagExample` / `DeclareCapability` to `AddFlagEnum` / `AddFlagExample` / `AddCapability` returning `*Violation`; add the reasons `flag_not_found`, `unsupported_type`, `invalid_value`, `not_in_enum` and `not_in_vocabulary` beside 028's; delete `ErrInvalidDeclaration`.
+- [X] T058 In `schema` and root `ax`, rename the public functions to `DeclareFlagEnum` / `DeclareFlagExample` / `DeclareCapability`, route failures through `declarationError` (kinds `flag enum`, `flag example`, `capability`), and remove `ErrInvalidDeclaration` from both packages. Rename the three `ExampleWith…` functions to `ExampleDeclare…`.
+- [X] T059 Update `examples/integration`, README.md, AGENTS.md and `examples/integration/README.md` to the new names and contract.
 - [ ] T060 Re-run `make surface-update` and replace the spec 018 audit rows (drop `ErrInvalidDeclaration`, rename the three functions), then the full gate (T047–T054) on the mise-pinned toolchain.
 
 ---
