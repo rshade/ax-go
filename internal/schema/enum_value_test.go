@@ -50,8 +50,8 @@ func TestEnumValueSet(t *testing.T) {
 
 		const secret = "s3cr3t-token"
 		err := cmd.Flags().Lookup("output").Value.Set(secret)
-		var contractErr *contract.Error
-		if !errors.As(err, &contractErr) {
+		contractErr, ok := errors.AsType[*contract.Error](err)
+		if !ok {
 			t.Fatalf("Set error = %T %v, want *contract.Error", err, err)
 		}
 		if contractErr.ErrorCode != "validation_error" || contractErr.ExitCode() != contract.ExitValidation {
@@ -110,12 +110,10 @@ func TestEnumValueSet(t *testing.T) {
 		mustDeclareEnum(t, cmd, "output", "json", "table")
 
 		err := flags.Parse([]string{"--output=xml"})
-		var invalid *pflag.InvalidValueError
-		if !errors.As(err, &invalid) {
+		if _, ok := errors.AsType[*pflag.InvalidValueError](err); !ok {
 			t.Fatalf("Parse error = %T %v, want *pflag.InvalidValueError", err, err)
 		}
-		var contractErr *contract.Error
-		if !errors.As(err, &contractErr) {
+		if _, ok := errors.AsType[*contract.Error](err); !ok {
 			t.Fatalf("Parse error does not unwrap to *contract.Error: %v", err)
 		}
 	})

@@ -115,8 +115,7 @@ func newDispatcher(ctx context.Context, root *cobra.Command, cfg Config) *dispat
 	// would drop context and suggestions, and pflag's message echoes the raw
 	// input the envelope deliberately omits.
 	execRoot.SetFlagErrorFunc(func(cmd *cobra.Command, ferr error) error {
-		var contractErr *contract.Error
-		if errors.As(ferr, &contractErr) {
+		if contractErr, ok := errors.AsType[*contract.Error](ferr); ok {
 			return contractErr
 		}
 		return d.validationError(cmd.Context(), ferr.Error())

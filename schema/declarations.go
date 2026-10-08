@@ -132,12 +132,21 @@ func declarationError(kind internalschema.Kind, key string, violation *internals
 		invalidDeclarationCode,
 		fmt.Sprintf("invalid %s declaration %q: %s %s", kind, truncateKey(key), violation.Field, violation.Reason),
 		contract.WithErrorExitCode(contract.ExitValidation),
-		contract.WithActionableFix(declarationFix(violation.Reason)),
+		contract.WithActionableFix(violationFix(violation)),
 		contract.WithErrorContext(map[string]any{
 			"field":  violation.Field,
 			"reason": string(violation.Reason),
 		}),
 	)
+}
+
+// violationFix is declarationFix with the one field-specific override: a
+// duplicate among enum values is about canonical equality, not a name or URI.
+func violationFix(violation *internalschema.Violation) string {
+	if violation.Reason == internalschema.ReasonDuplicate && violation.Field == "values" {
+		return `Remove enum values that are equal after canonicalisation, such as "3" and "03".`
+	}
+	return declarationFix(violation.Reason)
 }
 
 func declarationFix(reason internalschema.Reason) string {
@@ -164,6 +173,16 @@ func declarationFix(reason internalschema.Reason) string {
 		return "Remove whitespace and control characters (a MIME type may contain spaces)."
 	case internalschema.ReasonCorruptAnnotation:
 		return corruptAnnotationFix
+	case internalschema.ReasonFlagNotFound:
+		return "Define the flag on the command (Flags or PersistentFlags) before declaring it."
+	case internalschema.ReasonUnsupportedType:
+		return "Declare an enum only on a string, integer, or custom non-slice flag."
+	case internalschema.ReasonInvalidValue:
+		return "Use a value that parses as the flag's type, written as it would appear on argv."
+	case internalschema.ReasonNotInEnum:
+		return "Use a value from the flag's enum, and keep a non-empty default inside the enum."
+	case internalschema.ReasonNotVocabulary:
+		return "Use one of the Capability constants: read-only, create, mutate, delete, external-network, admin."
 	default:
 		return ""
 	}
@@ -198,6 +217,9 @@ func treeDeclarationError(ctx context.Context, conflict *internalschema.Conflict
 		label = "prompt name"
 	case internalschema.KindResource:
 		label = "resource URI"
+	case internalschema.KindFlagEnum, internalschema.KindFlagExample, internalschema.KindCapability:
+		// Flag and capability declarations are per-command and never conflict.
+		label = string(conflict.Kind)
 	default:
 		label = string(conflict.Kind)
 	}

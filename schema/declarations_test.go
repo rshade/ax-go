@@ -442,6 +442,11 @@ func TestEveryDeclarationReasonHasAFix(t *testing.T) {
 		internalschema.ReasonTooLong,
 		internalschema.ReasonInvalidCharacter,
 		internalschema.ReasonCorruptAnnotation,
+		internalschema.ReasonFlagNotFound,
+		internalschema.ReasonUnsupportedType,
+		internalschema.ReasonInvalidValue,
+		internalschema.ReasonNotInEnum,
+		internalschema.ReasonNotVocabulary,
 	} {
 		if declarationFix(reason) == "" {
 			t.Errorf("reason %q has no actionable_fix", reason)
