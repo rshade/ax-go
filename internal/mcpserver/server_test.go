@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"testing"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -242,11 +243,26 @@ func TestInitializeAndToolsListOverInMemory(t *testing.T) {
 }
 
 // TestDeclarationsAreNotServedInPhaseOne pins the Phase 2 trigger boundary
-// (spec 028 FR-011): prompt and resource declarations on the command tree are
-// projected by __schema only. The live server registers neither, so its
-// initialize capabilities advertise no prompts or resources and its tool set
-// is byte-identical to the declaration-free golden.
+// (spec 028 FR-011) over the wire: prompt and resource declarations on the
+// command tree are projected by __schema only. The live server registers
+// neither, so initialize advertises no prompts or resources capability,
+// prompts/list and resources/list return nothing, and the tools/list response
+// names exactly the tools of the same tree without declarations.
 func TestDeclarationsAreNotServedInPhaseOne(t *testing.T) {
+	ctx := context.Background()
+	liveToolNames := func(root *cobra.Command) []string {
+		t.Helper()
+		res, err := newInMemorySession(t, newTestServer(t, root)).ListTools(ctx, nil)
+		if err != nil {
+			t.Fatalf("tools/list: %v", err)
+		}
+		names := make([]string, 0, len(res.Tools))
+		for _, tool := range res.Tools {
+			names = append(names, tool.Name)
+		}
+		return names
+	}
+
 	root := fixedRoot()
 	if v := internalschema.AddPrompt(root, internalschema.Prompt{Name: "triage", Template: "t"}); v != nil {
 		t.Fatalf("AddPrompt: %+v", v)
@@ -263,16 +279,18 @@ func TestDeclarationsAreNotServedInPhaseOne(t *testing.T) {
 	if caps.Prompts != nil || caps.Resources != nil {
 		t.Fatalf("capabilities advertise prompts=%v resources=%v, want neither", caps.Prompts, caps.Resources)
 	}
+	// The SDK answers prompts/list and resources/list even with nothing
+	// registered, so the boundary is that both come back empty.
+	prompts, err := session.ListPrompts(ctx, nil)
+	if err != nil || len(prompts.Prompts) != 0 {
+		t.Fatalf("prompts/list = %+v (err %v), want no prompts in Phase 1", prompts, err)
+	}
+	resources, err := session.ListResources(ctx, nil)
+	if err != nil || len(resources.Resources) != 0 {
+		t.Fatalf("resources/list = %+v (err %v), want no resources in Phase 1", resources, err)
+	}
 
-	var buf bytes.Buffer
-	if err := contract.WriteJSON(&buf, schema.MCPSchema{Tools: newTestDispatcher(root).tools}); err != nil {
-		t.Fatalf("marshal tools list: %v", err)
-	}
-	want, err := os.ReadFile(filepath.Join("..", "..", "testdata", "mcp_tools_list.golden.json"))
-	if err != nil {
-		t.Fatalf("read golden: %v", err)
-	}
-	if !bytes.Equal(buf.Bytes(), want) {
-		t.Fatalf("declarations changed the live tool set\nwant: %s\ngot:  %s", want, buf.Bytes())
+	if got, want := liveToolNames(root), liveToolNames(fixedRoot()); !slices.Equal(got, want) {
+		t.Fatalf("declarations changed the live tool set: got %v, want %v", got, want)
 	}
 }

@@ -128,6 +128,8 @@ Every decision below resolves a design question the spec left to planning.
   `completion`, `help` and `mcp-server` all appear in the integration golden),
   so pruning them only in the MCP walk would let the two formats diverge.
   Sharing one rule makes the formats agree by construction.
+  (Refined by R11: the root itself is never pruned, so "non-hidden" here
+  means the root plus every command not under a hidden child.)
 
 ## R7. Live server is untouched (FR-011)
 
@@ -177,3 +179,38 @@ Every decision below resolves a design question the spec left to planning.
   the truncation hazard above. Inline text with a `truncated` flag was rejected
   because it relies on every agent honoring the flag. A declared but
   unprojected content field was rejected because no golden could observe it.
+
+## R11. Post-implementation review remediation (speckit-review-run on PR #266)
+
+- **Decision**: Six review agents ran against the PR. Their valid findings are
+  applied on the same branch:
+  - **Hidden root.** `WalkDeclarationCommands` now always visits the root and
+    prunes only hidden children, exactly as `BuildCommand` does. Previously a
+    hidden root made the walk skip everything, so `--as=ax` and `--as=mcp`
+    disagreed and duplicates escaped `FindDuplicate`. A parity test pins the
+    walk to `BuildCommand`. `BuildCommand` itself is not refactored onto a
+    shared helper: it is a tracked benchmark, and a per-node slice allocation
+    would break the allocs/op budget.
+  - **MIME types** may contain spaces (`text/plain; charset=utf-8`). The code
+    had wrongly applied the URI whitespace rule, which contradicted FR-004.
+  - **Corrupt annotations.** A declaration call no longer rewrites an existing
+    annotation that fails to decode or validate, because that silently
+    destroyed it. It returns `corrupt_annotation` instead. `__schema` reports
+    such an annotation through `FindCorrupt` (FR-004b).
+  - **`malformed`** is a new reason for a URI that has a scheme but fails to
+    parse, distinct from `not_absolute`.
+  - **Bounded errors.** Error messages echo at most 128 bytes of the key, and
+    `invalid_schema_declaration` gains a reason-keyed `actionable_fix`.
+  - **Typed internals.** `Reason` and `Kind` are internal string types, and the
+    public `context` values stay plain strings.
+  - **Linear scanner.** The placeholder scanner jumps to the last `{{` that the
+    one-at-a-time scan reaches. In a brace run that scan steps by two, so the
+    target is not `strings.LastIndex`. `FuzzTemplatePlaceholders` checks it
+    against the original scanner as an oracle.
+- **Rationale**: Each fix closes a silent-failure path or a spec/code mismatch.
+  None changes an exported name or signature, so the surface baseline is
+  untouched.
+- **Alternatives considered**: Asserting that `prompts/list` errors on the live
+  server was rejected after probing. The SDK answers `prompts/list` with an
+  empty list even when nothing is registered, so the boundary test asserts
+  empty lists and absent capabilities instead.

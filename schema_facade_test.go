@@ -64,14 +64,12 @@ func TestRootSchemaFacadeDeclaresPromptsAndResources(t *testing.T) {
 	}
 
 	var envelope *Error
-	if err := DeclarePrompt(
-		nil,
-		prompt,
-	); !errors.As(err, &envelope) ||
-		envelope.ErrorCode != "invalid_schema_declaration" {
+	err := DeclarePrompt(nil, prompt)
+	if !errors.As(err, &envelope) || envelope.ErrorCode != "invalid_schema_declaration" {
 		t.Fatalf("DeclarePrompt(nil) = %v, want invalid_schema_declaration", err)
 	}
-	if err := DeclareResource(nil, resource); !errors.As(err, &envelope) || ErrorExitCode(err) != ExitValidation {
+	err = DeclareResource(nil, resource)
+	if !errors.As(err, &envelope) || ErrorExitCode(err) != ExitValidation {
 		t.Fatalf("DeclareResource(nil) = %v, want exit %d", err, ExitValidation)
 	}
 }

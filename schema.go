@@ -56,7 +56,9 @@ type MCPSchema = isolatedschema.MCPSchema
 // MCPTool describes one command as an MCP-compatible tool.
 type MCPTool = isolatedschema.MCPTool
 
-// BuildMCPSchema adapts the command tree to a simple MCP tools list.
+// BuildMCPSchema adapts the command tree to the MCP adapter shape: tools plus
+// declared prompts and resources. It cannot fail and keeps the first of a
+// duplicated prompt name or resource URI; __schema --as=mcp fails closed.
 func BuildMCPSchema(root *cobra.Command) MCPSchema {
 	return isolatedschema.BuildMCPSchema(root)
 }
@@ -83,7 +85,8 @@ type MCPResource = isolatedschema.MCPResource
 
 // DeclarePrompt validates prompt and records a copy of it on cmd. It returns
 // an *Error with error_code invalid_schema_declaration (exit 2) on a nil cmd,
-// an invalid prompt, or a name already declared on cmd, leaving cmd unchanged.
+// an invalid prompt, a name already declared on cmd, or a hand-written prompt
+// annotation that does not decode cleanly, leaving cmd unchanged.
 func DeclarePrompt(cmd *cobra.Command, prompt Prompt) error {
 	return isolatedschema.DeclarePrompt(cmd, prompt)
 }

@@ -43,13 +43,40 @@ func TestWalkDeclarationCommandsPrunesOnlyHidden(t *testing.T) {
 	}
 }
 
-func TestWalkDeclarationCommandsHiddenRootVisitsNothing(t *testing.T) {
-	root := &cobra.Command{Use: "app", Hidden: true}
-	root.AddCommand(&cobra.Command{Use: "child", RunE: noopRunE})
+// TestWalkDeclarationCommandsMatchesBuildCommand pins the walk to
+// BuildCommand's pruning on every fixture, including a hidden root: BuildCommand
+// never prunes the root it is handed, so neither may the walk, or the ax-native
+// and MCP projections disagree and duplicates escape FindDuplicate.
+func TestWalkDeclarationCommandsMatchesBuildCommand(t *testing.T) {
+	hiddenRoot := func() *cobra.Command {
+		root := &cobra.Command{Use: "app", Hidden: true, RunE: noopRunE}
+		child := &cobra.Command{Use: "child", RunE: noopRunE}
+		child.AddCommand(&cobra.Command{Use: "gone", Hidden: true, RunE: noopRunE})
+		root.AddCommand(child)
+		return root
+	}
+	fixture := func() *cobra.Command { root, _ := declarationTree(); return root }
 
-	WalkDeclarationCommands(root, func(cmd *cobra.Command) {
-		t.Fatalf("visited %q under a hidden root", cmd.CommandPath())
-	})
+	for name, build := range map[string]func() *cobra.Command{"hidden root": hiddenRoot, "fixture": fixture} {
+		t.Run(name, func(t *testing.T) {
+			root := build()
+			var walked []string
+			WalkDeclarationCommands(root, func(cmd *cobra.Command) {
+				walked = append(walked, cmd.Use)
+			})
+			if built := builtUses(BuildCommand(root)); !slices.Equal(walked, built) {
+				t.Fatalf("walk = %v, BuildCommand = %v", walked, built)
+			}
+		})
+	}
+}
+
+func builtUses(cmd Command) []string {
+	uses := []string{cmd.Use}
+	for _, child := range cmd.Commands {
+		uses = append(uses, builtUses(child)...)
+	}
+	return uses
 }
 
 func TestValidName(t *testing.T) {
@@ -91,6 +118,8 @@ func TestTemplatePlaceholders(t *testing.T) {
 		{name: "invalid charset is literal", template: "{{a!}} {{b c}}", want: nil},
 		{name: "single braces are literal", template: "{a} }} {{", want: nil},
 		{name: "literal then placeholder", template: "{{ x }} {{y}}", want: []string{"y"}},
+		{name: "odd brace run is literal", template: "{{{{{a}}", want: nil},
+		{name: "even brace run reaches the name", template: "{{{{a}}", want: []string{"a"}},
 		{name: "triple open brace is literal", template: "{{{x}}}", want: nil},
 		{name: "extra closing brace is literal", template: "{{a}}}", want: []string{"a"}},
 	}
@@ -273,7 +302,12 @@ func TestFindDuplicate(t *testing.T) {
 		root, cmds := declarationTree()
 		mustAddPrompt(t, cmds["leaf"], prompt("a"))
 		mustAddPrompt(t, cmds["sibling"], prompt("a"))
-		want := &Conflict{Kind: KindPrompt, Key: "a", Commands: []string{"app group leaf", "app zeta"}}
+		want := &Conflict{
+			Kind:     KindPrompt,
+			Key:      "a",
+			Reason:   ReasonDuplicate,
+			Commands: []string{"app group leaf", "app zeta"},
+		}
 		if got := FindDuplicate(root); !reflect.DeepEqual(got, want) {
 			t.Fatalf("FindDuplicate = %+v, want %+v", got, want)
 		}
@@ -298,7 +332,7 @@ func TestFindDuplicate(t *testing.T) {
 		root := &cobra.Command{Use: "app", Annotations: map[string]string{
 			promptsAnnotationKey: `[{"name":"a","template":"t"},{"name":"a","template":"u"}]`,
 		}}
-		want := &Conflict{Kind: KindPrompt, Key: "a", Commands: []string{"app", "app"}}
+		want := &Conflict{Kind: KindPrompt, Key: "a", Reason: ReasonDuplicate, Commands: []string{"app", "app"}}
 		if got := FindDuplicate(root); !reflect.DeepEqual(got, want) {
 			t.Fatalf("FindDuplicate = %+v, want %+v", got, want)
 		}
@@ -382,8 +416,9 @@ func TestValidateResource(t *testing.T) {
 			want: &Violation{Field: "uri", Reason: ReasonInvalidCharacter}},
 		{name: "relative uri", mutate: func(r *Resource) { r.URI = "docs/pricing" },
 			want: &Violation{Field: "uri", Reason: ReasonNotAbsolute}},
-		{name: "unparseable uri", mutate: func(r *Resource) { r.URI = "app://%zz" },
-			want: &Violation{Field: "uri", Reason: ReasonNotAbsolute}},
+		{name: "malformed uri with a scheme", mutate: func(r *Resource) { r.URI = "app://%zz" },
+			want: &Violation{Field: "uri", Reason: ReasonMalformed}},
+		{name: "valid urn", mutate: func(r *Resource) { r.URI = "urn:app:pricing" }},
 		{name: "empty name", mutate: func(r *Resource) { r.Name = "" },
 			want: &Violation{Field: "name", Reason: ReasonRequired}},
 		{name: "invalid utf8 name", mutate: func(r *Resource) { r.Name = invalidUTF8 },
@@ -394,6 +429,7 @@ func TestValidateResource(t *testing.T) {
 			want: &Violation{Field: "description", Reason: ReasonInvalidUTF8}},
 		{name: "invalid utf8 mime type", mutate: func(r *Resource) { r.MIMEType = invalidUTF8 },
 			want: &Violation{Field: "mime_type", Reason: ReasonInvalidUTF8}},
+		{name: "valid mime with parameters", mutate: func(r *Resource) { r.MIMEType = "text/plain; charset=utf-8" }},
 		{name: "control character in mime type", mutate: func(r *Resource) { r.MIMEType = "text/plain\r\n" },
 			want: &Violation{Field: "mime_type", Reason: ReasonInvalidCharacter}},
 	}
@@ -421,9 +457,7 @@ func TestAddResource(t *testing.T) {
 		cmd := &cobra.Command{Use: "app", Annotations: map[string]string{"keep": "me"}}
 		second := Resource{URI: "app://other", Name: "other"}
 		for _, r := range []Resource{resource, second} {
-			if v := AddResource(cmd, r); v != nil {
-				t.Fatalf("AddResource(%q) = %+v", r.URI, v)
-			}
+			mustAddResource(t, cmd, r)
 		}
 		if got := Resources(cmd.Annotations); !reflect.DeepEqual(got, []Resource{resource, second}) {
 			t.Fatalf("Resources = %+v", got)
@@ -443,9 +477,7 @@ func TestAddResource(t *testing.T) {
 	})
 	t.Run("same-command duplicate URI", func(t *testing.T) {
 		cmd := &cobra.Command{Use: "app"}
-		if v := AddResource(cmd, resource); v != nil {
-			t.Fatalf("first AddResource = %+v", v)
-		}
+		mustAddResource(t, cmd, resource)
 		before := maps.Clone(cmd.Annotations)
 		want := &Violation{Field: "uri", Reason: ReasonDuplicate}
 		if got := AddResource(cmd, Resource{URI: resource.URI, Name: "renamed"}); !reflect.DeepEqual(got, want) {
@@ -474,11 +506,14 @@ func TestFindDuplicateResources(t *testing.T) {
 	t.Run("resource across commands", func(t *testing.T) {
 		root, cmds := declarationTree()
 		for _, cmd := range []*cobra.Command{cmds["group"], cmds["sibling"]} {
-			if v := AddResource(cmd, Resource{URI: "app://docs", Name: cmd.Name()}); v != nil {
-				t.Fatalf("AddResource: %+v", v)
-			}
+			mustAddResource(t, cmd, Resource{URI: "app://docs", Name: cmd.Name()})
 		}
-		want := &Conflict{Kind: KindResource, Key: "app://docs", Commands: []string{"app group", "app zeta"}}
+		want := &Conflict{
+			Kind:     KindResource,
+			Key:      "app://docs",
+			Reason:   ReasonDuplicate,
+			Commands: []string{"app group", "app zeta"},
+		}
 		if got := FindDuplicate(root); !reflect.DeepEqual(got, want) {
 			t.Fatalf("FindDuplicate = %+v, want %+v", got, want)
 		}
@@ -486,9 +521,7 @@ func TestFindDuplicateResources(t *testing.T) {
 	t.Run("prompt conflict reported before an earlier resource conflict", func(t *testing.T) {
 		root, cmds := declarationTree()
 		for _, cmd := range []*cobra.Command{root, cmds["group"]} {
-			if v := AddResource(cmd, Resource{URI: "app://docs", Name: "r"}); v != nil {
-				t.Fatalf("AddResource: %+v", v)
-			}
+			mustAddResource(t, cmd, Resource{URI: "app://docs", Name: "r"})
 		}
 		mustAddPrompt(t, cmds["leaf"], Prompt{Name: "p", Template: "t"})
 		mustAddPrompt(t, cmds["sibling"], Prompt{Name: "p", Template: "t"})
@@ -496,14 +529,178 @@ func TestFindDuplicateResources(t *testing.T) {
 			t.Fatalf("FindDuplicate = %+v, want the prompt conflict first", got)
 		}
 	})
-	t.Run("same key in prompt and resource namespaces is allowed", func(t *testing.T) {
-		root, cmds := declarationTree()
-		mustAddPrompt(t, root, Prompt{Name: "docs", Template: "t"})
-		if v := AddResource(cmds["leaf"], Resource{URI: "app://docs", Name: "docs"}); v != nil {
-			t.Fatalf("AddResource: %+v", v)
+	t.Run("duplicate under a hidden root still fails", func(t *testing.T) {
+		root := &cobra.Command{Use: "app", Hidden: true}
+		child := &cobra.Command{Use: "child", RunE: noopRunE}
+		root.AddCommand(child)
+		mustAddResource(t, root, Resource{URI: "app://docs", Name: "a"})
+		mustAddResource(t, child, Resource{URI: "app://docs", Name: "b"})
+		if got := FindDuplicate(root); got == nil {
+			t.Fatal("FindDuplicate missed a duplicate under a hidden root")
 		}
-		if got := FindDuplicate(root); got != nil {
-			t.Fatalf("FindDuplicate = %+v, want nil", got)
+	})
+}
+
+func TestAddRefusesToRewriteCorruptAnnotation(t *testing.T) {
+	cases := []struct {
+		name string
+		key  string
+		raw  string
+		add  func(*cobra.Command) *Violation
+	}{
+		{name: "undecodable prompts", key: promptsAnnotationKey, raw: "{not json",
+			add: func(c *cobra.Command) *Violation { return AddPrompt(c, Prompt{Name: "ok", Template: "t"}) }},
+		{name: "invalid prompt entry", key: promptsAnnotationKey, raw: `[{"name":"bad name","template":"x"}]`,
+			add: func(c *cobra.Command) *Violation { return AddPrompt(c, Prompt{Name: "ok", Template: "t"}) }},
+		{name: "undecodable resources", key: resourcesAnnotationKey, raw: "{not json",
+			add: func(c *cobra.Command) *Violation { return AddResource(c, Resource{URI: "app://ok", Name: "ok"}) }},
+		{name: "invalid resource entry", key: resourcesAnnotationKey, raw: `[{"uri":"relative","name":"x"}]`,
+			add: func(c *cobra.Command) *Violation { return AddResource(c, Resource{URI: "app://ok", Name: "ok"}) }},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "app", Annotations: map[string]string{tc.key: tc.raw}}
+			want := &Violation{Field: "annotation", Reason: ReasonCorruptAnnotation}
+			if got := tc.add(cmd); !reflect.DeepEqual(got, want) {
+				t.Fatalf("add = %+v, want %+v", got, want)
+			}
+			if cmd.Annotations[tc.key] != tc.raw {
+				t.Fatalf("annotation rewritten to %q; it must be left for __schema to report", cmd.Annotations[tc.key])
+			}
+		})
+	}
+}
+
+func TestFindCorrupt(t *testing.T) {
+	t.Run("clean tree", func(t *testing.T) {
+		root, cmds := declarationTree()
+		mustAddPrompt(t, cmds["leaf"], Prompt{Name: "p", Template: "t"})
+		mustAddResource(t, root, Resource{URI: "app://r", Name: "r"})
+		if got := FindCorrupt(root); got != nil {
+			t.Fatalf("FindCorrupt = %+v, want nil", got)
+		}
+	})
+	t.Run("first corrupt command in walk order, prompts before resources", func(t *testing.T) {
+		root, cmds := declarationTree()
+		cmds["group"].Annotations = map[string]string{resourcesAnnotationKey: "nope", promptsAnnotationKey: "nope"}
+		cmds["sibling"].Annotations = map[string]string{promptsAnnotationKey: "nope"}
+		want := &Conflict{
+			Kind:     KindPrompt,
+			Key:      promptsAnnotationKey,
+			Reason:   ReasonCorruptAnnotation,
+			Commands: []string{"app group"},
+		}
+		if got := FindCorrupt(root); !reflect.DeepEqual(got, want) {
+			t.Fatalf("FindCorrupt = %+v, want %+v", got, want)
+		}
+	})
+	t.Run("corrupt resources", func(t *testing.T) {
+		root, cmds := declarationTree()
+		cmds["leaf"].Annotations = map[string]string{resourcesAnnotationKey: `[{"uri":"relative","name":"x"}]`}
+		want := &Conflict{
+			Kind:     KindResource,
+			Key:      resourcesAnnotationKey,
+			Reason:   ReasonCorruptAnnotation,
+			Commands: []string{"app group leaf"},
+		}
+		if got := FindCorrupt(root); !reflect.DeepEqual(got, want) {
+			t.Fatalf("FindCorrupt = %+v, want %+v", got, want)
+		}
+	})
+	t.Run("hidden subtree ignored", func(t *testing.T) {
+		root, cmds := declarationTree()
+		cmds["hiddenChild"].Annotations = map[string]string{promptsAnnotationKey: "nope"}
+		if got := FindCorrupt(root); got != nil {
+			t.Fatalf("FindCorrupt = %+v, want nil for a hidden subtree", got)
+		}
+	})
+}
+
+func mustAddResource(t *testing.T, cmd *cobra.Command, resource Resource) {
+	t.Helper()
+	if v := AddResource(cmd, resource); v != nil {
+		t.Fatalf("AddResource(%q) on %q = %+v", resource.URI, cmd.Name(), v)
+	}
+}
+
+// referencePlaceholders is the original one-"{{"-at-a-time Option A scanner,
+// kept as an oracle: the production scanner's linear jump must agree with it.
+func referencePlaceholders(template string) []string {
+	var names []string
+	for rest := template; ; {
+		open := strings.Index(rest, "{{")
+		if open < 0 {
+			return names
+		}
+		rest = rest[open+2:]
+		end := strings.Index(rest, "}}")
+		if end < 0 {
+			return names
+		}
+		if name := rest[:end]; validName(name) {
+			names = append(names, name)
+			rest = rest[end+2:]
+		}
+	}
+}
+
+func FuzzTemplatePlaceholders(f *testing.F) {
+	for _, seed := range []string{
+		"", "{{a}}", "{{a}} {{b}}", "{{ a }}", "{{{x}}}", "{{a}}}", "{{{{{a}}", "{{{{a}}",
+		"{{a{{b}}", "{{a", "}}{{", "{{}}", "x{{y}}z{{", "{{a.b-c_d}}", "{{é}}",
+	} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, template string) {
+		got := templatePlaceholders(template)
+		if want := referencePlaceholders(template); !slices.Equal(got, want) {
+			t.Fatalf("templatePlaceholders(%q) = %q, reference = %q", template, got, want)
+		}
+		for _, name := range got {
+			if !validName(name) || !strings.Contains(template, "{{"+name+"}}") {
+				t.Fatalf("placeholder %q is not a literal {{valid name}} in %q", name, template)
+			}
+		}
+
+		var args []PromptArgument
+		seen := map[string]bool{}
+		for _, name := range got {
+			if !seen[name] {
+				seen[name] = true
+				args = append(args, PromptArgument{Name: name})
+			}
+		}
+		prompt := Prompt{Name: "fuzz", Arguments: args, Template: template}
+		if ValidatePrompt(prompt) != nil {
+			return
+		}
+		cmd := &cobra.Command{Use: "app"}
+		if v := AddPrompt(cmd, prompt); v != nil {
+			t.Fatalf("AddPrompt rejected a valid prompt: %+v", v)
+		}
+		if stored := Prompts(cmd.Annotations); len(stored) != 1 || !reflect.DeepEqual(stored[0], prompt) {
+			t.Fatalf("prompt did not round-trip: %+v", stored)
+		}
+	})
+}
+
+func FuzzValidateResource(f *testing.F) {
+	f.Add("app://docs", "docs", "text/plain; charset=utf-8")
+	f.Add("urn:app:x", "x", "")
+	f.Add("relative", "x", "text/plain")
+	f.Add("app://%zz", "x", "")
+	f.Add("app://a b", "x", "\n")
+	f.Fuzz(func(t *testing.T, uri, name, mimeType string) {
+		resource := Resource{URI: uri, Name: name, MIMEType: mimeType}
+		if ValidateResource(resource) != nil {
+			return
+		}
+		cmd := &cobra.Command{Use: "app"}
+		if v := AddResource(cmd, resource); v != nil {
+			t.Fatalf("AddResource rejected a valid resource: %+v", v)
+		}
+		if stored := Resources(cmd.Annotations); len(stored) != 1 || stored[0] != resource {
+			t.Fatalf("resource did not round-trip: %+v", stored)
 		}
 	})
 }

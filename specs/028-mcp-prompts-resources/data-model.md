@@ -34,7 +34,7 @@ enforces.
 | Name | `string` | `name` | required, UTF-8 |
 | Title | `string` | `title,omitempty` | UTF-8 |
 | Description | `string` | `description,omitempty` | UTF-8 |
-| MIMEType | `string` | `mime_type,omitempty` | UTF-8, no control chars |
+| MIMEType | `string` | `mime_type,omitempty` | UTF-8, no control chars (spaces allowed) |
 
 Phase 1 has no content field (clarification Q2).
 
@@ -59,8 +59,8 @@ declares nothing.
 
 `MCPSchema` gains `Prompts []MCPPrompt` (`prompts,omitempty`) and
 `Resources []MCPResource` (`resources,omitempty`) after `Tools`. Order is
-pre-order over non-hidden commands (reserved commands included, matching
-the ax-native tree), then declaration order. The first occurrence of a
+pre-order over the root and every command not under a hidden child (reserved
+commands included, matching the ax-native tree), then declaration order. The first occurrence of a
 duplicate key wins.
 
 ## Storage: Cobra annotations
@@ -73,8 +73,9 @@ duplicate key wins.
 Lifecycle: `Declare*` validates, decodes the existing list, rejects a
 same-command duplicate, appends, re-encodes, and writes. Other annotations are
 preserved. On error the annotation map is not modified, and a nil map is not
-allocated. On read, a value that fails to decode yields no entries, and each
-decoded entry is re-validated, with invalid entries dropped (fail closed).
+allocated. `Declare*` refuses (`corrupt_annotation`) to rewrite an existing
+value that fails to decode or holds an invalid entry. On read, such a value
+projects no invalid entries (fail closed), and `__schema` reports it.
 
 ## Duplicate conflict (internal)
 

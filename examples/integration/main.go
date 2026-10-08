@@ -99,6 +99,13 @@ func runWithEntityID(
 ) int {
 	root, flush := newRootCommand(stdin, resolved, newEntityID)
 	if err := declareAgentContext(root); err != nil {
+		// This runs before ax.Execute, which normally stamps tool and version,
+		// so stamp them here to keep the envelope's required fields populated.
+		var envelope *ax.Error
+		if errors.As(err, &envelope) {
+			envelope.Tool = appName
+			envelope.Version = resolved
+		}
 		_ = ax.WriteError(stderr, err)
 		return ax.ErrorExitCode(err)
 	}

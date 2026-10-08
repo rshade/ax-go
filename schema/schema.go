@@ -85,7 +85,11 @@ func WithNonDeterministicFields[T any](cmd *cobra.Command) {
 	internalschema.RegisterEnvelope(cmd, internalschema.DataLocators(reflect.TypeFor[T]()))
 }
 
-// BuildSchema reflects a Cobra command tree into the ax-native schema.
+// BuildSchema reflects a Cobra command tree into the ax-native schema. It
+// cannot fail: when a prompt name or resource URI is declared on more than one
+// command it keeps the first in walk order, and it omits a hand-corrupted
+// declaration annotation. The __schema command (NewSchemaCommand) is where
+// both cases fail closed with validation_error (exit 2).
 func BuildSchema(root *cobra.Command, opts ...Option) Schema {
 	cfg := options{}
 	for _, opt := range opts {
@@ -127,8 +131,11 @@ func NewSchemaCommand(root *cobra.Command, opts ...Option) *cobra.Command {
 		Example: fmt.Sprintf("  %s __schema\n  %s __schema --as=mcp",
 			root.Name(), root.Name()),
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if conflict := internalschema.FindCorrupt(root); conflict != nil {
+				return treeDeclarationError(cmd.Context(), conflict)
+			}
 			if conflict := internalschema.FindDuplicate(root); conflict != nil {
-				return duplicateDeclarationError(cmd.Context(), conflict)
+				return treeDeclarationError(cmd.Context(), conflict)
 			}
 			switch as {
 			case "", "ax":
@@ -150,8 +157,9 @@ func NewSchemaCommand(root *cobra.Command, opts ...Option) *cobra.Command {
 }
 
 // MCPSchema is the lightweight MCP-compatible adapter shape. Prompts and
-// Resources aggregate every non-hidden command's declarations in pre-order
-// walk order, then declaration order, and are omitted when none exist.
+// Resources aggregate the declarations of the root and every command not under
+// a hidden child, in pre-order walk order then declaration order, and are
+// omitted when none exist.
 type MCPSchema struct {
 	Tools     []MCPTool     `json:"tools"`
 	Prompts   []MCPPrompt   `json:"prompts,omitempty"`
@@ -166,7 +174,10 @@ type MCPTool struct {
 	NonDeterministicFields []string       `json:"nonDeterministicFields"`
 }
 
-// BuildMCPSchema adapts the command tree to a simple MCP tools list.
+// BuildMCPSchema adapts the command tree to the MCP adapter shape: tools plus
+// declared prompts and resources. Like BuildSchema it cannot fail, keeping the
+// first of a duplicated key; __schema --as=mcp is where duplicates and corrupt
+// annotations fail closed.
 func BuildMCPSchema(root *cobra.Command) MCPSchema {
 	mcpSchema := mcp.Build(root)
 	tools := make([]MCPTool, 0, len(mcpSchema.Tools))
@@ -180,23 +191,30 @@ func BuildMCPSchema(root *cobra.Command) MCPSchema {
 	}
 	return MCPSchema{
 		Tools:     tools,
-		Prompts:   toMCPPrompts(mcpSchema.Prompts),
-		Resources: toMCPResources(mcpSchema.Resources),
+		Prompts:   convertSlice(mcpSchema.Prompts, toMCPPrompt),
+		Resources: convertSlice(mcpSchema.Resources, toMCPResource),
 	}
 }
 
-// convertCommandSchema converts command pre-order, so dedup keeps the first
-// declaration of a key in the same walk order BuildMCPSchema uses.
+// convertCommandSchema converts command pre-order, the order
+// internalschema.WalkDeclarationCommands visits, so dedup keeps the same first
+// declaration of a key that BuildMCPSchema keeps.
 func convertCommandSchema(command internalschema.Command, dedup *internalschema.Deduper) CommandSchema {
 	schema := CommandSchema{
-		Use:                    command.Use,
-		Short:                  command.Short,
-		Long:                   command.Long,
-		Example:                command.Example,
-		Flags:                  convertFlagSchemas(command.Flags),
-		Commands:               make([]CommandSchema, 0, len(command.Commands)),
-		Prompts:                fromInternalPrompts(dedup.Prompts(internalschema.Prompts(command.Annotations))),
-		Resources:              fromInternalResources(dedup.Resources(internalschema.Resources(command.Annotations))),
+		Use:      command.Use,
+		Short:    command.Short,
+		Long:     command.Long,
+		Example:  command.Example,
+		Flags:    convertFlagSchemas(command.Flags),
+		Commands: make([]CommandSchema, 0, len(command.Commands)),
+		Prompts: convertSlice(
+			dedup.FirstPrompts(internalschema.Prompts(command.Annotations)),
+			fromInternalPrompt,
+		),
+		Resources: convertSlice(
+			dedup.FirstResources(internalschema.Resources(command.Annotations)),
+			fromInternalResource,
+		),
 		NonDeterministicFields: internalschema.NonDeterministicFields(command.Annotations),
 	}
 

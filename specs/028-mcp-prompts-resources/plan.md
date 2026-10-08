@@ -82,13 +82,17 @@ Post-design re-check: no violations, and Complexity Tracking is empty.
   append, encode, write. They allocate `Annotations` only on success.
 - `Prompts(annotations) []Prompt` and `Resources(annotations) []Resource`:
   decode, then re-validate each entry and drop invalid ones (fail closed).
-- `WalkDeclarationCommands(root, visit)`: pre-order over non-hidden commands,
+- `WalkDeclarationCommands(root, visit)`: pre-order over the declaration tree
+  (the root, always, plus every command not under a hidden child),
   exactly `BuildCommand`'s pruning, with reserved commands included
   (research R6). It is shared by MCP aggregation and `FindDuplicate`, and it
   matches the recursion of `convertCommandSchema`, so both formats see the
   same set.
 - `FindDuplicate(root *cobra.Command) *Conflict`: checks prompts first, then
   resources.
+- `FindCorrupt(root *cobra.Command) *Conflict`: the first command whose
+  declaration annotation does not project cleanly (FR-004b, research R11).
+  `NewSchemaCommand.RunE` checks it before `FindDuplicate`.
 
 ### `internal/mcp/mcp.go`
 

@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"net"
 	"os"
 	"os/exec"
@@ -898,15 +897,5 @@ func assertQuickstartSession(ctx context.Context, t *testing.T, session *sdk.Cli
 	}
 	if !strings.Contains(text.Text, `"name":"quickstart"`) {
 		t.Errorf("stream payload missing name=quickstart; got %q", text.Text)
-	}
-}
-
-func TestDeclareAgentContextRejectsNilRoot(t *testing.T) {
-	var envelope *ax.Error
-	if err := declareAgentContext(
-		nil,
-	); !errors.As(err, &envelope) ||
-		envelope.ErrorCode != "invalid_schema_declaration" {
-		t.Fatalf("declareAgentContext(nil) = %v, want invalid_schema_declaration", err)
 	}
 }
