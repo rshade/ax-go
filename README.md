@@ -289,6 +289,34 @@ a custom payload shape, an NDJSON line, or a log field — without constructing
 an `ax.Envelope` or `ax.Error` first. It resolves the same live trace/span IDs
 `ax.NewEnvelope` and `ax.NewError` already embed.
 
+A command can also declare MCP **prompts** (workflow templates that answer "how
+do I drive this tool") and static **resources** (addressable reference
+metadata). An agent with no repository on disk can find both in the schema:
+
+```go
+if err := ax.DeclarePrompt(root, ax.Prompt{
+    Name:      "triage-spike",
+    Arguments: []ax.PromptArgument{{Name: "window", Required: true}},
+    Template:  "Run `app report --since={{window}}`, then explain the top line item.",
+}); err != nil {
+    return err // *ax.Error: invalid_schema_declaration, exit 2
+}
+if err := ax.DeclareResource(root, ax.Resource{
+    URI: "app://docs/pricing-model", Name: "pricing-model", MIMEType: "text/markdown",
+}); err != nil {
+    return err
+}
+```
+
+Declarations appear on their command in `__schema` and in top-level `prompts`
+and `resources` arrays in `__schema --as=mcp`. Trees that declare none emit
+exactly the output they did before. Each `{{name}}` placeholder must name a
+declared argument. A resource needs an absolute URI and carries metadata only.
+A prompt name or resource URI declared on two commands makes `__schema` fail
+with a `validation_error` (exit `2`). The live `mcp-server` does not serve
+prompts or resources yet; that runtime phase is deferred
+([`specs/028-mcp-prompts-resources/`](specs/028-mcp-prompts-resources/spec.md)).
+
 ### Running as an MCP server
 
 The same command tree that powers `__schema --as=mcp` can run as a **live MCP

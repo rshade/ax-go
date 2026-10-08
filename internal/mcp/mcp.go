@@ -46,9 +46,13 @@ const (
 	excludeAnnotationValue = "true"
 )
 
-// Schema is the internal MCP-compatible adapter shape.
+// Schema is the internal MCP-compatible adapter shape. Prompts and Resources
+// are static declarations aggregated from the whole non-hidden tree; they are
+// nil when nothing is declared.
 type Schema struct {
-	Tools []Tool
+	Tools     []Tool
+	Prompts   []internalschema.Prompt
+	Resources []internalschema.Resource
 }
 
 // Tool describes one command as an MCP-compatible tool.
@@ -61,13 +65,16 @@ type Tool struct {
 
 // Build adapts a Cobra command tree to MCP-compatible tool metadata using the
 // WalkCallableCommands rules, so the static --as=mcp adapter and the live
-// mcp-server advertise the same tool set.
+// mcp-server advertise the same tool set. Prompts and resources come from
+// internalschema.CollectDeclarations instead: exclusion and runnability govern
+// tools only, so a group or excluded command may still carry declarations.
 func Build(root *cobra.Command) Schema {
 	var tools []Tool
 	WalkCallableCommands(root, func(cmd *cobra.Command) {
 		tools = append(tools, BuildTool(cmd))
 	})
-	return Schema{Tools: tools}
+	prompts, resources := internalschema.CollectDeclarations(root)
+	return Schema{Tools: tools, Prompts: prompts, Resources: resources}
 }
 
 // BuildTool describes a single command as an MCP-compatible tool: ToolName for

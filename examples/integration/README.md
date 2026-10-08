@@ -79,6 +79,11 @@ go run ./examples/integration __schema
 go run ./examples/integration __schema --as=mcp
 ```
 
+The root command declares one MCP prompt (`greet-then-stream`) and one static
+resource (`ax-integration://docs/exit-codes`) in `declareAgentContext`. They
+appear under `command.prompts` / `command.resources` in the ax-native schema
+and in the top-level `prompts` / `resources` arrays of `--as=mcp`.
+
 Build the example with version injection and inspect the same schema field:
 
 ```sh

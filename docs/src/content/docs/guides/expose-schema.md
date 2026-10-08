@@ -143,6 +143,66 @@ annotation (`github.com/rshade/ax-go/mcp/exclude` set to `true`); any other
 value is ignored. To hide a command from humans too, set `Hidden: true`
 instead.
 
+## Declare prompts and resources
+
+Tools tell an agent what it *can* call. A prompt tells it *how* to use your CLI
+for a task, and a resource gives it stable reference material it can look up
+again. Declare both on the command they describe:
+
+```go
+if err := ax.DeclarePrompt(root, ax.Prompt{
+    Name:        "triage-spike",
+    Title:       "Triage a cost spike",
+    Description: "Find and explain the top cost driver in a window.",
+    Arguments: []ax.PromptArgument{
+        {Name: "window", Description: "lookback window, e.g. 7d", Required: true},
+    },
+    Template: "Run `yourcli report --since={{window}}`, then `yourcli explain` on the top line item.",
+}); err != nil {
+    return err
+}
+
+if err := ax.DeclareResource(root, ax.Resource{
+    URI:      "yourcli://docs/pricing-model",
+    Name:     "pricing-model",
+    MIMEType: "text/markdown",
+}); err != nil {
+    return err
+}
+```
+
+`yourcli __schema` shows each declaration on its command, under `prompts` and
+`resources`. `yourcli __schema --as=mcp` collects every declaration into
+top-level arrays, in command-tree order:
+
+```json
+{"tools":[...],"prompts":[{"name":"triage-spike","title":"Triage a cost spike","description":"...","arguments":[{"name":"window","description":"lookback window, e.g. 7d","required":true}],"template":"Run `yourcli report --since={{window}}`, then `yourcli explain` on the top line item."}],"resources":[{"uri":"yourcli://docs/pricing-model","name":"pricing-model","mimeType":"text/markdown"}]}
+```
+
+The rules are checked when you declare, and a bad declaration returns an
+`ax.Error` with `error_code` `invalid_schema_declaration` (exit `2`):
+
+- Names (prompt and argument) use only letters, digits, `_`, `.`, and `-`.
+- Every `{{name}}` in a template must name a declared argument. Other brace
+  text, such as `{{ name }}` with spaces, is left as literal text.
+- A resource URI must be absolute (`scheme://...`), at most 2048 bytes, with no
+  spaces or control characters. Resources carry metadata only, never content
+  or live state. For now an agent can discover a resource but cannot read it;
+  content arrives when `mcp-server` serves resources. ax-go never inlines a
+  truncated body, because an agent cannot tell a fragment from the whole.
+
+Declarations on a hidden command are dropped, like the command itself. A group
+command or a command marked with `mcp.Exclude` keeps its declarations, because
+those rules only decide which commands become tools. If two commands declare
+the same prompt name or resource URI, `__schema` fails with a
+`validation_error` (exit `2`) that names both commands.
+
+:::note
+`mcp-server` does not serve prompts or resources yet. For now they live in the
+schema contract, so the output is pinned before any runtime behavior depends on
+it.
+:::
+
 ## Keep the schema stable in CI
 
 `__schema` is part of your public contract: an agent that learned your CLI from

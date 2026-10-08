@@ -1,0 +1,1 @@
+{"error_code":"validation_error","message":"duplicate resource URI \"app://docs\" declared on more than one command","trace_id":"MASKED","tool":"","version":"","schema_version":"1.0.0","actionable_fix":"Rename or remove one of the duplicate declarations.","context":{"commands":["app","app run"],"key":"app://docs","kind":"resource"}}

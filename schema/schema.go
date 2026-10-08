@@ -45,6 +45,8 @@ type CommandSchema struct {
 	Example                string          `json:"example,omitempty"`
 	Flags                  []FlagSchema    `json:"flags,omitempty"`
 	Commands               []CommandSchema `json:"commands,omitempty"`
+	Prompts                []Prompt        `json:"prompts,omitempty"`
+	Resources              []Resource      `json:"resources,omitempty"`
 	NonDeterministicFields []string        `json:"non_deterministic_fields"`
 }
 
@@ -95,7 +97,7 @@ func BuildSchema(root *cobra.Command, opts ...Option) Schema {
 		Tool:          root.Name(),
 		Version:       cfg.version,
 		ModeDetection: contract.ModeDetectionRule,
-		Command:       convertCommandSchema(internalschema.BuildCommand(root)),
+		Command:       convertCommandSchema(internalschema.BuildCommand(root), internalschema.NewDeduper()),
 		ErrorEnvelope: ErrorSchemaInfo{
 			SchemaVersion: contract.ErrorSchemaVersion,
 			Required: []string{
@@ -125,6 +127,9 @@ func NewSchemaCommand(root *cobra.Command, opts ...Option) *cobra.Command {
 		Example: fmt.Sprintf("  %s __schema\n  %s __schema --as=mcp",
 			root.Name(), root.Name()),
 		RunE: func(cmd *cobra.Command, _ []string) error {
+			if conflict := internalschema.FindDuplicate(root); conflict != nil {
+				return duplicateDeclarationError(cmd.Context(), conflict)
+			}
 			switch as {
 			case "", "ax":
 				return contract.WriteJSON(cmd.OutOrStdout(), BuildSchema(root, opts...))
@@ -144,9 +149,13 @@ func NewSchemaCommand(root *cobra.Command, opts ...Option) *cobra.Command {
 	return cmd
 }
 
-// MCPSchema is the lightweight MCP-compatible adapter shape.
+// MCPSchema is the lightweight MCP-compatible adapter shape. Prompts and
+// Resources aggregate every non-hidden command's declarations in pre-order
+// walk order, then declaration order, and are omitted when none exist.
 type MCPSchema struct {
-	Tools []MCPTool `json:"tools"`
+	Tools     []MCPTool     `json:"tools"`
+	Prompts   []MCPPrompt   `json:"prompts,omitempty"`
+	Resources []MCPResource `json:"resources,omitempty"`
 }
 
 // MCPTool describes one command as an MCP-compatible tool.
@@ -169,10 +178,16 @@ func BuildMCPSchema(root *cobra.Command) MCPSchema {
 			NonDeterministicFields: tool.NonDeterministicFields,
 		})
 	}
-	return MCPSchema{Tools: tools}
+	return MCPSchema{
+		Tools:     tools,
+		Prompts:   toMCPPrompts(mcpSchema.Prompts),
+		Resources: toMCPResources(mcpSchema.Resources),
+	}
 }
 
-func convertCommandSchema(command internalschema.Command) CommandSchema {
+// convertCommandSchema converts command pre-order, so dedup keeps the first
+// declaration of a key in the same walk order BuildMCPSchema uses.
+func convertCommandSchema(command internalschema.Command, dedup *internalschema.Deduper) CommandSchema {
 	schema := CommandSchema{
 		Use:                    command.Use,
 		Short:                  command.Short,
@@ -180,11 +195,13 @@ func convertCommandSchema(command internalschema.Command) CommandSchema {
 		Example:                command.Example,
 		Flags:                  convertFlagSchemas(command.Flags),
 		Commands:               make([]CommandSchema, 0, len(command.Commands)),
+		Prompts:                fromInternalPrompts(dedup.Prompts(internalschema.Prompts(command.Annotations))),
+		Resources:              fromInternalResources(dedup.Resources(internalschema.Resources(command.Annotations))),
 		NonDeterministicFields: internalschema.NonDeterministicFields(command.Annotations),
 	}
 
 	for _, child := range command.Commands {
-		schema.Commands = append(schema.Commands, convertCommandSchema(child))
+		schema.Commands = append(schema.Commands, convertCommandSchema(child, dedup))
 	}
 
 	return schema

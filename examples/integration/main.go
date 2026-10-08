@@ -98,6 +98,10 @@ func runWithEntityID(
 	newEntityID func() (string, error),
 ) int {
 	root, flush := newRootCommand(stdin, resolved, newEntityID)
+	if err := declareAgentContext(root); err != nil {
+		_ = ax.WriteError(stderr, err)
+		return ax.ErrorExitCode(err)
+	}
 	root.SetArgs(args)
 
 	return ax.Execute(
@@ -202,6 +206,32 @@ func newRootCommand(
 		loggerMu.RUnlock()
 		return ax.Flush(ctx, currentLogger)
 	}
+}
+
+// declareAgentContext attaches a workflow prompt and a static reference
+// resource to root. Both appear in "__schema" on the root command and in the
+// top-level prompts/resources arrays of "__schema --as=mcp" (feature 028); the
+// live mcp-server does not serve them yet.
+func declareAgentContext(root *cobra.Command) error {
+	if err := ax.DeclarePrompt(root, ax.Prompt{
+		Name:        "greet-then-stream",
+		Title:       "Greet, then stream",
+		Description: "Produce one greeting envelope, then a short NDJSON stream for the same name.",
+		Arguments: []ax.PromptArgument{
+			{Name: "name", Description: "name to greet", Required: true},
+		},
+		Template: "Run `ax-integration --format=json --name {{name}}`, then " +
+			"`ax-integration stream --format=json --count=3 --name {{name}}`.",
+	}); err != nil {
+		return err
+	}
+	return ax.DeclareResource(root, ax.Resource{
+		URI:         "ax-integration://docs/exit-codes",
+		Name:        "exit-codes",
+		Title:       "Exit codes",
+		Description: "0 success, 1 internal, 2 validation, 3 network or timeout, 4 auth or permission.",
+		MIMEType:    "text/plain",
+	})
 }
 
 func newConfirmCommand() *cobra.Command {
