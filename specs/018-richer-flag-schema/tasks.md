@@ -407,10 +407,10 @@ golden files match their T001 checksums.
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T046 [P] Update `README.md`. Extend the `__schema` section with the three declaration functions, the capability vocabulary table, the enum-rejection envelope (exit 2, before dry-run), and the new output fields, linking `specs/018-richer-flag-schema/contracts/`. Update `AGENTS.md` → Core AX Mandates → the `__schema` bullet with one sentence on the declaration idiom and parse-time enum enforcement. Run `npm run lint:md`.
-- [ ] T047 Verify SC-004 and FR-008. `testdata/schema_ax.golden.json`, `testdata/schema_mcp.golden.json` and `testdata/mcp_tools_list.golden.json` must match their T001 checksums byte for byte. Also run `git diff --exit-code` on all three. A mismatch is a defect in the omitempty or nil handling: fix it, do not regenerate.
-- [ ] T048 Run `make surface-update`, then review `git diff internal/cmd/surfacecheck/baseline.json`. Every line must be an **addition** naming an identifier or field from contracts/declaration-api.md or data-model.md, in `schema` or `ax`, with presence `"all"`. Any removed or changed line is a defect.
-- [ ] T049 Append retained audit rows for every new **root-package** feature from T048 to `specs/015-internalize-helpers/public-surface-audit.json`:
+- [X] T046 [P] Update `README.md`. Extend the `__schema` section with the three declaration functions, the capability vocabulary table, the enum-rejection envelope (exit 2, before dry-run), and the new output fields, linking `specs/018-richer-flag-schema/contracts/`. Update `AGENTS.md` → Core AX Mandates → the `__schema` bullet with one sentence on the declaration idiom and parse-time enum enforcement. Run `npm run lint:md`.
+- [X] T047 Verify SC-004 and FR-008. `testdata/schema_ax.golden.json`, `testdata/schema_mcp.golden.json` and `testdata/mcp_tools_list.golden.json` must match their T001 checksums byte for byte. Also run `git diff --exit-code` on all three. A mismatch is a defect in the omitempty or nil handling: fix it, do not regenerate.
+- [X] T048 Run `make surface-update`, then review `git diff internal/cmd/surfacecheck/baseline.json`. Every line must be an **addition** naming an identifier or field from contracts/declaration-api.md or data-model.md, in `schema` or `ax`, with presence `"all"`. Any removed or changed line is a defect.
+- [X] T049 Append retained audit rows for every new **root-package** feature from T048 to `specs/015-internalize-helpers/public-surface-audit.json`:
   - `DeclareFlagEnum`, `DeclareFlagExample`, `DeclareCapability` and `ErrInvalidDeclaration`;
   - `Capability` and its six constants;
   - `CapabilitySchema` and `MCPToolAnnotations` with their fields;
@@ -420,12 +420,12 @@ golden files match their T001 checksums.
   one-line rationale citing spec 018. Seed the rows with `go run
   ./internal/cmd/surfacecheck -audit-seed`, then classify them by hand. Run
   `make surface-check` until it reports `"status":"pass"`.
-- [ ] T050 Run `make bench-check`. `BenchmarkBuildCommand` must stay within budget (ns/op ≤ +5%, allocs/op ≤ +1). If it does not, remove the extra allocation on the no-declaration path; do not adjust the budget.
-- [ ] T051 Run `make cover-check`. Every floor must hold, notably `internal/schema` 93%, `internal/mcp` 96.9%, root 85% and `examples/integration` 85%. Add tests if a floor slips; never lower one.
-- [ ] T052 Run `make doc-coverage`. The required list is unchanged, and the three new `ExampleWithX` functions run with verified output.
-- [ ] T053 Run the full gate: `gofmt -l .` must print nothing, then `make test` (all 4 build-tag configurations, `-race`), `make lint` (all 4 configurations), `go vet ./...`, `make validate` and `make size-check`. The logging probe must be unaffected, and `go list -deps ./examples/logging` must not newly include `schema`.
-- [ ] T054 Run the verification commands in `specs/018-richer-flag-schema/quickstart.md`, including `go test -run '^$' -fuzz FuzzEnumCanonicalise -fuzztime 30s ./internal/schema`, and confirm each expected outcome listed there.
-- [ ] T055 Remove debug code and make sure no `TODO` remains in the changed files. Confirm `CHANGELOG.md` is **not** modified, because release-please owns it. Draft a Conventional Commit subject, `feat(schema): add per-flag enum/example and command capability class to __schema (#28)`, and validate it with `npx commitlint`.
+- [X] T050 Run `make bench-check`. `BenchmarkBuildCommand` must stay within budget (ns/op ≤ +5%, allocs/op ≤ +1). If it does not, remove the extra allocation on the no-declaration path; do not adjust the budget.
+- [X] T051 Run `make cover-check`. Every floor must hold, notably `internal/schema` 93%, `internal/mcp` 96.9%, root 85% and `examples/integration` 85%. Add tests if a floor slips; never lower one.
+- [X] T052 Run `make doc-coverage`. The required list is unchanged, and the three new `ExampleWithX` functions run with verified output.
+- [X] T053 Run the full gate: `gofmt -l .` must print nothing, then `make test` (all 4 build-tag configurations, `-race`), `make lint` (all 4 configurations), `go vet ./...`, `make validate` and `make size-check`. The logging probe must be unaffected, and `go list -deps ./examples/logging` must not newly include `schema`.
+- [X] T054 Run the verification commands in `specs/018-richer-flag-schema/quickstart.md`, including `go test -run '^$' -fuzz FuzzEnumCanonicalise -fuzztime 30s ./internal/schema`, and confirm each expected outcome listed there.
+- [X] T055 Remove debug code and make sure no `TODO` remains in the changed files. Confirm `CHANGELOG.md` is **not** modified, because release-please owns it. Draft a Conventional Commit subject, `feat(schema): add per-flag enum/example and command capability class to __schema (#28)`, and validate it with `npx commitlint`.
 
 ---
 
@@ -440,7 +440,7 @@ R4 and R10, revised).
 - [X] T057 In `internal/schema`, rename `DeclareFlagEnum` / `DeclareFlagExample` / `DeclareCapability` to `AddFlagEnum` / `AddFlagExample` / `AddCapability` returning `*Violation`; add the reasons `flag_not_found`, `unsupported_type`, `invalid_value`, `not_in_enum` and `not_in_vocabulary` beside 028's; delete `ErrInvalidDeclaration`.
 - [X] T058 In `schema` and root `ax`, rename the public functions to `DeclareFlagEnum` / `DeclareFlagExample` / `DeclareCapability`, route failures through `declarationError` (kinds `flag enum`, `flag example`, `capability`), and remove `ErrInvalidDeclaration` from both packages. Rename the three `ExampleWith…` functions to `ExampleDeclare…`.
 - [X] T059 Update `examples/integration`, README.md, AGENTS.md and `examples/integration/README.md` to the new names and contract.
-- [ ] T060 Re-run `make surface-update` and replace the spec 018 audit rows (drop `ErrInvalidDeclaration`, rename the three functions), then the full gate (T047–T054) on the mise-pinned toolchain.
+- [X] T060 Re-run `make surface-update` and replace the spec 018 audit rows (drop `ErrInvalidDeclaration`, rename the three functions), then the full gate (T047–T054) on the mise-pinned toolchain.
 
 ---
 
