@@ -1043,7 +1043,7 @@ type controlledDeadlineContext struct {
 	expired <-chan struct{}
 }
 
-func (c controlledDeadlineContext) Deadline() (time.Time, bool) {
+func (controlledDeadlineContext) Deadline() (time.Time, bool) {
 	return time.Time{}, false
 }
 
@@ -1060,6 +1060,6 @@ func (c controlledDeadlineContext) Err() error {
 	}
 }
 
-func (c controlledDeadlineContext) Value(any) any {
+func (controlledDeadlineContext) Value(any) any {
 	return nil
 }

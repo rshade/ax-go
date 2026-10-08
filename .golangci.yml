@@ -368,6 +368,52 @@ linters:
       patterns:
         - ".*"
 
+    # Named explicitly. golangci-lint replaces revive's defaults when any rule
+    # is configured (golangci-lint#1745), and a later revive release can add or
+    # drop a default without a config change. Listing the set pins it.
+    #
+    # unused-parameter is omitted on purpose. unparam is already enabled and
+    # is the stricter check: it follows call sites across the package, so an
+    # interface stub that must keep a parameter is not a false positive the
+    # way revive's unused-parameter rule is. unused-parameter is a revive
+    # default, which is why enable-default-rules stays off and the other
+    # defaults are repeated by name below.
+    revive:
+      rules:
+        # Revive defaults, except unused-parameter.
+        - name: blank-imports
+        - name: context-as-argument
+        - name: context-keys-type
+        - name: dot-imports
+        - name: empty-block
+        - name: error-naming
+        - name: error-return
+        - name: error-strings
+        - name: errorf
+        - name: exported
+        - name: increment-decrement
+        - name: indent-error-flow
+        - name: package-comments
+        - name: range
+        - name: receiver-naming
+        - name: redefines-builtin-id
+        - name: superfluous-else
+        - name: time-naming
+        - name: unexported-return
+        - name: unreachable-code
+        - name: var-declaration
+        - name: var-naming
+        # Opt-in structural rules from issue #230.
+        - name: bare-return
+        - name: confusing-naming
+        - name: duplicated-imports
+        - name: early-return
+        - name: flag-parameter
+        - name: redundant-import-alias
+        - name: unnecessary-stmt
+        - name: unused-receiver
+        - name: use-any
+
     rowserrcheck:
       # database/sql is always checked.
       # Default: []
@@ -439,6 +485,31 @@ linters:
       - path: 'pkg/version/'
         text: 'var-naming: avoid package names that conflict with Go standard library package names'
         linters: [ revive ]
+      # confusing-naming stays enabled. These two files are the exported facade
+      # over a same-file unexported implementation (Guard/guard, Perform/perform,
+      # FindDuplicate/findDuplicate). The *_facade tests and the schema duplicate
+      # walk exist to pin that delegation. A path-scoped exclusion keeps the rule
+      # for every other file. A bare //nolint is not used.
+      - path: '(^|/)guard\.go$'
+        text: 'differs only by capitalization'
+        linters: [ revive ]
+      - path: 'internal/schema/declarations\.go$'
+        text: 'differs only by capitalization'
+        linters: [ revive ]
+      # stdoutIsTTY is the public TTY-detection input of mode precedence.
+      # Splitting the parameter would change the exported signature.
+      - path: 'contract/mode\.go$'
+        text: "parameter 'stdoutIsTTY' seems to be a control flag"
+        linters: [ revive ]
+      # Test helpers take *testing.T first so they can call t.Helper.
+      # context-as-argument stays on for non-test code.
+      - path: '_test\.go'
+        text: 'context.Context should be the first parameter'
+        linters: [ revive ]
+      # revive is not in the linter lists below on purpose. Removing it from
+      # the exclusion turns the linter on for those paths. It stays in
+      # linters.enable. context-as-argument is the one test exception, because
+      # helpers take *testing.T first so they can call t.Helper.
       - path: '_test\.go'
         linters:
           - bodyclose
@@ -453,13 +524,13 @@ linters:
           - intrange
           - mnd
           - noctx
-          - revive
           - staticcheck
           - testableexamples
           - testifylint
           - testpackage
           - usetesting
           - wrapcheck
+      # Same choice as _test.go: revive is not excluded here either.
       - path: 'test/'
         linters:
           - bodyclose
@@ -474,7 +545,6 @@ linters:
           - intrange
           - mnd
           - noctx
-          - revive
           - staticcheck
           - testableexamples
           - testifylint
