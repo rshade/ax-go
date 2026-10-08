@@ -43,6 +43,9 @@ function returns nil on success. On an authoring mistake it returns an
 - `message`: `invalid <kind> declaration "<key>": <field> <reason>`, where kind
   is `flag enum`, `flag example` or `capability`
 - `context`: `{"field": ..., "reason": ...}`
+- `actionable_fix`: a non-empty remediation hint per reason, from the same
+  table as spec 028 (a `values`/`duplicate` enum gets its own canonicalisation
+  hint)
 
 | `field` | `reason` values |
 |---------|-----------------|
