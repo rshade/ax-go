@@ -490,11 +490,11 @@ linters:
       - path: 'pkg/version/'
         text: 'var-naming: avoid package names that conflict with Go standard library package names'
         linters: [ revive ]
-      # confusing-naming stays enabled. These two files are the exported facade
-      # over a same-file unexported implementation (Guard/guard, Perform/perform,
-      # FindDuplicate/findDuplicate). The *_facade tests and the schema duplicate
-      # walk exist to pin that delegation. A path-scoped exclusion keeps the rule
-      # for every other file. A bare //nolint is not used.
+      # confusing-naming stays enabled. These two files pair an exported
+      # wrapper with a same-file unexported implementation (Guard/guard,
+      # Perform/perform, FindDuplicate/findDuplicate). The names are the
+      # wrapper, so the rule is scoped to those pairs. A bare //nolint is
+      # not used.
       - path: '(^|/)guard\.go$'
         text: 'Method ''(Guard|Perform)'' differs only by capitalization to function ''(guard|perform)'''
         linters: [ revive ]
