@@ -12,16 +12,16 @@ func newDeployCommand() (*cobra.Command, error) {
     cmd.Flags().Int("replicas", 1, "replica count")
     cmd.Flags().Duration("timeout", 30*time.Second, "deadline")
 
-    if err := ax.WithFlagEnum(cmd, "output", "json", "table", "yaml"); err != nil {
+    if err := ax.DeclareFlagEnum(cmd, "output", "json", "table", "yaml"); err != nil {
         return nil, err
     }
-    if err := ax.WithFlagEnum(cmd, "replicas", "1", "3", "5"); err != nil {
+    if err := ax.DeclareFlagEnum(cmd, "replicas", "1", "3", "5"); err != nil {
         return nil, err
     }
-    if err := ax.WithFlagExample(cmd, "timeout", "45s"); err != nil {
+    if err := ax.DeclareFlagExample(cmd, "timeout", "45s"); err != nil {
         return nil, err
     }
-    if err := ax.WithCapability(cmd, ax.CapabilityMutate, "idempotent by release name"); err != nil {
+    if err := ax.DeclareCapability(cmd, ax.CapabilityMutate, "idempotent by release name"); err != nil {
         return nil, err
     }
     return cmd, nil
@@ -31,14 +31,15 @@ func newDeployCommand() (*cobra.Command, error) {
 You do **not** declare `default` or `required` again. ax-go still derives them
 from Cobra.
 
-The following are rejected with an error wrapping `ax.ErrInvalidDeclaration`:
+The following are rejected with an `*ax.Error` carrying
+`invalid_schema_declaration` (exit 2), the same contract as `ax.DeclarePrompt`:
 
 ```go
-ax.WithFlagEnum(cmd, "output", "table", "yaml")      // default "json" not in set
-ax.WithFlagEnum(cmd, "replicas", "1", "01")          // duplicates after canonicalisation
-ax.WithFlagEnum(cmd, "timeout", "1s")                // duration: unsupported enum type
-ax.WithFlagExample(cmd, "replicas", "three")         // not an int
-ax.WithCapability(cmd, ax.Capability("write"), "")   // not in the vocabulary
+ax.DeclareFlagEnum(cmd, "output", "table", "yaml")      // default "json" not in set
+ax.DeclareFlagEnum(cmd, "replicas", "1", "01")          // duplicates after canonicalisation
+ax.DeclareFlagEnum(cmd, "timeout", "1s")                // duration: unsupported enum type
+ax.DeclareFlagExample(cmd, "replicas", "three")         // not an int
+ax.DeclareCapability(cmd, ax.Capability("write"), "")   // not in the vocabulary
 ```
 
 ## For an agent
