@@ -275,8 +275,7 @@ func TestDeclarationTypesCannotCarryLiveState(t *testing.T) {
 
 func assertStaticShape(t *testing.T, typ reflect.Type, path string) {
 	t.Helper()
-	for i := range typ.NumField() {
-		field := typ.Field(i)
+	for field := range typ.Fields() {
 		fieldPath := path + "." + field.Name
 		kind := field.Type.Kind()
 		if kind == reflect.String || kind == reflect.Bool {
