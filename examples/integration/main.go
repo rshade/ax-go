@@ -101,8 +101,7 @@ func runWithEntityID(
 	if err := declareAgentContext(root); err != nil {
 		// This runs before ax.Execute, which normally stamps tool and version,
 		// so stamp them here to keep the envelope's required fields populated.
-		var envelope *ax.Error
-		if errors.As(err, &envelope) {
+		if envelope, ok := errors.AsType[*ax.Error](err); ok {
 			envelope.Tool = appName
 			envelope.Version = resolved
 		}
