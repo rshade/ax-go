@@ -410,7 +410,7 @@ golden files match their T001 checksums.
 - [X] T046 [P] Update `README.md`. Extend the `__schema` section with the three declaration functions, the capability vocabulary table, the enum-rejection envelope (exit 2, before dry-run), and the new output fields, linking `specs/018-richer-flag-schema/contracts/`. Update `AGENTS.md` → Core AX Mandates → the `__schema` bullet with one sentence on the declaration idiom and parse-time enum enforcement. Run `npm run lint:md`.
 - [X] T047 Verify SC-004 and FR-008. `testdata/schema_ax.golden.json`, `testdata/schema_mcp.golden.json` and `testdata/mcp_tools_list.golden.json` must match their T001 checksums byte for byte. Also run `git diff --exit-code` on all three. A mismatch is a defect in the omitempty or nil handling: fix it, do not regenerate.
 - [X] T048 Run `make surface-update`, then review `git diff internal/cmd/surfacecheck/baseline.json`. Every line must be an **addition** naming an identifier or field from contracts/declaration-api.md or data-model.md, in `schema` or `ax`, with presence `"all"`. Any removed or changed line is a defect.
-- [X] T049 Append retained audit rows for every new **root-package** feature from T048 to `specs/015-internalize-helpers/public-surface-audit.json`:
+- [X] T049 Append retained audit rows for every new **root-package** feature from T048 to `specs/023-internalize-helpers/public-surface-audit.json`:
   - `DeclareFlagEnum`, `DeclareFlagExample`, `DeclareCapability` and `ErrInvalidDeclaration`;
   - `Capability` and its six constants;
   - `CapabilitySchema` and `MCPToolAnnotations` with their fields;
