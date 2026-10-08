@@ -82,8 +82,12 @@ type flagAssignment struct {
 // callable tool set.
 func newDispatcher(ctx context.Context, root *cobra.Command, cfg Config) *dispatcher {
 	ensurePersistentFlags(root)
-	root.SilenceUsage = true
-	root.SilenceErrors = true
+	// Execute runs on the real root. A subtree mount still has a parent, and
+	// Cobra redirects Execute there; silence and flag errors have to be set on
+	// that command or a tools/call re-parses os.Args and re-runs mcp-server.
+	execRoot := root.Root()
+	execRoot.SilenceUsage = true
+	execRoot.SilenceErrors = true
 
 	tools, targets := discoverTools(root)
 	names := make(map[string]struct{}, len(tools))
@@ -98,7 +102,7 @@ func newDispatcher(ctx context.Context, root *cobra.Command, cfg Config) *dispat
 		tools:         tools,
 		toolNames:     names,
 		targets:       targets,
-		sliceDefaults: snapshotSliceDefaults(root),
+		sliceDefaults: snapshotSliceDefaults(execRoot),
 		stderr:        cfg.Stderr,
 	}
 	// Reclassify Cobra flag-parse failures (e.g. a non-numeric value for an int
@@ -106,7 +110,7 @@ func newDispatcher(ctx context.Context, root *cobra.Command, cfg Config) *dispat
 	// slice-argument validation and the argument-validation contract (C-8). Without
 	// this they would surface untyped from ExecuteContext and fall through to
 	// internal_error (exit 1), misreporting fixable bad input as a server fault.
-	root.SetFlagErrorFunc(func(cmd *cobra.Command, ferr error) error {
+	execRoot.SetFlagErrorFunc(func(cmd *cobra.Command, ferr error) error {
 		return d.validationError(cmd.Context(), ferr.Error())
 	})
 	return d
@@ -285,7 +289,7 @@ func (d *dispatcher) buildArgs(
 	flagArgs = append(flagArgs, "--"+idempotencyKeyFlagName+"="+cc.idempotencyKey)
 	sort.Strings(flagArgs)
 
-	return append(commandPathArgs(d.root, target), flagArgs...), assignments, cc, nil
+	return append(commandPathArgs(d.root.Root(), target), flagArgs...), assignments, cc, nil
 }
 
 func (d *dispatcher) applyCallConfigArg(
@@ -425,19 +429,25 @@ func (d *dispatcher) runRecovered(
 
 	ctx = diagwriter.WithWriter(ctx, &errBuf)
 
-	resetCommandTree(ctx, d.root, d.sliceDefaults)
+	// d.root is the mounted command. When it is not the Cobra root, Execute
+	// on it ignores SetArgs and parses os.Args on the real root, which is the
+	// mcp-server invocation and starts the server again. Set the prefixed argv
+	// on the real root and reset flags from there, including its persistent
+	// flags.
+	execRoot := d.root.Root()
+	resetCommandTree(ctx, execRoot, d.sliceDefaults)
 	if err := applyFlagAssignments(assignments); err != nil {
 		return d.validationError(ctx, err.Error())
 	}
 
-	d.root.SetArgs(argv)
-	d.root.SetIn(bytes.NewReader(nil))
-	d.root.SetOut(outBuf)
-	d.root.SetErr(&errBuf)
+	execRoot.SetArgs(argv)
+	execRoot.SetIn(bytes.NewReader(nil))
+	execRoot.SetOut(outBuf)
+	execRoot.SetErr(&errBuf)
 
-	runErr = d.root.ExecuteContext(ctx)
+	runErr = execRoot.ExecuteContext(ctx)
 
-	d.root.SetArgs(nil)
+	execRoot.SetArgs(nil)
 	return runErr
 }
 
