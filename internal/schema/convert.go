@@ -4,9 +4,13 @@ import (
 	"encoding/csv"
 	"errors"
 	"fmt"
+	"math"
+	"net"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/spf13/pflag"
 )
 
 // JSON Schema type names emitted for flag properties.
@@ -45,6 +49,16 @@ const (
 	typeDurationSlice = "durationSlice"
 	typeStringSlice   = "stringSlice"
 	typeStringArray   = "stringArray"
+	typeIP            = "ip"
+	typeIPMask        = "ipMask"
+	typeIPNet         = "ipNet"
+	typeIPSlice       = "ipSlice"
+	typeIPNetSlice    = "ipNetSlice"
+	typeBytesHex      = "bytesHex"
+	typeBytesBase64   = "bytesBase64"
+	typeStringToStr   = "stringToString"
+	typeStringToInt   = "stringToInt"
+	typeStringToInt64 = "stringToInt64"
 )
 
 // Integer bit sizes and bases handed to strconv.
@@ -86,7 +100,7 @@ func JSONSchemaArrayItemType(flagType string) (string, bool) {
 		return JSONInteger, true
 	case typeFloat32Slice, typeFloat64Slice:
 		return JSONNumber, true
-	case typeDurationSlice, "ipSlice", "ipNetSlice", typeStringArray, typeStringSlice:
+	case typeDurationSlice, typeIPSlice, typeIPNetSlice, typeStringArray, typeStringSlice:
 		return JSONString, true
 	default:
 		return "", false
@@ -97,7 +111,8 @@ func JSONSchemaArrayItemType(flagType string) (string, bool) {
 // matching JSONSchemaType(flagType): bool, int64, uint64, float64 or string.
 // Integers are parsed in base 10, so callers pass canonical values. ok is false
 // for an empty value or one that does not parse as the type, so a string is
-// never advertised for a non-string type.
+// never advertised for a non-string type, and for NaN or ±Inf, which pflag
+// accepts but encoding/json cannot marshal.
 func ScalarJSON(flagType, value string) (any, bool) {
 	if value == "" {
 		return nil, false
@@ -114,8 +129,7 @@ func ScalarJSON(flagType, value string) (any, bool) {
 		parsed, err := strconv.ParseInt(value, base10, bits64)
 		return parsed, err == nil
 	case JSONNumber:
-		parsed, err := strconv.ParseFloat(value, bits64)
-		return parsed, err == nil
+		return finiteFloatJSON(value)
 	default:
 		return value, true
 	}
@@ -124,7 +138,7 @@ func ScalarJSON(flagType, value string) (any, bool) {
 // ArrayItemJSON converts one element of a slice flag to the JSON value matching
 // itemType (from JSONSchemaArrayItemType). Integers are parsed in base 10;
 // uintSlice elements become uint64 and every other integer slice int64. ok is
-// false when the element does not parse.
+// false when the element does not parse or is a non-finite float.
 func ArrayItemJSON(value, itemType, flagType string) (any, bool) {
 	switch itemType {
 	case JSONBoolean:
@@ -138,11 +152,18 @@ func ArrayItemJSON(value, itemType, flagType string) (any, bool) {
 		parsed, err := strconv.ParseInt(value, base10, bits64)
 		return parsed, err == nil
 	case JSONNumber:
-		parsed, err := strconv.ParseFloat(value, bits64)
-		return parsed, err == nil
+		return finiteFloatJSON(value)
 	default:
 		return value, true
 	}
+}
+
+func finiteFloatJSON(value string) (any, bool) {
+	parsed, err := strconv.ParseFloat(value, bits64)
+	if err != nil || math.IsNaN(parsed) || math.IsInf(parsed, 0) {
+		return nil, false
+	}
+	return parsed, true
 }
 
 // SplitSliceValue splits a slice flag value in CLI form into its elements the
@@ -165,10 +186,15 @@ func SplitSliceValue(flagType, value string) ([]string, error) {
 
 // ValidateValue reports whether value, in CLI form, is accepted by a flag of
 // flagType, using the same parsing rules pflag applies in Set: integers in the
-// base and bit size pflag uses, durations through time.ParseDuration, and slice
-// values split per SplitSliceValue with each element checked. Types it does not
-// know, including custom pflag.Value types, are unchecked and return nil.
+// base and bit size pflag uses, durations through time.ParseDuration, slice
+// values split per SplitSliceValue with each element checked, and the ip, ipMask,
+// ipNet, bytes, stringTo* and ip slice types through pflag's own Set. Custom
+// pflag.Value types are unchecked and return nil, as are func, boolfunc and
+// time, whose Set runs an author callback or depends on per-flag formats.
 func ValidateValue(flagType, value string) error {
+	if handled, err := validateWithPflag(flagType, value); handled {
+		return err
+	}
 	if _, ok := JSONSchemaArrayItemType(flagType); ok {
 		return validateSliceValue(flagType, value)
 	}
@@ -226,6 +252,41 @@ func validateSliceValue(flagType, value string) error {
 		}
 	}
 	return nil
+}
+
+// validateWithPflag checks value with pflag's own Set on a scratch FlagSet for
+// the built-in types ax-go does not parse itself, so validation cannot drift
+// from what the real flag accepts. handled is false for every other type.
+func validateWithPflag(flagType, value string) (bool, error) {
+	scratch := pflag.NewFlagSet(flagType, pflag.ContinueOnError)
+	switch flagType {
+	case typeIP:
+		scratch.IP(flagType, nil, "")
+	case typeIPMask:
+		scratch.IPMask(flagType, nil, "")
+	case typeIPNet:
+		scratch.IPNet(flagType, net.IPNet{}, "")
+	case typeIPSlice:
+		scratch.IPSlice(flagType, nil, "")
+	case typeIPNetSlice:
+		scratch.IPNetSlice(flagType, nil, "")
+	case typeBytesHex:
+		scratch.BytesHex(flagType, nil, "")
+	case typeBytesBase64:
+		scratch.BytesBase64(flagType, nil, "")
+	case typeStringToStr:
+		scratch.StringToString(flagType, nil, "")
+	case typeStringToInt:
+		scratch.StringToInt(flagType, nil, "")
+	case typeStringToInt64:
+		scratch.StringToInt64(flagType, nil, "")
+	default:
+		return false, nil
+	}
+	if err := scratch.Set(flagType, value); err != nil {
+		return true, fmt.Errorf("value is not a valid %s: %w", flagType, err)
+	}
+	return true, nil
 }
 
 // integerParseType maps count, whose Set parses an int, onto int so the shared
@@ -297,8 +358,8 @@ func isBuiltinFlagType(flagType string) bool {
 	case typeBool, typeCount, typeString, typeDuration, typeFloat32, typeFloat64,
 		typeInt, typeInt8, typeInt16, typeInt32, typeInt64,
 		typeUint, typeUint8, typeUint16, typeUint32, typeUint64,
-		"ip", "ipMask", "ipNet", "bytesHex", "bytesBase64",
-		"stringToString", "stringToInt", "stringToInt64",
+		typeIP, typeIPMask, typeIPNet, typeBytesHex, typeBytesBase64,
+		typeStringToStr, typeStringToInt, typeStringToInt64,
 		"func", "boolfunc", "time":
 		return true
 	default:
