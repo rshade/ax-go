@@ -225,7 +225,14 @@ func TestRegisterEnvelopeAndNonDeterministicFields(t *testing.T) {
 		}
 	})
 
-	t.Run("nil command is no op", func(_ *testing.T) {
+	// A nil *cobra.Command carries no annotations, so not panicking is the
+	// whole observable contract.
+	t.Run("nil command is no op", func(t *testing.T) {
+		defer func() {
+			if r := recover(); r != nil {
+				t.Fatalf("RegisterEnvelope(nil, ...) panicked: %v", r)
+			}
+		}()
 		schema.RegisterEnvelope(nil, []string{"data.field"})
 	})
 }
