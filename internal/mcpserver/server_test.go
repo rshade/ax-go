@@ -7,6 +7,7 @@ import (
 	"maps"
 	"os"
 	"path/filepath"
+	"reflect"
 	"regexp"
 	"slices"
 	"testing"
@@ -292,5 +293,93 @@ func TestDeclarationsAreNotServedInPhaseOne(t *testing.T) {
 
 	if got, want := liveToolNames(root), liveToolNames(fixedRoot()); !slices.Equal(got, want) {
 		t.Fatalf("declarations changed the live tool set: got %v, want %v", got, want)
+	}
+}
+
+// TestToolsListCarriesCapabilityAnnotations asserts the live tools/list
+// registers the research.md R6 hint mapping as the SDK's ToolAnnotations on a
+// classified tool and leaves Annotations nil on an unclassified one.
+func TestToolsListCarriesCapabilityAnnotations(t *testing.T) {
+	yes, no := true, false
+	root := &cobra.Command{Use: "demo", Short: "demo root", RunE: noopRunE}
+	classes := map[string]schema.Capability{
+		"get":    schema.CapabilityReadOnly,
+		"add":    schema.CapabilityCreate,
+		"set":    schema.CapabilityMutate,
+		"rm":     schema.CapabilityDelete,
+		"fetch":  schema.CapabilityExternalNetwork,
+		"reboot": schema.CapabilityAdmin,
+	}
+	for use, class := range classes {
+		cmd := &cobra.Command{Use: use, Short: use, RunE: noopRunE}
+		if err := schema.WithCapability(cmd, class, ""); err != nil {
+			t.Fatalf("WithCapability(%s): %v", use, err)
+		}
+		root.AddCommand(cmd)
+	}
+	root.AddCommand(&cobra.Command{Use: "plain", Short: "plain", RunE: noopRunE})
+
+	res, err := newInMemorySession(t, newTestServer(t, root)).ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("tools/list: %v", err)
+	}
+	want := map[string]*sdk.ToolAnnotations{
+		"demo-get":    {ReadOnlyHint: true},
+		"demo-add":    {DestructiveHint: &no},
+		"demo-set":    {DestructiveHint: &yes},
+		"demo-rm":     {DestructiveHint: &yes},
+		"demo-fetch":  {OpenWorldHint: &yes},
+		"demo-reboot": {DestructiveHint: &yes},
+		"demo-plain":  nil,
+		"demo":        nil,
+	}
+	seen := 0
+	for _, tool := range res.Tools {
+		expected, tracked := want[tool.Name]
+		if !tracked {
+			continue
+		}
+		seen++
+		if !reflect.DeepEqual(tool.Annotations, expected) {
+			t.Errorf("%s annotations = %+v, want %+v", tool.Name, tool.Annotations, expected)
+		}
+	}
+	if seen != len(want) {
+		t.Fatalf("tools/list returned %d of the %d expected tools", seen, len(want))
+	}
+}
+
+// TestDiscoverToolsCapabilityMatchesStaticAdapter asserts the live tool values
+// equal the static --as=mcp values field for field on a classified tree, so the
+// two conversions from internal/mcp.Tool cannot drift apart.
+func TestDiscoverToolsCapabilityMatchesStaticAdapter(t *testing.T) {
+	newRoot := func() *cobra.Command {
+		root := fixedRoot()
+		for _, child := range root.Commands() {
+			if child.Name() == "greet" {
+				if err := schema.WithCapability(child, schema.CapabilityCreate, "one greeting per call"); err != nil {
+					t.Fatalf("WithCapability: %v", err)
+				}
+			}
+		}
+		if err := schema.WithCapability(root, schema.CapabilityExternalNetwork, ""); err != nil {
+			t.Fatalf("WithCapability: %v", err)
+		}
+		return root
+	}
+	static := schema.BuildMCPSchema(newRoot()).Tools
+	live := newTestDispatcher(newRoot()).tools
+	byName := func(tools []schema.MCPTool) map[string]schema.MCPTool {
+		out := make(map[string]schema.MCPTool, len(tools))
+		for _, tool := range tools {
+			tool.InputSchema = nil
+			out[tool.Name] = tool
+		}
+		return out
+	}
+	for name, liveTool := range byName(live) {
+		if !reflect.DeepEqual(liveTool, byName(static)[name]) {
+			t.Errorf("tool %s diverged\nlive:   %+v\nstatic: %+v", name, liveTool, byName(static)[name])
+		}
 	}
 }

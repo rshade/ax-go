@@ -103,15 +103,19 @@ func runWithEntityID(
 	newEntityID func() (string, error),
 ) int {
 	root, flush := newRootCommand(stdin, resolved, newEntityID)
-	if err := declareAgentContext(root); err != nil {
+	declErr := declareAgentContext(root)
+	if declErr == nil {
+		declErr = declareCommandSemantics(root)
+	}
+	if declErr != nil {
 		// This runs before ax.Execute, which normally stamps tool and version,
 		// so stamp them here to keep the envelope's required fields populated.
-		if envelope, ok := errors.AsType[*ax.Error](err); ok {
+		if envelope, ok := errors.AsType[*ax.Error](declErr); ok {
 			envelope.Tool = appName
 			envelope.Version = resolved
 		}
-		_ = ax.WriteError(stderr, err)
-		return ax.ErrorExitCode(err)
+		_ = ax.WriteError(stderr, declErr)
+		return ax.ErrorExitCode(declErr)
 	}
 	root.SetArgs(args)
 
@@ -246,6 +250,35 @@ func declareAgentContext(root *cobra.Command) error {
 		Description: "0 success, 1 internal, 2 validation, 3 network or timeout, 4 auth or permission.",
 		MIMEType:    "text/plain",
 	})
+}
+
+// declareCommandSemantics declares what an agent needs to call each command
+// correctly on the first try: the allowed --count values (enforced at parse
+// time), an example --patch document, and every command's side-effect class.
+// A command missing from the tree surfaces as ax.ErrInvalidDeclaration.
+func declareCommandSemantics(root *cobra.Command) error {
+	commands := map[string]*cobra.Command{}
+	for _, cmd := range root.Commands() {
+		commands[cmd.Name()] = cmd
+	}
+	stream := commands[streamCommandName]
+	patchConfig := commands[patchConfigCommandName]
+	if err := errors.Join(
+		ax.WithFlagEnum(stream, "count", "1", "2", "3", "5", "10"),
+		ax.WithFlagExample(patchConfig, "patch", `[{"op":"replace","path":"/name","value":"Ada"}]`),
+		ax.WithCapability(root, ax.CapabilityReadOnly, ""),
+		ax.WithCapability(stream, ax.CapabilityReadOnly, ""),
+		ax.WithCapability(patchConfig, ax.CapabilityMutate, "rewrites the file in place, preserving comments"),
+		ax.WithCapability(commands[fetchCommandName], ax.CapabilityExternalNetwork, ""),
+		ax.WithCapability(commands[failCommandName], ax.CapabilityReadOnly, ""),
+		ax.WithCapability(commands[authzCommandName], ax.CapabilityReadOnly, ""),
+		ax.WithCapability(commands[crashCommandName], ax.CapabilityReadOnly, ""),
+		ax.WithCapability(commands[confirmCommandName], ax.CapabilityMutate,
+			"confirmation-gated; requires --yes or an interactive yes"),
+	); err != nil {
+		return fmt.Errorf("declare command semantics: %w", err)
+	}
+	return nil
 }
 
 func newConfirmCommand() *cobra.Command {

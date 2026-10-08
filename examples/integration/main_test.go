@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"reflect"
 	"runtime"
 	"strings"
 	"testing"
@@ -897,5 +898,44 @@ func assertQuickstartSession(ctx context.Context, t *testing.T, session *sdk.Cli
 	}
 	if !strings.Contains(text.Text, `"name":"quickstart"`) {
 		t.Errorf("stream payload missing name=quickstart; got %q", text.Text)
+	}
+}
+
+// TestStreamRejectsOutOfSetCount asserts the declared --count enum is enforced
+// at parse time, before any dry-run handling: exit 2, nothing on stdout, and an
+// envelope listing the allowed values and one suggestion per value, never the
+// rejected input.
+func TestStreamRejectsOutOfSetCount(t *testing.T) {
+	for _, args := range [][]string{
+		{"stream", "--format=json", "--count=4"},
+		{"stream", "--format=json", "--dry-run", "--count=4"},
+	} {
+		t.Run(strings.Join(args, " "), func(t *testing.T) {
+			code, stdout, stderr := runCapture(t, args, emptyEnv)
+			if code != ax.ExitValidation {
+				t.Fatalf("exit code = %d, want %d; stderr=%s", code, ax.ExitValidation, stderr)
+			}
+			if stdout != "" {
+				t.Fatalf("stdout = %q, want empty", stdout)
+			}
+			var envelope ax.Error
+			if err := json.Unmarshal([]byte(stderr), &envelope); err != nil {
+				t.Fatalf("stderr was not an error envelope: %v", err)
+			}
+			if envelope.ErrorCode != "validation_error" {
+				t.Fatalf("error_code = %q, want validation_error", envelope.ErrorCode)
+			}
+			wantAllowed := []any{"1", "2", "3", "5", "10"}
+			if !reflect.DeepEqual(envelope.Context["allowed"], wantAllowed) {
+				t.Fatalf("context.allowed = %#v, want %#v", envelope.Context["allowed"], wantAllowed)
+			}
+			if _, present := envelope.Context["value"]; present {
+				t.Fatal("context echoes the rejected value")
+			}
+			wantSuggestions := []string{"--count=1", "--count=2", "--count=3", "--count=5", "--count=10"}
+			if !reflect.DeepEqual(envelope.Suggestions, wantSuggestions) {
+				t.Fatalf("suggestions = %v, want %v", envelope.Suggestions, wantSuggestions)
+			}
+		})
 	}
 }

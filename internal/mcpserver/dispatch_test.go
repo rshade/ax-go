@@ -15,6 +15,7 @@ import (
 	ax "github.com/rshade/ax-go"
 	"github.com/rshade/ax-go/contract"
 	internalmcp "github.com/rshade/ax-go/internal/mcp"
+	"github.com/rshade/ax-go/schema"
 )
 
 const echoStderrMarker = "echo-command-diagnostic"
@@ -833,5 +834,87 @@ func TestDispatchExcludedCommandIsUnknownTool(t *testing.T) {
 	}
 	if calls != 0 {
 		t.Errorf("excluded RunE ran %d times, want 0", calls)
+	}
+}
+
+// enumRoot builds a tree whose "show" command echoes an enum-constrained
+// --output flag (empty default, excluded from the set) and counts body runs.
+func enumRoot(t *testing.T, runs *int) *cobra.Command {
+	t.Helper()
+	root := &cobra.Command{Use: "demo", Short: "root", RunE: noopRunE}
+	var output string
+	show := &cobra.Command{Use: "show", Short: "show", RunE: func(cmd *cobra.Command, _ []string) error {
+		*runs++
+		return contract.WriteJSON(cmd.OutOrStdout(), contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: output}))
+	}}
+	show.Flags().StringVar(&output, "output", "", "output format")
+	root.AddCommand(show)
+	if err := schema.WithFlagEnum(show, "output", "json", "table"); err != nil {
+		t.Fatalf("WithFlagEnum: %v", err)
+	}
+	return root
+}
+
+// TestDispatchRejectsOutOfSetEnum asserts the live server enforces a declared
+// enum with the same structured envelope as ax.Execute (context and
+// suggestions preserved, not a re-wrapped pflag message), never runs the body,
+// keeps serving, resets an enum flag to its empty default between calls (C1),
+// and advertises the enum in the tool's inputSchema.
+func TestDispatchRejectsOutOfSetEnum(t *testing.T) {
+	var runs int
+	d := newTestDispatcher(enumRoot(t, &runs))
+
+	res := mustCall(t, d, "demo-show", map[string]any{"output": "xml"})
+	if !res.IsError {
+		t.Fatalf("expected IsError for an out-of-set value, got: %s", resultText(t, res))
+	}
+	text := resultText(t, res)
+	if strings.Contains(text, "xml") {
+		t.Fatalf("envelope echoes the raw input: %s", text)
+	}
+	env := decodeErrorEnvelope(t, text)
+	if env.ErrorCode != "validation_error" {
+		t.Fatalf("error_code = %q, want validation_error", env.ErrorCode)
+	}
+	wantContext := map[string]any{"flag": "output", "allowed": []any{"json", "table"}}
+	if !reflect.DeepEqual(env.Context, wantContext) {
+		t.Fatalf("context = %#v, want %#v", env.Context, wantContext)
+	}
+	if !reflect.DeepEqual(env.Suggestions, []string{"--output=json", "--output=table"}) {
+		t.Fatalf("suggestions = %v", env.Suggestions)
+	}
+	if runs != 0 {
+		t.Fatalf("command body ran %d times on rejection, want 0", runs)
+	}
+
+	res = mustCall(t, d, "demo-show", map[string]any{"output": "table"})
+	if res.IsError {
+		t.Fatalf("valid call failed after a rejection: %s", resultText(t, res))
+	}
+	if got := decodeEnvelope(t, resultText(t, res)).Data.Name; got != "table" {
+		t.Fatalf("output = %q, want table", got)
+	}
+
+	res = mustCall(t, d, "demo-show", nil)
+	if res.IsError {
+		t.Fatalf("call omitting --output failed: %s", resultText(t, res))
+	}
+	if got := decodeEnvelope(t, resultText(t, res)).Data.Name; got != "" {
+		t.Fatalf("output = %q after reset, want empty default (previous value leaked)", got)
+	}
+
+	var tool *schema.MCPTool
+	for i := range d.tools {
+		if d.tools[i].Name == "demo-show" {
+			tool = &d.tools[i]
+		}
+	}
+	if tool == nil {
+		t.Fatal("demo-show not advertised")
+	}
+	properties, _ := tool.InputSchema["properties"].(map[string]any)
+	output, _ := properties["output"].(map[string]any)
+	if !reflect.DeepEqual(output["enum"], []any{"json", "table"}) {
+		t.Fatalf("advertised enum = %#v, want [json table]", output["enum"])
 	}
 }

@@ -318,6 +318,62 @@ fail with a `validation_error` (exit `2`). The live `mcp-server` does not serve
 prompts or resources yet; that runtime phase is deferred
 ([`specs/028-mcp-prompts-resources/`](specs/028-mcp-prompts-resources/spec.md)).
 
+#### Declaring flag and command semantics
+
+Three declaration functions, in the same `With…(cmd, …)` idiom, add the facts
+an agent needs to call a command correctly on the first try. `default` and
+`required` are still derived from Cobra, so you do not declare them again. Each
+function returns an error wrapping `ax.ErrInvalidDeclaration` for an authoring
+mistake, such as a default outside the enum, and leaves the command unchanged:
+
+```go
+cmd.Flags().String("output", "json", "output format")
+cmd.Flags().Duration("timeout", 30*time.Second, "deadline")
+
+if err := ax.WithFlagEnum(cmd, "output", "json", "table", "yaml"); err != nil {
+    return err
+}
+if err := ax.WithFlagExample(cmd, "timeout", "45s"); err != nil {
+    return err
+}
+if err := ax.WithCapability(cmd, ax.CapabilityMutate, "idempotent by release name"); err != nil {
+    return err
+}
+```
+
+| Declaration | `__schema` | `__schema --as=mcp` |
+|-------------|------------|---------------------|
+| `WithFlagEnum` | flag `enum`, CLI strings in author order | typed JSON-Schema `enum` |
+| `WithFlagExample` | flag `example`, in CLI form | one-element `examples` array |
+| `WithCapability` | command `capability: {class, note}` | tool `capability` plus MCP `annotations` hints |
+
+The capability class comes from a fixed vocabulary. A command that never
+declares one is unclassified: the field is omitted and no class is implied.
+
+| Class | Meaning an agent may rely on | MCP hint |
+|-------|------------------------------|----------|
+| `read-only` | Observes state only; safe to call speculatively | `readOnlyHint: true` |
+| `create` | Creates new state; retries may duplicate without `--idempotency-key` | `destructiveHint: false` |
+| `mutate` | Changes existing state and may overwrite it | `destructiveHint: true` |
+| `delete` | Removes state | `destructiveHint: true` |
+| `external-network` | Reaches a network endpoint outside the host; says nothing about state | `openWorldHint: true` |
+| `admin` | Privileged or administrative operation | `destructiveHint: true` |
+
+A declared enum is **enforced**, not only advertised. The check runs while flags
+are parsed, before `PersistentPreRunE`, `--dry-run` handling, or `RunE`, under
+both `ax.Execute` and `mcp-server`. An out-of-set value exits `2` with nothing
+on `stdout` and one envelope on `stderr`. The envelope never echoes the
+rejected input:
+
+```json
+{"error_code":"validation_error","message":"flag --output: value is not one of the allowed values","context":{"allowed":["json","table","yaml"],"flag":"output"},"suggestions":["--output=json","--output=table","--output=yaml"]}
+```
+
+Integer enums compare numerically, so `--replicas=03` matches `3`. The flag's
+own default is always accepted. See
+[`specs/018-richer-flag-schema/contracts/`](specs/018-richer-flag-schema/contracts/)
+for the full API and payload contracts.
+
 ### Running as an MCP server
 
 The same command tree that powers `__schema --as=mcp` can run as a **live MCP

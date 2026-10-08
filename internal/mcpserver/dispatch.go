@@ -110,7 +110,15 @@ func newDispatcher(ctx context.Context, root *cobra.Command, cfg Config) *dispat
 	// slice-argument validation and the argument-validation contract (C-8). Without
 	// this they would surface untyped from ExecuteContext and fall through to
 	// internal_error (exit 1), misreporting fixable bad input as a server fault.
+	// A flag Value that already returns a structured *contract.Error (a declared
+	// enum's rejection) is passed through unchanged: re-wrapping its message
+	// would drop context and suggestions, and pflag's message echoes the raw
+	// input the envelope deliberately omits.
 	execRoot.SetFlagErrorFunc(func(cmd *cobra.Command, ferr error) error {
+		var contractErr *contract.Error
+		if errors.As(ferr, &contractErr) {
+			return contractErr
+		}
 		return d.validationError(cmd.Context(), ferr.Error())
 	})
 	return d

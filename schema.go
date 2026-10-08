@@ -96,3 +96,57 @@ func DeclarePrompt(cmd *cobra.Command, prompt Prompt) error {
 func DeclareResource(cmd *cobra.Command, resource Resource) error {
 	return isolatedschema.DeclareResource(cmd, resource)
 }
+
+// ErrInvalidDeclaration is wrapped by every authoring error returned from
+// WithFlagEnum, WithFlagExample, and WithCapability. It is the same value as
+// schema.ErrInvalidDeclaration, so errors.Is holds across both packages.
+var ErrInvalidDeclaration = isolatedschema.ErrInvalidDeclaration
+
+// WithFlagEnum declares the only values the named flag accepts; a value outside
+// the set is rejected at parse time with validation_error and exit code 2,
+// before PersistentPreRunE and RunE and so before any dry-run handling. See
+// schema.WithFlagEnum for the full contract.
+func WithFlagEnum(cmd *cobra.Command, flag string, values ...string) error {
+	return isolatedschema.WithFlagEnum(cmd, flag, values...)
+}
+
+// WithFlagExample attaches one CLI-form example value to the named flag. See
+// schema.WithFlagExample for the full contract.
+func WithFlagExample(cmd *cobra.Command, flag string, example string) error {
+	return isolatedschema.WithFlagExample(cmd, flag, example)
+}
+
+// Capability is a command's side-effect class from ax-go's fixed vocabulary.
+// See schema.Capability.
+type Capability = isolatedschema.Capability
+
+// The six capability classes; each equals its schema package counterpart.
+const (
+	// CapabilityReadOnly marks a command that observes state only.
+	CapabilityReadOnly = isolatedschema.CapabilityReadOnly
+	// CapabilityCreate marks a command that creates new state.
+	CapabilityCreate = isolatedschema.CapabilityCreate
+	// CapabilityMutate marks a command that changes existing state.
+	CapabilityMutate = isolatedschema.CapabilityMutate
+	// CapabilityDelete marks a command that removes state.
+	CapabilityDelete = isolatedschema.CapabilityDelete
+	// CapabilityExternalNetwork marks a command that reaches a network endpoint
+	// outside the host.
+	CapabilityExternalNetwork = isolatedschema.CapabilityExternalNetwork
+	// CapabilityAdmin marks a privileged or administrative operation.
+	CapabilityAdmin = isolatedschema.CapabilityAdmin
+)
+
+// CapabilitySchema is a command's declared side-effect class and optional note.
+type CapabilitySchema = isolatedschema.CapabilitySchema
+
+// MCPToolAnnotations are the standard MCP tool hints derived from a capability
+// class.
+type MCPToolAnnotations = isolatedschema.MCPToolAnnotations
+
+// WithCapability classifies cmd's side effects with one class from the fixed
+// vocabulary plus an optional note. See schema.WithCapability for the full
+// contract.
+func WithCapability(cmd *cobra.Command, class Capability, note string) error {
+	return isolatedschema.WithCapability(cmd, class, note)
+}
