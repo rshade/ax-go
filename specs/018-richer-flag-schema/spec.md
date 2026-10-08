@@ -205,21 +205,33 @@ still appear without any re-declaration.
   default value is not a member of its declared allowed-value set, the condition must
   be surfaced to the author (an authoring mistake) — with enforcement active, an
   unreachable-or-rejected default is a contradiction that must not ship silently.
+  An **empty** default means "no default" and is exempt, so an optional enum flag
+  need not list `""`. A **non-empty implicit** default is not exempt: an integer
+  flag declared without an explicit default carries `0`, which must be a member.
+  The flag's declared default is always **accepted** at parse time — passing it
+  explicitly yields the same state as omitting the flag — so resetting a flag to
+  its default (as the MCP server does between calls) can never be rejected.
 - **Capability class outside the fixed vocabulary**: a declared class that is not a
   member of ax-go's fixed vocabulary must be surfaced to the author as an authoring
   error, not emitted as an unrecognised class.
 - **Example inconsistent with the flag's own constraints**: an example that
   violates the flag's type or its declared allowed set is an authoring mistake and
-  must be surfaced rather than advertised as valid.
+  must be surfaced rather than advertised as valid. Where ax-go cannot type-check a
+  value — an author-defined custom flag type — the example is accepted unchecked,
+  and that limitation is documented on the declaration function.
 - **Inherited / persistent flags**: metadata declared on a parent command's flag
   must appear on child commands exactly as `default` and `required` already
   propagate, with no duplication.
 - **Empty or malformed declaration**: a declaration with no usable content must
   fail closed — the field is omitted rather than emitted partial or invalid —
   matching how the non-deterministic-fields declaration already fails closed.
-- **Non-string allowed values**: an allowed-value set on an integer, boolean, or
-  other non-string flag must be represented consistently between `__schema` and the
-  `--as=mcp` JSON-Schema `enum`.
+- **Non-string allowed values**: an allowed-value set on an integer flag must be
+  represented consistently between `__schema` (CLI-form strings, as `default` is
+  today) and the `--as=mcp` JSON-Schema `enum` (typed numbers). Allowed-value sets
+  are supported on string, integer, and author-defined custom flag types only;
+  declaring one on a boolean, counter, floating-point, duration, or list flag is an
+  authoring error (FR-013), because those types either make an enum meaningless or
+  have no single canonical spelling to compare against.
 - **Ordering / determinism**: the emitted order of allowed values must be stable
   across runs for identical input, so agents diffing two runs never see spurious
   drift.
@@ -244,7 +256,10 @@ still appear without any re-declaration.
 - **FR-004**: The `--as=mcp` adapter MUST reflect the same information for MCP
   clients: the allowed-value set as a JSON-Schema `enum` on the flag's input-schema
   property, the per-flag example in the standard JSON-Schema example form, and the
-  command capability class on the corresponding MCP tool.
+  command capability class on the corresponding MCP tool. The live `mcp-server`
+  runtime advertises the same input schema (`enum`, examples) and conveys the
+  capability class through the standard MCP tool hints only; carrying the exact
+  class and note on the live path is out of scope for this feature.
 - **FR-005**: ax-go MUST provide a public declaration mechanism for authors to
   attach an allowed-value set, an example, and a capability class, consistent with
   the existing per-command metadata declaration idiom.
@@ -270,14 +285,20 @@ still appear without any re-declaration.
 - **FR-013**: An authoring inconsistency — a derived default outside a declared
   allowed set, an example that violates the flag's type or allowed set, or a
   capability class outside the fixed vocabulary — MUST be surfaced to the author
-  rather than emitted as a contradictory or unrecognised contract.
+  rather than emitted as a contradictory or unrecognised contract. An example for
+  an author-defined custom flag type, whose values ax-go cannot parse, is exempt
+  from the type check.
 - **FR-014**: Declared allowed-value sets MUST be **enforced at parse time**: for a
   flag with a declared set, ax-go MUST reject any value outside the set before the
   command's action runs, emitting the `ax.Error` envelope on `stderr` with the
   validation exit code (2), naming the offending flag and the permitted set, and
   causing no side effect. Enforcement MUST precede `--dry-run` side-effect
   suppression, so an out-of-set value never produces a "successful" dry-run
-  envelope. The rejection MUST be deterministic for identical input.
+  envelope. The rejection MUST be deterministic for identical input. The rejection
+  MUST NOT echo the offending value back: it may be a secret mistakenly passed to
+  the wrong flag, and `stderr` is shipped to log aggregation; the flag name, the
+  permitted set, and suggested corrections are sufficient to repair the call. A
+  flag's declared default value is always accepted.
 - **FR-015**: The command capability / side-effect class MUST be expressed as a
   **required class drawn from a fixed, ax-go-defined and documented vocabulary**,
   plus an **optional free-form note** for author-specific detail. The fixed class is

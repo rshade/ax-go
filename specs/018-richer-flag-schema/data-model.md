@@ -54,12 +54,14 @@ An internal type in `internal/schema` that wraps a flag's `pflag.Value`.
 | inner | `pflag.Value` | The original value; never another `enumValue` (see re-declaration below) |
 | allowed | `[]string` | Non-empty; no duplicates after canonicalisation; author order preserved |
 | kind | internal enum | `string` or `int` with signedness and bit size, derived from `inner.Type()` |
-| flagName | `string` | For the rejection envelope |
+| flag | `*pflag.Flag` | The owning flag: supplies the name for the rejection envelope and the live `DefValue` that `Set` always accepts |
 
 **Methods**:
 
-- `Set(v)`: canonicalises `v`. If `v` is not a member, it returns
-  `*contract.Error` (R9) and does **not** call `inner.Set`, so the bound
+- `Set(v)`: if `v` equals the live `flag.DefValue`, it returns `inner.Set(v)`
+  without a membership check, so restoring the default can never fail
+  (research.md R5). Otherwise it canonicalises `v`. If `v` is not a member, it
+  returns `*contract.Error` (R9) and does **not** call `inner.Set`, so the bound
   variable is not modified. If `v` is a member, it returns `inner.Set(v)`.
 - `String()` and `Type()` delegate to `inner`.
 

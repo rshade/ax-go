@@ -87,12 +87,14 @@ Invocation: `app deploy --output=xml` (with or without `--dry-run`).
   "tool": "app",
   "version": "<injected>",
   "schema_version": "<ErrorSchemaVersion>",
-  "context": {"allowed": ["json","table","yaml"], "flag": "output", "value": "xml"},
+  "context": {"allowed": ["json","table","yaml"], "flag": "output"},
   "suggestions": ["--output=json", "--output=table", "--output=yaml"]
 }
 ```
 
 - exit code: `2`
+
+The offending value (`xml`) appears nowhere in the envelope (research.md R9).
 
 The same input always produces the same envelope, apart from `trace_id`.
 Neither `PersistentPreRunE` nor `RunE` runs.

@@ -62,8 +62,10 @@ budget.
 
 **Performance Goals**: `BenchmarkBuildCommand` stays inside the benchcheck
 budget: ns/op may grow at most 5%, and allocs/op at most +1, for a tree that
-declares nothing. A flag with no declaration adds no allocations: the code does
-one type assertion and reads one map entry.
+declares nothing. On a flag with no declaration the readers do one type
+assertion and one map lookup and allocate nothing. `BenchmarkBuildCommand`
+measures exactly this path (its tree declares nothing), and `make bench-check`
+fails at +1 allocs/op. No performance claim is made about the declared path.
 
 **Constraints**: The `schema` package stays import-isolated, so it must not
 import the MCP SDK, `net/http`, or the root facade. Output stays deterministic.
@@ -93,7 +95,7 @@ decision it changes, so no ADR is absorbed or retired.
 | VI. Library Scope | Cobra stays the only framework; no state is persisted; the change is specified through Spec Kit, not an ADR | PASS |
 | VII. Test-First | Failing tests come first for each FR. Golden, fuzz (canonicaliser) and `ExampleXxx` tests are added, and every new export has a doc comment. | PASS (gated in tasks) |
 | VIII. Observability | No logging; the rejection envelope keeps `trace_id` because `normalizeExecuteError` fills it | PASS |
-| IX. Security | No panic: declarations return errors. The user's value appears only in the JSON-escaped envelope's `context` field. It is never formatted into a log message and never into the error `message`. | PASS |
+| IX. Security | No panic: declarations return errors. The rejection envelope never echoes the user's value, in `message` or in `context`, because stderr is shipped to Loki (Principle VIII) and a secret passed to the wrong flag must not reach logs (research.md R9). | PASS |
 | X. Idiomatic Go | No new dependency and no package-level mutable state. The vocabulary is a `const` block, and membership is checked with a `switch`. Errors wrap with `%w` (`ErrInvalidDeclaration`). | PASS |
 | XI. Stability & SemVer | Additive Go API and additive payload fields, so the commit type is `feat:` and the release is a minor bump. No `breaking-change-approved` label is needed. | PASS |
 | XII. Deprecation | Nothing deprecated | N/A |
@@ -133,7 +135,7 @@ specs/018-richer-flag-schema/
 
 ```text
 internal/schema/
-├── schema.go             # Flag gains Enum/Example; Command gains Capability; CollectFlags reads them
+├── schema.go             # Flag gains Enum/Example (CollectFlags reads them); Command unchanged — capability is read from its cloned Annotations
 ├── declare.go            # NEW: enumValue wrapper, annotation keys, declaration + validation logic,
 │                         #      capability vocabulary, fail-closed readers
 ├── convert.go            # NEW: type-aware canonicalise/convert helpers (moved from internal/mcp)
@@ -141,7 +143,7 @@ internal/schema/
 └── declare_fuzz_test.go  # NEW: FuzzEnumCanonicalise
 
 internal/mcp/
-├── mcp.go                # flagProperty emits "enum"/"examples"; Tool gains Capability + Annotations
+├── mcp.go                # flagProperty emits "enum"/"examples"; Tool gains CapabilityClass/CapabilityNote/Hints
 └── *_test.go             # enum/example/annotations property tests
 
 internal/mcpserver/

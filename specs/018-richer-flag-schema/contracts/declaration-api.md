@@ -51,7 +51,8 @@ declaration applies to every descendant command.
   the given order, as `enum`. `--as=mcp` emits them as a typed JSON-Schema
   `enum`. Any value outside the set given at parse time is rejected before
   `PersistentPreRunE` or `RunE` runs, with `validation_error` and exit code `2`,
-  including under `--dry-run`. Calling the function again replaces the set.
+  including under `--dry-run`. The flag's own default is always accepted, even
+  when it is empty and not a member. Calling the function again replaces the set.
 - **Errors**: the function returns an error wrapping `ErrInvalidDeclaration`,
   and leaves `cmd` unchanged, when:
   - `cmd` is nil or the flag is not found;
