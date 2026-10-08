@@ -239,6 +239,10 @@ To check whether a proposed change respects these boundaries, ask:
    `deadcode -test` reports across all four tag configurations on the host
    platform. Test-only callers count; this does not prove production usage
    or cover exported public API.
+10. **Unread fields:** Does `make slop-check` pass? It reports struct fields a
+    composite literal assigns and nothing reads, intersected across all four
+    tag configurations with tests counted as readers. Read the field where it
+    matters or delete it; there is no allowlist.
 
 ## Roadmap Sync Behavior
 

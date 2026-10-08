@@ -249,6 +249,39 @@ timeouts, `4` for permission errors, and `1` for internal failures (including
 canceled analysis). Tool output is bounded at 16 MiB per stream and each configuration
 has a five-minute analysis timeout.
 
+### Unread Field Gate
+
+Run `make slop-check` before handing work back. It is included in `make ci`
+and the CI `validate` job. It is not `make slop`: that is the non-blocking,
+type-free ast-grep report, and this is the blocking, type-aware gate.
+
+`internal/cmd/slopcheck` reports a struct field that a composite literal
+assigns and no code reads, such as the table-test `expectError bool` that
+every case sets and no assertion consults. `unused` treats the write in the
+literal as a use, so nothing else in the pipeline sees it. The classification
+lives in `internal/unreadfield` and has two front ends: this stdlib-only gate,
+which owns the stream contract, and a `go/analysis` adapter
+(`internal/unreadfield/analyzer`) tested with `analysistest`. Both call the
+same `Analyze`, and a parity test keeps them equal.
+
+The gate loads `./...` with `go list -deps -export -test` under default,
+`ax_no_grpc`, `ax_no_otlp`, and both tags on the host GOOS/GOARCH, and
+reports a field only when it is unread in every configuration that assigns
+it. Tests count as readers. Exported fields of types nameable outside the
+package are skipped. A value used whole in any way the analysis cannot follow
+(equality, interface conversion, reflection, a call into another package)
+counts as reading every field, so the gate misses rather than over-reports.
+There is no allowlist: read the field where it matters, or delete it.
+
+A pass emits one minified JSON object on stdout and nothing on stderr.
+Failures emit one `ax.Error` envelope on stderr and nothing on stdout, with
+findings in `context.cause`. Exit codes are `2` for findings, invalid flags
+or `-dir`, or a package that does not load or type-check, `3` for a
+configuration exceeding its five-minute timeout, `4` for permission errors,
+and `1` for cancellation or internal failures. The build-tag list is
+`unreadfield.BuildConfigurations()`, and a test keeps it equal to the
+Makefile `BUILD_TAG_MATRIX`.
+
 ### Mandatory Spec Kit Workflow
 
 For every feature governed by Spec Kit, especially a public API or
@@ -917,5 +950,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/030-serve-mcp-prompts-resources/plan.md
+at specs/031-slopcheck-unread-fields/plan.md
 <!-- SPECKIT END -->
