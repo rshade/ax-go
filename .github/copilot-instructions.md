@@ -2,7 +2,9 @@
 
 `ax-go` (module `github.com/rshade/ax-go`, package `ax`) is the Agentic Experience
 foundation for Go CLIs: it makes Go command-line tools predictable for LLM agents while
-staying ergonomic for humans. It targets **Go 1.27.1**.
+staying ergonomic for humans. The Go version and every tool version are pinned in
+`mise.toml` (and `go.mod`'s `go` directive matches it); read them from there, never
+from prose.
 
 ## Source of truth (read before flagging a "divergence")
 
@@ -20,7 +22,8 @@ Authority runs **constitution → feature spec → agent docs → code**:
 
 ## Go version facts (avoid stale-Go false positives)
 
-This is modern Go (1.27.1). The following are valid and must not be flagged as errors:
+This is modern Go (see the `go` pin in `mise.toml`). The following are valid and must
+not be flagged as errors:
 
 - `for i := range n` where `n` is an integer ranges `i` from `0` to `n-1` (Go 1.22+).
 - Generics, the `min`/`max`/`clear` builtins, and `errors.Join` are available.
@@ -60,15 +63,16 @@ This is modern Go (1.27.1). The following are valid and must not be flagged as e
 - Reads accept Hujson; **writes emit strict, minified JSON** (Hujson cannot marshal
   comments). NDJSON for streaming/unbounded output.
 - `internal/` is private and toolchain-enforced. The public surface is the root package
-  `ax` plus the contract packages `contract`, `config`, `schema`, and `id`; only those
-  are gated by API-diff (`internal/` is exempt).
+  `ax` plus `config`, `contract`, `id`, `logging`, `mcp`, `schema`, and `axtest`.
+  `allowedPackages` in `internal/cmd/apidiff-verdict` is the single list API-diff gates
+  (`internal/` is exempt).
 
 ## How to validate (run before raising correctness concerns)
 
 ```bash
 go test -race ./...        # make test — race detector is required
 make validate              # gofmt -s, go mod tidy -diff, go vet ./...
-make lint                  # golangci-lint v2.12.2 + markdownlint + actionlint
+make lint                  # golangci-lint + markdownlint + actionlint (versions in mise.toml)
 make doc-coverage          # ExampleXxx coverage on the primary API
 make cover-check           # per-package + repo-wide coverage floors
 make ci                    # test + validate + lint + doc-coverage

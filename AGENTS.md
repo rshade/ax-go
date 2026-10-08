@@ -7,7 +7,7 @@
 and still ergonomic for human engineers.
 
 The module is `github.com/rshade/ax-go`, the package name should be `ax`, and
-the project currently targets Go `1.27.1`. The canonical source of truth for
+the project targets the Go version pinned in `mise.toml`. The canonical source of truth for
 behavior and public API decisions is the constitution at
 `.specify/memory/constitution.md`. The ADRs in `docs/adr/` are a FROZEN legacy
 decision log being retired through the Spec Kit feature workflow; where an ADR
@@ -265,9 +265,10 @@ explicitly requested only one artifact or stage. `speckit-clarify` is
 conditional on material ambiguity; `speckit-analyze` is always required after
 task generation and before implementation.
 
-Go, golangci-lint, actionlint, and govulncheck are pinned once in
-[`mise.toml`](mise.toml) — the single source of truth CI reads via
-`jdx/mise-action`. Run `make ensure` (requires [mise](https://mise.jdx.dev/))
+Go, golangci-lint, actionlint, govulncheck, deadcode, dupl, go-apidiff, and
+markdownlint-cli are pinned once in [`mise.toml`](mise.toml) — the single
+source of truth CI reads via `mise install`. Do not repeat a version in a
+workflow, the Makefile, or prose; read it from `mise.toml`. Run `make ensure` (requires [mise](https://mise.jdx.dev/))
 to install every pinned tool locally at the same version CI uses. `go.mod`'s
 `go` directive must match `mise.toml`'s pinned `go` version; `make validate`
 and CI's `validate` job fail closed if they disagree. `mise.toml` also pins
@@ -840,7 +841,7 @@ follows them.
 - **Public API diffing in CI.** The `API Diff` workflow
   (`.github/workflows/apidiff.yml`) runs `go-apidiff` on every PR and scopes
   the result to the public surface — the root package `ax` plus the public
-  packages `config`, `contract`, `id`, `logging`, `mcp`, and `schema`.
+  packages `axtest`, `config`, `contract`, `id`, `logging`, `mcp`, and `schema`.
   `internal/` is exempt
   (Constitution Principle XI; the toolchain blocks external import). An
   incompatible change to that surface **fails CI** unless the PR carries the

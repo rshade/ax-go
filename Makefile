@@ -6,8 +6,8 @@
 GOLANGCI_LINT?=golangci-lint
 GOLANGCI_LINT_VERSION:=$(shell awk -F'"' '/^golangci-lint =/{print $$2}' mise.toml)
 MARKDOWNLINT?=markdownlint
-MARKDOWNLINT_VERSION?=0.49.0
-MARKDOWNLINT_FILES?=AGENTS.md README.md CONTRIBUTING.md .github/copilot-instructions.md docs/**/*.md
+MARKDOWNLINT_VERSION:=$(shell awk -F'"' '/^"npm:markdownlint-cli" =/{print $$4}' mise.toml)
+MARKDOWNLINT_FILES?=AGENTS.md README.md CONTRIBUTING.md .github/copilot-instructions.md .github/skills/**/*.md docs/**/*.md
 ACTIONLINT?=actionlint
 GOVULNCHECK?=govulncheck
 VERSION ?= $(shell git describe --tags --always --dirty 2>/dev/null || echo 0.0.0-unknown)
@@ -229,12 +229,16 @@ lint:
 			$(GOLANGCI_LINT) run --allow-parallel-runners --build-tags="$$tags" || exit 1; \
 		fi; \
 	done
-	@echo "Running markdownlint..."
-	@command -v $(MARKDOWNLINT) >/dev/null 2>&1 || \
-		(echo "markdownlint CLI not found. Install with"; \
-		echo "  npm install -g markdownlint-cli@$(MARKDOWNLINT_VERSION)"; exit 1)
-	$(MARKDOWNLINT) $(MARKDOWNLINT_FILES)
+	@$(MAKE) lint-markdown
 	@$(MAKE) lint-actions
+
+# CI calls this target too, so the file list and version live in one place.
+.PHONY: lint-markdown
+lint-markdown:
+	@echo "Running markdownlint (expected version $(MARKDOWNLINT_VERSION))..."
+	@$(MARKDOWNLINT) --version 2>/dev/null | grep -qx "$(MARKDOWNLINT_VERSION)" || \
+		(echo "markdownlint-cli $(MARKDOWNLINT_VERSION) required (pinned in mise.toml). Run: mise install"; exit 1)
+	$(MARKDOWNLINT) $(MARKDOWNLINT_FILES)
 
 .PHONY: lint-actions
 lint-actions:
@@ -277,28 +281,21 @@ security:
 	$(GOVULNCHECK) ./...
 
 .PHONY: ensure
-ensure: ensure-mise-tools ensure-markdownlint
+ensure: ensure-mise-tools
 	@echo "All dev tools are ready."
 
-# Go, golangci-lint, actionlint, govulncheck, and deadcode are all pinned in mise.toml;
+# Go, golangci-lint, actionlint, govulncheck, deadcode, dupl, go-apidiff, and
+# markdownlint-cli are all pinned in mise.toml;
 # `mise install` puts every one of them on PATH via shims at the exact
 # version CI uses (.github/workflows/*.yml via jdx/mise-action). Bumping a
 # version is a one-line mise.toml edit instead of a hunt across the Makefile
 # and every workflow file.
 .PHONY: ensure-mise-tools
 ensure-mise-tools:
-	@echo "==> Go, golangci-lint, actionlint, govulncheck, deadcode, dupl (pinned in mise.toml)"
+	@echo "==> Go, golangci-lint, actionlint, govulncheck, deadcode, dupl, go-apidiff, markdownlint-cli (pinned in mise.toml)"
 	@command -v mise >/dev/null 2>&1 || \
 		(echo "    mise not found. Install: https://mise.jdx.dev/installing-mise.html"; exit 1)
 	mise install
-	@echo "    OK"
-
-.PHONY: ensure-markdownlint
-ensure-markdownlint:
-	@echo "==> markdownlint-cli"
-	@command -v $(MARKDOWNLINT) >/dev/null 2>&1 || \
-		(echo "    Installing markdownlint-cli@$(MARKDOWNLINT_VERSION)..." && \
-		npm install -g markdownlint-cli@$(MARKDOWNLINT_VERSION))
 	@echo "    OK"
 
 .PHONY: clean

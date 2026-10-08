@@ -54,11 +54,6 @@ jobs:
           go list -f '{{.ImportPath}} {{.Name}}' ./... |
             go run ./internal/cmd/apidiff-verdict check-packages
 
-      - name: Install go-apidiff
-        run: |
-          go install github.com/joelanford/go-apidiff@v0.8.3
-          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
-
       - name: Compute public API verdict
         id: verdict
         env:

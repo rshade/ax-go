@@ -66,8 +66,8 @@ To change the checklist content, edit the `body:` field in
 
 ## Quality gates
 
-Go, golangci-lint, actionlint, govulncheck, and deadcode are pinned once in
-[`mise.toml`](mise.toml). Install [mise](https://mise.jdx.dev/), then run
+Go, golangci-lint, actionlint, govulncheck, deadcode, dupl, go-apidiff, and
+markdownlint-cli are pinned once in [`mise.toml`](mise.toml). Install [mise](https://mise.jdx.dev/), then run
 `make ensure` to fetch every pinned tool at the version CI uses.
 
 Before opening a PR, run:
