@@ -149,8 +149,15 @@ the schema readers check consistency again and omit the field (R3).
   `DefValue` means "no default" and is exempt. The existing schema already
   treats it that way: `Default` is `omitempty`, and
   `internal/mcp.jsonSchemaScalarDefault` emits no default for `""`. pflag never
-  calls `Set` for the default, so an unset flag is never rejected. An explicit
-  `--flag=""` is rejected unless `""` is a declared member.
+  calls `Set` for the default, so an unset flag is never rejected.
+- **The default is always accepted by `Set`**: the wrapper keeps a pointer to its
+  `*pflag.Flag` and accepts any value equal to the live `flag.DefValue`, before
+  the membership check. Passing the default explicitly produces the same state as
+  omitting the flag, so this widens nothing an agent can observe. It is required
+  because `internal/mcpserver.resetFlagSet` restores every changed flag with
+  `flag.Value.Set(flag.DefValue)` between calls and discards the error. Without
+  the exemption, an enum flag with an empty default would reject that reset and
+  keep the previous call's value, silently leaking it into the next call.
 
 **Rationale**:
 
@@ -265,7 +272,8 @@ are untagged.
 - `error_code`: `validation_error`, with exit code `2`.
 - `message`: a constant shape that never contains the user's value, for example
   `flag --output: value is not one of the allowed values`.
-- `context`: `{"flag": "<name>", "value": "<input>", "allowed": [...]}`.
+- `context`: `{"flag": "<name>", "allowed": [...]}`. The offending value is
+  deliberately **not** included.
 - `suggestions`: one `--<flag>=<value>` string per allowed value, in declared
   order.
 
@@ -273,8 +281,11 @@ are untagged.
 
 - The agent can repair its call from the envelope without reading `__schema`
   again.
-- Keeping the raw input out of `message` follows the spirit of the
-  log-injection rule in Principle IX: `message` is often echoed to people.
+- The raw input is kept out of the whole envelope, not just `message`. Envelopes
+  go to stderr, which Principle VIII ships to Loki by default, and a value passed
+  to the wrong flag can be a secret. Principle IX forbids logging secrets "in
+  labels or payload". The agent already knows what it sent, so `flag`, `allowed`
+  and `suggestions` are enough to repair the call.
 - `context` is a JSON-escaped map, and `encoding/json` sorts its keys, so the
   envelope is deterministic.
 

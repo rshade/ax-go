@@ -56,7 +56,7 @@ A value outside the set is rejected before anything runs:
 app deploy --output=xml --dry-run; echo "exit=$?"
 # stdout: (empty)
 # stderr: {"error_code":"validation_error","message":"flag --output: value is not one of the allowed values",
-#          "context":{"allowed":["json","table","yaml"],"flag":"output","value":"xml"},
+#          "context":{"allowed":["json","table","yaml"],"flag":"output"},
 #          "suggestions":["--output=json","--output=table","--output=yaml"],...}
 # exit=2
 ```

@@ -38,8 +38,9 @@ These conventions apply to every task:
   `schema.ErrInvalidDeclaration` and `ax.ErrInvalidDeclaration` refer to that
   same value. Every authoring error wraps it with `%w`, and a failed declaration
   mutates nothing.
-- **Enum rejection**: `contract.NewError(context.Background(), "validation_error", "flag --<name>: value is not one of the allowed values", contract.WithErrorExitCode(contract.ExitValidation), contract.WithErrorContext(map[string]any{"flag": name, "value": input, "allowed": allowed}), contract.WithSuggestions("--<name>=<v>"...))`.
-  The raw input never appears in `message`.
+- **Enum rejection**: `contract.NewError(context.Background(), "validation_error", "flag --<name>: value is not one of the allowed values", contract.WithErrorExitCode(contract.ExitValidation), contract.WithErrorContext(map[string]any{"flag": name, "allowed": allowed}), contract.WithSuggestions("--<name>=<v>"...))`.
+  The raw input never appears anywhere in the envelope, neither `message` nor `context` (research.md R9).
+- **Default exemption**: `enumValue.Set` accepts any value equal to the live `flag.DefValue` before the membership check (research.md R5).
 - **Comments**: doc comments state contracts (inputs, outputs, errors, exit
   code, fail-closed behaviour), never narration. Every new exported identifier
   needs one, because `godoclint` enforces it.
@@ -69,7 +70,7 @@ and flag lookup. Every story depends on these.
   - `ValidateValue(flagType, value string) error`: type-checks one CLI-form value for every built-in scalar type, including `duration` via `time.ParseDuration` and integer range at the bit size (`int8` rejects `300`). Slice types split as CSV with each element checked. A custom type returns nil, meaning unchecked.
   - `CanonicalEnumValue(flagType, value string) (string, error)`: string and custom types are returned unchanged; integer types are parsed at the bit size and re-formatted base 10, so `"03"` becomes `"3"`.
 - [ ] T003 Create `internal/schema/convert.go`. Move the conversion logic of `jsonSchemaType`, `jsonSchemaArrayItemType`, `jsonSchemaScalarDefault` and `convertArrayDefault` out of `internal/mcp/mcp.go` and into the T002 helpers, then rewrite `internal/mcp/mcp.go` to call them. Done when T002 passes and every existing test in `internal/mcp/` (`input_schema_test.go`, `mcp_test.go`) passes **unmodified**. Keep behaviour identical: `testdata/schema_mcp.golden.json` must not change.
-- [ ] T004 [P] Add `FuzzEnumCanonicalise` in `internal/schema/declare_fuzz_test.go`. For random `(flagType ∈ {string,int,int8,uint16,int64,uint}, value)` pairs it asserts:
+- [ ] T004 Add `FuzzEnumCanonicalise` in `internal/schema/declare_fuzz_test.go`. For random `(flagType ∈ {string,int,int8,uint16,int64,uint}, value)` pairs it asserts:
   - no panic;
   - when `CanonicalEnumValue` succeeds, canonicalising its output again returns the same string (idempotent);
   - for integer types, the canonical form parses back to the same number.
@@ -121,7 +122,7 @@ empty stdout, one envelope on stderr, and that `RunE` was never entered.
   - a `uint8` flag;
   - a custom `pflag.Value` with `Type()` `"format"`;
   - a persistent flag declared on its owner;
-  - an empty string default, which is exempt.
+  - an empty string default, which is exempt from the membership check.
 
   **Error cases**, each asserting `errors.Is(err, ErrInvalidDeclaration)`:
   - nil cmd;
@@ -144,8 +145,9 @@ empty stdout, one envelope on stderr, and that `RunE` was never entered.
 - [ ] T008 [P] [US1] Add `TestEnumValueSet` in `internal/schema/enum_value_test.go`:
   - A member value calls the inner `Set`, so the bound variable updates.
   - `"03"` is accepted for a `"3"` member on an int flag.
-  - A non-member returns `*contract.Error` with `ErrorCode` `validation_error` and `ExitCode()` 2. Its `Context` holds `flag`, `value` and `allowed` in declared order. `Suggestions` holds `--<flag>=<v>` for each member in order. `Message` does not contain the raw input. The bound variable is **unchanged**.
+  - A non-member returns `*contract.Error` with `ErrorCode` `validation_error` and `ExitCode()` 2. Its `Context` holds exactly `flag` and `allowed` (in declared order), with **no** `value` key. `Suggestions` holds `--<flag>=<v>` for each member in order. `Message` does not contain the raw input. The bound variable is **unchanged**.
   - `String()` and `Type()` delegate to the inner value.
+  - The live default is always accepted: with `DefValue` `""` and a set that excludes `""`, `Set("")` succeeds and updates the inner value. This guards the MCP dispatcher's reset (C1).
   - Through `pflag.FlagSet.Parse`, the error is an `*pflag.InvalidValueError` for which `errors.As(err, **contract.Error)` succeeds.
 - [ ] T009 [P] [US1] Add `TestCollectFlagsEnum` in `internal/schema/schema_test.go`:
   - `Flag.Enum` follows the author's order;
@@ -167,7 +169,7 @@ empty stdout, one envelope on stderr, and that `RunE` was never entered.
 
   For each rejection, assert: exit code 2; stdout is empty; stderr holds
   exactly one minified envelope with `error_code` `validation_error` and the
-  expected `context` and `suggestions`; and counters show neither the
+  expected `context` (no `value` key) and `suggestions`; that the raw input appears nowhere in stderr; and that counters show neither the
   author's `PersistentPreRunE` nor `RunE` ran. Run the same rejection twice
   and assert the envelopes are byte-equal after masking `trace_id` (FR-007,
   SC-007).
@@ -176,6 +178,7 @@ empty stdout, one envelope on stderr, and that `RunE` was never entered.
   - the decoded envelope (`decodeErrorEnvelope`) has `error_code` `validation_error` and keeps `context` and `suggestions`, not a re-wrapped pflag message;
   - the command body never runs;
   - a later valid call on the same dispatcher succeeds, so flag reset still works with the wrapper;
+  - **reset regression (C1)**: on a flag whose default is `""` and whose set excludes `""`, a call with `--output=table` followed by a call that omits `--output` must see `""` in the second call, not `table`;
   - the advertised tool `inputSchema` holds the `enum`.
 - [ ] T013 [P] [US1] Add `TestWithFlagEnum` in `schema/declare_test.go`:
   - the public function succeeds and its errors satisfy `errors.Is(err, schema.ErrInvalidDeclaration)`;
@@ -188,7 +191,7 @@ empty stdout, one envelope on stderr, and that `RunE` was never entered.
 ### Implementation for User Story 1
 
 - [ ] T014 [US1] In `internal/schema/declare.go`, implement:
-  - the unexported `enumValue{inner pflag.Value; flagName, flagType string; allowed, canonical []string}`, whose `Set` canonicalises with `CanonicalEnumValue`, checks membership, and only then calls `inner.Set`, and whose `String` and `Type` delegate to `inner`;
+  - the unexported `enumValue{inner pflag.Value; flag *pflag.Flag; flagType string; allowed, canonical []string}`, whose `Set` first accepts any value equal to `flag.DefValue`, otherwise canonicalises with `CanonicalEnumValue`, checks membership, and only then calls `inner.Set`, and whose `String` and `Type` delegate to `inner`;
   - `DeclareFlagEnum(cmd *cobra.Command, name string, values []string) error`, which runs the validation order in data-model.md (checks 1–7) before mutating, re-uses the wrapper on re-declaration, and builds the rejection error exactly as the Conventions section specifies.
 
   Make T007 and T008 pass.
@@ -205,7 +208,7 @@ empty stdout, one envelope on stderr, and that `RunE` was never entered.
 
   Make T013 pass.
 - [ ] T019 [US1] In root `schema.go`, add `var ErrInvalidDeclaration = isolatedschema.ErrInvalidDeclaration` and `func WithFlagEnum(cmd *cobra.Command, flag string, values ...string) error`, which forwards. Confirm T011 now passes. **No change to `execute.go`**, per research.md R1. If T011 fails, diagnose the error chain; do not add a special case in `Execute`.
-- [ ] T020 [P] [US1] Add `ExampleWithFlagEnum` in `schema/example_test.go`. It declares an enum, writes `BuildSchema(...).Command.Flags` for that flag with `contract.WriteJSON`, and has a verified `// Output:` line.
+- [ ] T020 [US1] Add `ExampleWithFlagEnum` in `schema/example_test.go`. It declares an enum, writes `BuildSchema(...).Command.Flags` for that flag with `contract.WriteJSON`, and has a verified `// Output:` line.
 
 **Checkpoint**: US1 is fully functional. `go test -race ./...` is green. `testdata/schema_*.golden.json` are unchanged.
 
@@ -266,7 +269,7 @@ that two runs are byte-identical.
 - [ ] T025 [US2] In `internal/schema/declare.go`, add `DeclareFlagExample(cmd, name, example string) error`, which runs the data-model.md checks 1–4 and writes the annotation `[]string{example}`. In `internal/schema/schema.go`, add `Example string` to `Flag` and a fail-closed exported `FlagExample(*pflag.Flag) string` reader, and populate it in `CollectFlags`. Make T021 and T022 pass.
 - [ ] T026 [US2] In `internal/mcp/mcp.go`, make `flagProperty` emit `"examples"`. A scalar uses `ScalarJSON`. A slice is split as CSV, converted per element with `ArrayItemJSON`, and wrapped in a one-element array. Omit the key when conversion fails. Make T023 pass.
 - [ ] T027 [US2] In `schema/schema.go`, add `` Example string `json:"example,omitempty"` `` to `FlagSchema`, after `Enum`, and map it. In `schema/declare.go`, add `WithFlagExample(cmd *cobra.Command, flag string, example string) error` with a contract doc comment: CLI form, CSV for slices, custom types unchecked, must be an enum member, last call wins. In root `schema.go`, add the forwarding `WithFlagExample`. Make T024 pass.
-- [ ] T028 [P] [US2] Add `ExampleWithFlagExample` in `schema/example_test.go`, with a verified `// Output:`.
+- [ ] T028 [US2] Add `ExampleWithFlagExample` in `schema/example_test.go`, with a verified `// Output:`.
 
 **Checkpoint**: US1 and US2 both work independently. The existing goldens are unchanged.
 
@@ -333,7 +336,7 @@ both carry a declaration but are still not tools.
   - `type CapabilitySchema = isolatedschema.CapabilitySchema`;
   - `type MCPToolAnnotations = isolatedschema.MCPToolAnnotations`;
   - the forwarding `WithCapability`.
-- [ ] T038 [P] [US3] Add `ExampleWithCapability` in `schema/example_test.go`. It prints the command node's `capability` JSON with a verified `// Output:`.
+- [ ] T038 [US3] Add `ExampleWithCapability` in `schema/example_test.go`. It prints the command node's `capability` JSON with a verified `// Output:`.
 
 **Checkpoint**: US1–US3 all work independently.
 
@@ -391,7 +394,7 @@ golden files match their T001 checksums.
   - capabilities: root `read-only`; `stream` `read-only`; `patch-config` `mutate` with note `rewrites the file in place, preserving comments`; `fetch` `external-network`; `fail`, `authz` and `crash` `read-only`.
 
   Every declaration error must propagate. Change `newRootCommand` to return `(*cobra.Command, error)` and have `runWithEntityID` map a declaration error to exit code 1 on stderr through `ax.WriteError`.
-- [ ] T044 [US4] In `examples/integration/main_test.go`, add `TestStreamRejectsOutOfSetCount`. It runs `stream --count=4`, with and without `--dry-run`, and asserts exit 2, an empty stdout, and an envelope holding `context.allowed` `[1,2,3,5,10]` as strings and the five suggestions.
+- [ ] T044 [US4] In `examples/integration/main_test.go`, add `TestStreamRejectsOutOfSetCount`. It runs `stream --count=4`, with and without `--dry-run`, and asserts exit 2, an empty stdout, and an envelope holding `context.allowed` `["1","2","3","5","10"]`, no `context.value`, and the five suggestions.
 - [ ] T045 [US4] Regenerate `examples/integration/testdata/schema_ax.golden.json` and `schema_mcp.golden.json`, then review the diff. It must contain **only** additions: `enum`, `example`/`examples`, `capability` and `annotations`. Update `examples/integration/README.md` with a short section showing the enum rejection (`stream --count=4`) and the new `__schema` fields, then run markdownlint on it.
 
 **Checkpoint**: All four stories are verified end to end.
@@ -451,8 +454,8 @@ public `schema`, then root `ax` and the example. Each story ends at a green
 
 ### Parallel Opportunities
 
-- Phase 2: T002, T004 and T006 can run in parallel. T004 needs only the
-  signatures, so it compiles once T003 lands.
+- Phase 2: T002 and T006 can run in parallel. T004 calls `CanonicalEnumValue`,
+  so it runs after T003.
 - US1 tests: T007–T013 all touch different files and can run in parallel.
 - US2 tests: T021–T024 can run in parallel.
 - US3 tests: T029–T032 can run in parallel.
@@ -460,9 +463,8 @@ public `schema`, then root `ax` and the example. Each story ends at a green
   `internal/schema/declare.go`, `internal/mcp/mcp.go`, `schema/schema.go`,
   `schema/declare.go` and root `schema.go`. Serialize their implementation
   tasks, or merge carefully.
-- Examples: T020, T028 and T038 all edit `schema/example_test.go`. Each is
-  marked [P] relative to its own story's implementation; do not run them
-  concurrently with each other.
+- Examples: T020, T028 and T038 all edit `schema/example_test.go`, so none is
+  marked [P]; run them one at a time.
 
 ---
 
