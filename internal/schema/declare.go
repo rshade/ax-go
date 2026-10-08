@@ -159,10 +159,10 @@ func AddFlagEnum(cmd *cobra.Command, name string, values []string) *Violation {
 		}
 		canonical = append(canonical, form)
 	}
-	if !isMember(flagType, canonical, flag.DefValue, true) {
+	if !defaultIsMember(flagType, canonical, flag.DefValue) {
 		return &Violation{Field: fieldDefault, Reason: ReasonNotInEnum}
 	}
-	if example, ok := declaredExample(flag); ok && !isMember(flagType, canonical, example, false) {
+	if example, ok := declaredExample(flag); ok && !isMember(flagType, canonical, example) {
 		return &Violation{Field: fieldExample, Reason: ReasonNotInEnum}
 	}
 
@@ -186,15 +186,16 @@ func enumTypeSupported(value pflag.Value) bool {
 	return !errors.Is(err, errUnsupportedEnumType)
 }
 
-// isMember reports whether value canonicalises to one of canonical. When
-// emptyIsMember is true, "" counts as a member: an empty default means "no
-// default" and is exempt.
-func isMember(flagType string, canonical []string, value string, emptyIsMember bool) bool {
-	if value == "" && emptyIsMember {
-		return true
-	}
+// isMember reports whether value canonicalises to one of canonical.
+func isMember(flagType string, canonical []string, value string) bool {
 	form, err := CanonicalEnumValue(flagType, value)
 	return err == nil && slices.Contains(canonical, form)
+}
+
+// defaultIsMember reports whether a flag default satisfies the enum. An empty
+// default means "no default" and is exempt.
+func defaultIsMember(flagType string, canonical []string, defValue string) bool {
+	return defValue == "" || isMember(flagType, canonical, defValue)
 }
 
 // declaredExample returns the example annotation when it is well formed:
@@ -218,7 +219,7 @@ func FlagEnum(flag *pflag.Flag) []string {
 	if !ok {
 		return nil
 	}
-	if !isMember(wrapper.flagType, wrapper.canonical, flag.DefValue, true) {
+	if !defaultIsMember(wrapper.flagType, wrapper.canonical, flag.DefValue) {
 		return nil
 	}
 	return slices.Clone(wrapper.allowed)
@@ -256,7 +257,7 @@ func exampleProblem(flag *pflag.Flag, example string) Reason {
 	if err := ValidateValue(flag.Value.Type(), example); err != nil {
 		return ReasonInvalidValue
 	}
-	if wrapper, ok := flag.Value.(*enumValue); ok && !isMember(wrapper.flagType, wrapper.canonical, example, false) {
+	if wrapper, ok := flag.Value.(*enumValue); ok && !isMember(wrapper.flagType, wrapper.canonical, example) {
 		return ReasonNotInEnum
 	}
 	return ""

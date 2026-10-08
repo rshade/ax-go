@@ -72,7 +72,7 @@ type formatValue struct{ value string }
 
 func (v *formatValue) String() string     { return v.value }
 func (v *formatValue) Set(s string) error { v.value = s; return nil }
-func (v *formatValue) Type() string       { return "format" }
+func (*formatValue) Type() string         { return "format" }
 
 // customSliceValue is a custom pflag.Value that also implements
 // pflag.SliceValue; wrapping it would hide the slice behaviour.
@@ -80,7 +80,7 @@ type customSliceValue struct{ values []string }
 
 func (v *customSliceValue) String() string                { return strings.Join(v.values, ",") }
 func (v *customSliceValue) Set(s string) error            { v.values = append(v.values, s); return nil }
-func (v *customSliceValue) Type() string                  { return "csvList" }
+func (*customSliceValue) Type() string                    { return "csvList" }
 func (v *customSliceValue) Append(s string) error         { v.values = append(v.values, s); return nil }
 func (v *customSliceValue) Replace(values []string) error { v.values = values; return nil }
 func (v *customSliceValue) GetSlice() []string            { return v.values }
