@@ -156,7 +156,7 @@ schema/
 ├── declare.go            # NEW: Capability type + 6 consts,
 │                         #      DeclareFlagEnum / DeclareFlagExample / DeclareCapability
 ├── declare_test.go       # NEW
-└── example_test.go       # ExampleWithFlagEnum, ExampleWithFlagExample, ExampleWithCapability
+└── example_test.go       # ExampleDeclareFlagEnum, ExampleDeclareFlagExample, ExampleDeclareCapability
 
 schema.go (root ax)       # aliases + forwarding funcs + typed constants
 execute_test.go           # enum rejection → exit 2, stderr envelope, no stdout, dry-run still rejected
