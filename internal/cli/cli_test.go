@@ -20,6 +20,7 @@ func TestFlagConstants(t *testing.T) {
 		{name: "FlagDryRun", got: FlagDryRun, want: "dry-run"},
 		{name: "FlagIdempotencyKey", got: FlagIdempotencyKey, want: "idempotency-key"},
 		{name: "FlagYes", got: FlagYes, want: "yes"},
+		{name: "FlagStrict", got: FlagStrict, want: "strict"},
 	}
 
 	for _, tc := range cases {

@@ -21,10 +21,18 @@ type Metadata struct {
 	DryRun         bool   `json:"dry_run,omitempty"`
 }
 
+// Warning is one non-fatal finding attached to a success envelope.
+// Code is a stable machine token. Message is a single-line explanation.
+type Warning struct {
+	Code    string `json:"code"`
+	Message string `json:"message"`
+}
+
 // Envelope is the standard bounded JSON success payload shape.
 type Envelope[T any] struct {
-	Data T        `json:"data"`
-	Meta Metadata `json:"meta"`
+	Data     T         `json:"data"`
+	Meta     Metadata  `json:"meta"`
+	Warnings []Warning `json:"warnings,omitempty"`
 }
 
 // NewEnvelope wraps data with standard AX metadata from ctx.

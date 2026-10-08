@@ -10,6 +10,9 @@ import (
 // Metadata carries common machine-readable envelope fields.
 type Metadata = contract.Metadata
 
+// Warning is one non-fatal finding on a success envelope.
+type Warning = contract.Warning
+
 // Envelope is the standard bounded JSON success payload shape.
 type Envelope[T any] = contract.Envelope[T]
 

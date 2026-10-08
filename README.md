@@ -504,6 +504,14 @@ of just reporting:
 All optional fields are omitted when unset, so a default error envelope is
 byte-identical to one emitted before these fields existed.
 
+### Success warnings and `--strict`
+
+A success payload may include `warnings`, an array of `{code, message}`
+objects, omitted when empty. Order is the order the command attached them.
+Without `--strict`, warnings do not change the exit code. With `--strict`,
+any warning exits `2`, writes `error_code: warnings_as_errors` to stderr, and
+leaves stdout empty. `--strict` is a boolean. There is no severity rank.
+
 ## Engineering Standards
 
 - **Allocation discipline:** track allocations via standard `testing.B`

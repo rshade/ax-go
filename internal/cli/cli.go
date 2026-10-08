@@ -20,6 +20,8 @@ const (
 	FlagIdempotencyKey = "idempotency-key"
 	// FlagYes explicitly approves a confirmation-gated operation.
 	FlagYes = "yes"
+	// FlagStrict escalates any success-envelope warning to exit 2.
+	FlagStrict = "strict"
 )
 
 // EnsurePersistentStringFlag adds a persistent string flag unless it exists.
