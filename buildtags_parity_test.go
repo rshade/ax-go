@@ -243,3 +243,18 @@ func TestBuildTagParityIdempotencyKeyIsSurfaced(t *testing.T) {
 		t.Fatal("IdempotencyKeyFromContext is empty; an absent key must be auto-generated")
 	}
 }
+
+// TestBuildTagParityEnrichedSchemaMatchesGolden asserts the declared enum,
+// example, and capability fields render byte-identically to the committed
+// enriched goldens in whichever configuration this binary was built for.
+func TestBuildTagParityEnrichedSchemaMatchesGolden(t *testing.T) {
+	var native, mcp bytes.Buffer
+	if err := WriteJSON(&native, BuildSchema(newEnrichedSchemaTestCommand(t), WithSchemaVersion("v0.1.0"))); err != nil {
+		t.Fatalf("WriteJSON returned error: %v", err)
+	}
+	assertGolden(t, "testdata/schema_ax_enriched.golden.json", native.Bytes())
+	if err := WriteJSON(&mcp, BuildMCPSchema(newEnrichedSchemaTestCommand(t))); err != nil {
+		t.Fatalf("WriteJSON returned error: %v", err)
+	}
+	assertGolden(t, "testdata/schema_mcp_enriched.golden.json", mcp.Bytes())
+}

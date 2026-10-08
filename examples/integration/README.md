@@ -84,6 +84,35 @@ resource (`ax-integration://docs/exit-codes`) in `declareAgentContext`. They
 appear under `command.prompts` / `command.resources` in the ax-native schema
 and in the top-level `prompts` / `resources` arrays of `--as=mcp`.
 
+The schema also carries the semantics the example declares with
+`ax.WithFlagEnum`, `ax.WithFlagExample`, and `ax.WithCapability`:
+
+- `stream --count` lists its allowed values as `enum` (`1`, `2`, `3`, `5`,
+  `10`), typed as integers under `--as=mcp`.
+- `patch-config --patch` carries an `example` patch document, emitted as a
+  one-element `examples` array under `--as=mcp`.
+- Every command carries a `capability` class. `patch-config` and `confirm` are
+  `mutate` with a note, `fetch` is `external-network`, and the rest are
+  `read-only`. Under `--as=mcp` each tool also gets the standard MCP
+  `annotations` hints.
+
+A declared enum is enforced while flags are parsed, before `--dry-run` or the
+command body runs. An out-of-set value exits `2` with nothing on `stdout`:
+
+```sh
+go run ./examples/integration stream --format=json --count=4   # exit 2 — validation
+```
+
+The `stderr` envelope lists the allowed values and one suggestion per value,
+and never echoes the rejected input:
+
+```json
+{"error_code":"validation_error","message":"flag --count: value is not one of the allowed values","context":{"allowed":["1","2","3","5","10"],"flag":"count"},"suggestions":["--count=1","--count=2","--count=3","--count=5","--count=10"]}
+```
+
+That envelope is abridged; the real one also carries `trace_id`, `tool`,
+`version`, and `schema_version`.
+
 Build the example with version injection and inspect the same schema field:
 
 ```sh

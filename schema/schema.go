@@ -40,15 +40,27 @@ type ErrorSchemaInfo struct {
 
 // CommandSchema describes a Cobra command and its direct children.
 type CommandSchema struct {
-	Use                    string          `json:"use"`
-	Short                  string          `json:"short,omitempty"`
-	Long                   string          `json:"long,omitempty"`
-	Example                string          `json:"example,omitempty"`
-	Flags                  []FlagSchema    `json:"flags,omitempty"`
-	Commands               []CommandSchema `json:"commands,omitempty"`
-	Prompts                []Prompt        `json:"prompts,omitempty"`
-	Resources              []Resource      `json:"resources,omitempty"`
-	NonDeterministicFields []string        `json:"non_deterministic_fields"`
+	Use       string          `json:"use"`
+	Short     string          `json:"short,omitempty"`
+	Long      string          `json:"long,omitempty"`
+	Example   string          `json:"example,omitempty"`
+	Flags     []FlagSchema    `json:"flags,omitempty"`
+	Commands  []CommandSchema `json:"commands,omitempty"`
+	Prompts   []Prompt        `json:"prompts,omitempty"`
+	Resources []Resource      `json:"resources,omitempty"`
+	// Capability is the command's declared side-effect class (see
+	// WithCapability). It is nil, and omitted, when the command is
+	// unclassified; an agent must not assume any class for it.
+	Capability             *CapabilitySchema `json:"capability,omitempty"`
+	NonDeterministicFields []string          `json:"non_deterministic_fields"`
+}
+
+// CapabilitySchema is a command's declared side-effect class and its optional
+// free-form note. Class is always one of the six Capability constants; Note is
+// descriptive only and is omitted when empty.
+type CapabilitySchema struct {
+	Class Capability `json:"class"`
+	Note  string     `json:"note,omitempty"`
 }
 
 // FlagSchema describes a command flag.
@@ -59,6 +71,12 @@ type FlagSchema struct {
 	Default   string `json:"default,omitempty"`
 	Usage     string `json:"usage,omitempty"`
 	Required  bool   `json:"required,omitempty"`
+	// Enum lists the only values the flag accepts, in CLI string form and the
+	// author's order (see WithFlagEnum). It is absent when none is declared.
+	Enum []string `json:"enum,omitempty"`
+	// Example is one value in CLI form, exactly as an agent would pass it on
+	// argv (see WithFlagExample). It is absent when none is declared.
+	Example string `json:"example,omitempty"`
 }
 
 // Option configures BuildSchema and NewSchemaCommand.
@@ -174,6 +192,22 @@ type MCPTool struct {
 	Description            string         `json:"description,omitempty"`
 	InputSchema            map[string]any `json:"inputSchema"`
 	NonDeterministicFields []string       `json:"nonDeterministicFields"`
+	// Capability is the ax-specific side-effect class; nil when unclassified.
+	Capability *CapabilitySchema `json:"capability,omitempty"`
+	// Annotations are the standard MCP tool hints derived from Capability, so a
+	// generic MCP client can apply its own safety policy; nil when unclassified.
+	Annotations *MCPToolAnnotations `json:"annotations,omitempty"`
+}
+
+// MCPToolAnnotations are the standard MCP tool-annotation hints derived from a
+// command's capability class. The mapping is conservative: read-only sets
+// ReadOnlyHint; create sets DestructiveHint false; mutate, delete and admin set
+// DestructiveHint true; external-network sets only OpenWorldHint true. A nil
+// pointer is omitted and means the MCP default.
+type MCPToolAnnotations struct {
+	ReadOnlyHint    bool  `json:"readOnlyHint,omitempty"`
+	DestructiveHint *bool `json:"destructiveHint,omitempty"`
+	OpenWorldHint   *bool `json:"openWorldHint,omitempty"`
 }
 
 // BuildMCPSchema adapts the command tree to the MCP adapter shape: tools plus
@@ -189,6 +223,8 @@ func BuildMCPSchema(root *cobra.Command) MCPSchema {
 			Description:            tool.Description,
 			InputSchema:            tool.InputSchema,
 			NonDeterministicFields: tool.NonDeterministicFields,
+			Capability:             capabilitySchema(tool.CapabilityClass, tool.CapabilityNote),
+			Annotations:            toolAnnotations(tool.Hints),
 		})
 	}
 	return MCPSchema{
@@ -219,6 +255,9 @@ func convertCommandSchema(command internalschema.Command, dedup *internalschema.
 		),
 		NonDeterministicFields: internalschema.NonDeterministicFields(command.Annotations),
 	}
+	if class, note, ok := internalschema.CommandCapability(command.Annotations); ok {
+		schema.Capability = capabilitySchema(class, note)
+	}
 
 	for _, child := range command.Commands {
 		schema.Commands = append(schema.Commands, convertCommandSchema(child, dedup))
@@ -237,8 +276,28 @@ func convertFlagSchemas(source []internalschema.Flag) []FlagSchema {
 			Default:   flag.Default,
 			Usage:     flag.Usage,
 			Required:  flag.Required,
+			Enum:      flag.Enum,
+			Example:   flag.Example,
 		})
 	}
 
 	return flags
+}
+
+func capabilitySchema(class, note string) *CapabilitySchema {
+	if class == "" {
+		return nil
+	}
+	return &CapabilitySchema{Class: Capability(class), Note: note}
+}
+
+func toolAnnotations(hints *mcp.Hints) *MCPToolAnnotations {
+	if hints == nil {
+		return nil
+	}
+	return &MCPToolAnnotations{
+		ReadOnlyHint:    hints.ReadOnly,
+		DestructiveHint: hints.Destructive,
+		OpenWorldHint:   hints.OpenWorld,
+	}
 }

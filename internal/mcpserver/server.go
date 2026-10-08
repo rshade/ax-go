@@ -127,9 +127,24 @@ func newMCPServer(dispatch *dispatcher, cfg Config) *sdk.Server {
 			Name:        tool.Name,
 			Description: tool.Description,
 			InputSchema: tool.InputSchema,
+			Annotations: sdkAnnotations(tool.Annotations),
 		}, dispatch.handle)
 	}
 	return server
+}
+
+// sdkAnnotations maps ax-go's capability hints onto the SDK's ToolAnnotations,
+// or nil for an unclassified tool. The ax-specific capability object is not
+// carried on the live path; naming _meta keys for it is a separate decision.
+func sdkAnnotations(hints *schema.MCPToolAnnotations) *sdk.ToolAnnotations {
+	if hints == nil {
+		return nil
+	}
+	return &sdk.ToolAnnotations{
+		ReadOnlyHint:    hints.ReadOnlyHint,
+		DestructiveHint: hints.DestructiveHint,
+		OpenWorldHint:   hints.OpenWorldHint,
+	}
 }
 
 // discoverTools projects root's command tree into the callable MCP tool set and
@@ -148,12 +163,26 @@ func discoverTools(root *cobra.Command) ([]schema.MCPTool, map[string]*cobra.Com
 			return
 		}
 		tool := internalmcp.BuildTool(cmd)
-		tools = append(tools, schema.MCPTool{
+		mcpTool := schema.MCPTool{
 			Name:                   tool.Name,
 			Description:            tool.Description,
 			InputSchema:            tool.InputSchema,
 			NonDeterministicFields: tool.NonDeterministicFields,
-		})
+		}
+		if tool.CapabilityClass != "" {
+			mcpTool.Capability = &schema.CapabilitySchema{
+				Class: schema.Capability(tool.CapabilityClass),
+				Note:  tool.CapabilityNote,
+			}
+		}
+		if tool.Hints != nil {
+			mcpTool.Annotations = &schema.MCPToolAnnotations{
+				ReadOnlyHint:    tool.Hints.ReadOnly,
+				DestructiveHint: tool.Hints.Destructive,
+				OpenWorldHint:   tool.Hints.OpenWorld,
+			}
+		}
+		tools = append(tools, mcpTool)
 		targets[tool.Name] = cmd
 	})
 	return tools, targets

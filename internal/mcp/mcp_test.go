@@ -7,6 +7,8 @@ import (
 	"testing"
 
 	"github.com/spf13/cobra"
+
+	internalschema "github.com/rshade/ax-go/internal/schema"
 )
 
 // noopRunE is a do-nothing command body; Build never invokes it.
@@ -222,5 +224,84 @@ func TestBuildMarksRequiredFlags(t *testing.T) {
 	if _, present := rootTool.InputSchema["required"]; present {
 		t.Errorf("root inputSchema has unexpected required %v; the key must be absent when nothing is required",
 			rootTool.InputSchema["required"])
+	}
+}
+
+// TestBuildToolCapability pins the class-to-hint mapping of research.md R6,
+// the absence of both fields on an unclassified command, and that a hidden or
+// reserved command stays out of the tool set even when it carries a
+// declaration (FR-011).
+func TestBuildToolCapability(t *testing.T) {
+	yes, no := true, false
+	cases := []struct {
+		class string
+		want  *Hints
+	}{
+		{"read-only", &Hints{ReadOnly: true}},
+		{"create", &Hints{Destructive: &no}},
+		{"mutate", &Hints{Destructive: &yes}},
+		{"delete", &Hints{Destructive: &yes}},
+		{"external-network", &Hints{OpenWorld: &yes}},
+		{"admin", &Hints{Destructive: &yes}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.class, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "demo", RunE: noopRunE}
+			if err := internalschema.DeclareCapability(cmd, tc.class, "note"); err != nil {
+				t.Fatalf("DeclareCapability: %v", err)
+			}
+			tool := BuildTool(cmd)
+			if tool.CapabilityClass != tc.class || tool.CapabilityNote != "note" {
+				t.Fatalf("capability = (%q, %q), want (%q, note)", tool.CapabilityClass, tool.CapabilityNote, tc.class)
+			}
+			if !reflect.DeepEqual(tool.Hints, tc.want) {
+				t.Fatalf("Hints = %+v, want %+v", tool.Hints, tc.want)
+			}
+		})
+	}
+
+	t.Run("unclassified", func(t *testing.T) {
+		tool := BuildTool(&cobra.Command{Use: "demo", RunE: noopRunE})
+		if tool.CapabilityClass != "" || tool.CapabilityNote != "" || tool.Hints != nil {
+			t.Fatalf("unclassified tool = %+v, want no capability and nil Hints", tool)
+		}
+	})
+
+	t.Run("hidden and reserved stay excluded", func(t *testing.T) {
+		root := &cobra.Command{Use: "demo", RunE: noopRunE}
+		for _, child := range []*cobra.Command{
+			{Use: "secret", Hidden: true, RunE: noopRunE},
+			{Use: "__schema", RunE: noopRunE},
+			{Use: "mcp-server", RunE: noopRunE},
+			{Use: "completion", RunE: noopRunE},
+		} {
+			if err := internalschema.DeclareCapability(child, "admin", ""); err != nil {
+				t.Fatalf("DeclareCapability(%s): %v", child.Use, err)
+			}
+			root.AddCommand(child)
+		}
+		names := []string{}
+		for _, tool := range Build(root).Tools {
+			names = append(names, tool.Name)
+		}
+		if !reflect.DeepEqual(names, []string{"demo"}) {
+			t.Fatalf("tools = %v, want only [demo]", names)
+		}
+	})
+}
+
+// TestCapabilityAndEnumFailClosed pins the defensive fallbacks the declaration
+// path never reaches: an unknown class yields no hints, and an enum member that
+// does not convert to the property type suppresses the whole enum rather than
+// advertising a partial set.
+func TestCapabilityAndEnumFailClosed(t *testing.T) {
+	if hints := capabilityHints("write"); hints != nil {
+		t.Fatalf("capabilityHints(write) = %+v, want nil", hints)
+	}
+	if values, ok := enumJSON("int", []string{"1", "x"}); ok || values != nil {
+		t.Fatalf("enumJSON with an unconvertible member = (%v, %v), want (nil, false)", values, ok)
+	}
+	if values, ok := enumJSON("int", nil); ok || values != nil {
+		t.Fatalf("enumJSON(nil) = (%v, %v), want (nil, false)", values, ok)
 	}
 }

@@ -27,6 +27,8 @@ type Flag struct {
 	Default   string
 	Usage     string
 	Required  bool
+	Enum      []string
+	Example   string
 }
 
 // BuildCommand reflects a Cobra command tree into the internal schema.
@@ -52,8 +54,14 @@ func BuildCommand(cmd *cobra.Command) Command {
 
 // CollectFlags returns local and inherited flags without duplicates.
 func CollectFlags(cmd *cobra.Command) []Flag {
+	local, inherited := cmd.NonInheritedFlags(), cmd.InheritedFlags()
 	seen := map[string]struct{}{}
 	var flags []Flag
+	// Sizing the slice once avoids re-copying the wide Flag on every append
+	// growth, which dominates the __schema hot path (BenchmarkBuildCommand).
+	if capacity := countFlags(local) + countFlags(inherited); capacity > 0 {
+		flags = make([]Flag, 0, capacity)
+	}
 
 	add := func(flag *pflag.Flag) {
 		if _, ok := seen[flag.Name]; ok {
@@ -67,13 +75,21 @@ func CollectFlags(cmd *cobra.Command) []Flag {
 			Default:   flag.DefValue,
 			Usage:     flag.Usage,
 			Required:  IsRequiredFlag(flag),
+			Enum:      FlagEnum(flag),
+			Example:   FlagExample(flag),
 		})
 	}
 
-	cmd.NonInheritedFlags().VisitAll(add)
-	cmd.InheritedFlags().VisitAll(add)
+	local.VisitAll(add)
+	inherited.VisitAll(add)
 
 	return flags
+}
+
+func countFlags(flags *pflag.FlagSet) int {
+	count := 0
+	flags.VisitAll(func(*pflag.Flag) { count++ })
+	return count
 }
 
 // WalkCommands visits cmd and every descendant.

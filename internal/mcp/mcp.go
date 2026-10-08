@@ -2,7 +2,6 @@ package mcp
 
 import (
 	"slices"
-	"strconv"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -13,10 +12,10 @@ import (
 
 const (
 	jsonSchemaTypeKey    = "type"
-	jsonSchemaBoolean    = "boolean"
-	jsonSchemaInteger    = "integer"
-	jsonSchemaNumber     = "number"
-	jsonSchemaString     = "string"
+	jsonSchemaBoolean    = internalschema.JSONBoolean
+	jsonSchemaInteger    = internalschema.JSONInteger
+	jsonSchemaNumber     = internalschema.JSONNumber
+	jsonSchemaString     = internalschema.JSONString
 	jsonSchemaObject     = "object"
 	jsonSchemaArray      = "array"
 	jsonSchemaProperties = "properties"
@@ -62,6 +61,22 @@ type Tool struct {
 	Description            string
 	InputSchema            map[string]any
 	NonDeterministicFields []string
+	// CapabilityClass and CapabilityNote are the command's declared side-effect
+	// class and note; both are empty when the command is unclassified.
+	CapabilityClass string
+	CapabilityNote  string
+	// Hints are the standard MCP tool annotations derived from
+	// CapabilityClass; nil when the command is unclassified.
+	Hints *Hints
+}
+
+// Hints are the standard MCP tool-annotation hints derived from a capability
+// class. A nil pointer means the hint is omitted, which MCP clients read as
+// the spec default.
+type Hints struct {
+	ReadOnly    bool
+	Destructive *bool
+	OpenWorld   *bool
 }
 
 // Build adapts a Cobra command tree to MCP-compatible tool metadata using the
@@ -82,11 +97,38 @@ func Build(root *cobra.Command) Schema {
 // the name, the command's Short for the description, and its flags as the
 // input schema.
 func BuildTool(cmd *cobra.Command) Tool {
-	return Tool{
+	tool := Tool{
 		Name:                   ToolName(cmd),
 		Description:            cmd.Short,
 		InputSchema:            inputSchema(cmd),
 		NonDeterministicFields: internalschema.NonDeterministicFields(cmd.Annotations),
+	}
+	if class, note, ok := internalschema.CommandCapability(cmd.Annotations); ok {
+		tool.CapabilityClass = class
+		tool.CapabilityNote = note
+		tool.Hints = capabilityHints(class)
+	}
+	return tool
+}
+
+// capabilityHints maps a capability class to MCP hints conservatively: any
+// class that may overwrite or remove state is destructive, create is
+// explicitly not, read-only is the only class claiming readOnlyHint, and
+// external-network only sets openWorldHint because it says nothing about state.
+// idempotentHint is never set; ax-go cannot know it.
+func capabilityHints(class string) *Hints {
+	yes, no := true, false
+	switch class {
+	case "read-only":
+		return &Hints{ReadOnly: true}
+	case "create":
+		return &Hints{Destructive: &no}
+	case "mutate", "delete", "admin":
+		return &Hints{Destructive: &yes}
+	case "external-network":
+		return &Hints{OpenWorld: &yes}
+	default:
+		return nil
 	}
 }
 
@@ -199,7 +241,8 @@ func requiredFlags(cmd *cobra.Command) []string {
 }
 
 func flagProperty(flag *pflag.Flag) map[string]any {
-	if itemType, ok := jsonSchemaArrayItemType(flag.Value.Type()); ok {
+	flagType := flag.Value.Type()
+	if itemType, ok := internalschema.JSONSchemaArrayItemType(flagType); ok {
 		property := map[string]any{
 			jsonSchemaTypeKey: jsonSchemaArray,
 			"description":     flag.Usage,
@@ -208,73 +251,57 @@ func flagProperty(flag *pflag.Flag) map[string]any {
 		if value, hasDefault := jsonSchemaArrayDefault(flag, itemType); hasDefault {
 			property["default"] = value
 		}
+		addExamples(property, flagType, flag)
 		return property
 	}
 	property := map[string]any{
-		jsonSchemaTypeKey: jsonSchemaType(flag.Value.Type()),
+		jsonSchemaTypeKey: internalschema.JSONSchemaType(flagType),
 		"description":     flag.Usage,
 	}
-	if value, hasDefault := jsonSchemaScalarDefault(flag); hasDefault {
+	if value, hasDefault := internalschema.ScalarJSON(flagType, flag.DefValue); hasDefault {
 		property["default"] = value
 	}
+	if enum, ok := enumJSON(flagType, internalschema.FlagEnum(flag)); ok {
+		property["enum"] = enum
+	}
+	addExamples(property, flagType, flag)
 	return property
 }
 
-// jsonSchemaScalarDefault converts a scalar flag's DefValue to the JSON type
-// matching its schema type: booleans stay booleans, ints/uints and floats stay
-// numbers, strings stay strings. It reports hasDefault=false when DefValue is
-// empty (no default is emitted) or does not parse as the declared type, so the
-// schema never advertises a string default for a non-string type (e.g. the
-// boolean default "false", which is invalid JSON Schema).
-func jsonSchemaScalarDefault(flag *pflag.Flag) (any, bool) {
-	if flag.DefValue == "" {
+// addExamples sets the JSON-Schema "examples" array (one typed element) when
+// the flag declares an example that converts; otherwise the key is omitted.
+func addExamples(property map[string]any, flagType string, flag *pflag.Flag) {
+	example := internalschema.FlagExample(flag)
+	if example == "" {
+		return
+	}
+	if value, ok := internalschema.ExampleJSON(flagType, example); ok {
+		property["examples"] = []any{value}
+	}
+}
+
+// enumJSON converts a declared enum to JSON values typed like the property, in
+// author order. Integer members are canonicalised first ("03" becomes 3). ok is
+// false when no enum is declared or any member fails to convert, so a partial
+// set is never advertised.
+func enumJSON(flagType string, allowed []string) ([]any, bool) {
+	if len(allowed) == 0 {
 		return nil, false
 	}
-	switch jsonSchemaType(flag.Value.Type()) {
-	case jsonSchemaBoolean:
-		parsed, err := strconv.ParseBool(flag.DefValue)
-		return parsed, err == nil
-	case jsonSchemaInteger:
-		if strings.HasPrefix(flag.Value.Type(), "uint") {
-			parsed, err := strconv.ParseUint(flag.DefValue, 10, 64)
-			return parsed, err == nil
+	values := make([]any, 0, len(allowed))
+	for _, member := range allowed {
+		if internalschema.JSONSchemaType(flagType) == jsonSchemaString {
+			values = append(values, member)
+			continue
 		}
-		parsed, err := strconv.ParseInt(flag.DefValue, 10, 64)
-		return parsed, err == nil
-	case jsonSchemaNumber:
-		parsed, err := strconv.ParseFloat(flag.DefValue, 64)
-		return parsed, err == nil
-	default:
-		return flag.DefValue, true
+		canonical, err := internalschema.CanonicalEnumValue(flagType, member)
+		converted, ok := internalschema.ScalarJSON(flagType, canonical)
+		if err != nil || !ok {
+			return nil, false
+		}
+		values = append(values, converted)
 	}
-}
-
-func jsonSchemaType(flagType string) string {
-	switch flagType {
-	case "bool":
-		return jsonSchemaBoolean
-	case "count", "int", "int8", "int16", "int32", "int64", "uint", "uint8", "uint16", "uint32", "uint64":
-		return jsonSchemaInteger
-	case "float32", "float64":
-		return jsonSchemaNumber
-	default:
-		return jsonSchemaString
-	}
-}
-
-func jsonSchemaArrayItemType(flagType string) (string, bool) {
-	switch flagType {
-	case "boolSlice":
-		return jsonSchemaBoolean, true
-	case "intSlice", "int32Slice", "int64Slice", "uintSlice":
-		return jsonSchemaInteger, true
-	case "float32Slice", "float64Slice":
-		return jsonSchemaNumber, true
-	case "durationSlice", "ipSlice", "ipNetSlice", "stringArray", "stringSlice":
-		return jsonSchemaString, true
-	default:
-		return "", false
-	}
+	return values, true
 }
 
 func jsonSchemaArrayDefault(flag *pflag.Flag, itemType string) ([]any, bool) {
@@ -285,31 +312,11 @@ func jsonSchemaArrayDefault(flag *pflag.Flag, itemType string) ([]any, bool) {
 	source := slice.GetSlice()
 	values := make([]any, 0, len(source))
 	for _, value := range source {
-		converted, convertedOK := convertArrayDefault(value, itemType, flag.Value.Type())
+		converted, convertedOK := internalschema.ArrayItemJSON(value, itemType, flag.Value.Type())
 		if !convertedOK {
 			return nil, false
 		}
 		values = append(values, converted)
 	}
 	return values, true
-}
-
-func convertArrayDefault(value, itemType, flagType string) (any, bool) {
-	switch itemType {
-	case jsonSchemaBoolean:
-		parsed, err := strconv.ParseBool(value)
-		return parsed, err == nil
-	case jsonSchemaInteger:
-		if flagType == "uintSlice" {
-			parsed, err := strconv.ParseUint(value, 10, 64)
-			return parsed, err == nil
-		}
-		parsed, err := strconv.ParseInt(value, 10, 64)
-		return parsed, err == nil
-	case jsonSchemaNumber:
-		parsed, err := strconv.ParseFloat(value, 64)
-		return parsed, err == nil
-	default:
-		return value, true
-	}
 }

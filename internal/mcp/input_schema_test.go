@@ -8,6 +8,8 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	internalschema "github.com/rshade/ax-go/internal/schema"
 )
 
 // buildSingleTool builds cmd (a lone command) and returns its single Tool,
@@ -434,5 +436,143 @@ func TestBuildToolDescriptionUsesShort(t *testing.T) {
 	tool := buildSingleTool(t, cmd)
 	if tool.Description != "short help" {
 		t.Errorf("Description = %q, want Short %q", tool.Description, "short help")
+	}
+}
+
+// TestInputSchemaEnum pins the typed JSON-Schema enum: the declared values
+// convert to the property's JSON type in author order, an undeclared flag has
+// no enum key, and an inherited persistent flag carries its owner's enum.
+func TestInputSchemaEnum(t *testing.T) {
+	cases := []struct {
+		name     string
+		register func(cmd *cobra.Command)
+		flagName string
+		values   []string
+		want     any
+	}{
+		{
+			name:     "string",
+			register: func(cmd *cobra.Command) { cmd.Flags().String("output", "json", "o") },
+			flagName: "output",
+			values:   []string{"json", "table"},
+			want:     []any{"json", "table"},
+		},
+		{
+			name:     "int",
+			register: func(cmd *cobra.Command) { cmd.Flags().Int("n", 1, "n") },
+			flagName: "n",
+			values:   []string{"1", "03"},
+			want:     []any{int64(1), int64(3)},
+		},
+		{
+			name:     "uint",
+			register: func(cmd *cobra.Command) { cmd.Flags().Uint("n", 2, "n") },
+			flagName: "n",
+			values:   []string{"2", "4"},
+			want:     []any{uint64(2), uint64(4)},
+		},
+		{
+			name:     "undeclared",
+			register: func(cmd *cobra.Command) { cmd.Flags().String("output", "json", "o") },
+			flagName: "output",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "demo", RunE: noopRunE}
+			tc.register(cmd)
+			if tc.values != nil {
+				if err := internalschema.DeclareFlagEnum(cmd, tc.flagName, tc.values); err != nil {
+					t.Fatalf("DeclareFlagEnum: %v", err)
+				}
+			}
+			got, present := schemaProperty(t, buildSingleTool(t, cmd), tc.flagName)["enum"]
+			if tc.want == nil {
+				if present {
+					t.Fatalf("enum = %#v, want it omitted", got)
+				}
+				return
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("enum = %#v, want %#v", got, tc.want)
+			}
+		})
+	}
+
+	t.Run("inherited persistent flag", func(t *testing.T) {
+		root := &cobra.Command{Use: "demo", RunE: noopRunE}
+		root.PersistentFlags().String("region", "us", "region")
+		child := &cobra.Command{Use: "deploy", RunE: noopRunE}
+		root.AddCommand(child)
+		if err := internalschema.DeclareFlagEnum(root, "region", []string{"us", "eu"}); err != nil {
+			t.Fatalf("DeclareFlagEnum: %v", err)
+		}
+		got := schemaProperty(t, BuildTool(child), "region")["enum"]
+		if !reflect.DeepEqual(got, []any{"us", "eu"}) {
+			t.Fatalf("child region enum = %#v, want [us eu]", got)
+		}
+	})
+}
+
+// TestInputSchemaExamples pins the JSON-Schema examples array: one element
+// typed like the property, an array inside it for a slice flag, and no key
+// when no example is declared.
+func TestInputSchemaExamples(t *testing.T) {
+	cases := []struct {
+		name     string
+		register func(cmd *cobra.Command)
+		flagName string
+		example  string
+		want     any
+	}{
+		{
+			name:     "int",
+			register: func(cmd *cobra.Command) { cmd.Flags().Int("n", 1, "n") },
+			flagName: "n",
+			example:  "5",
+			want:     []any{int64(5)},
+		},
+		{
+			name:     "duration",
+			register: func(cmd *cobra.Command) { cmd.Flags().Duration("timeout", time.Second, "t") },
+			flagName: "timeout",
+			example:  "45s",
+			want:     []any{"45s"},
+		},
+		{
+			name:     "stringSlice",
+			register: func(cmd *cobra.Command) { cmd.Flags().StringSlice("tags", nil, "t") },
+			flagName: "tags",
+			example:  "a,b",
+			want:     []any{[]any{"a", "b"}},
+		},
+		{
+			name:     "undeclared",
+			register: func(cmd *cobra.Command) { cmd.Flags().Int("n", 1, "n") },
+			flagName: "n",
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "demo", RunE: noopRunE}
+			tc.register(cmd)
+			if tc.example != "" {
+				if err := internalschema.DeclareFlagExample(cmd, tc.flagName, tc.example); err != nil {
+					t.Fatalf("DeclareFlagExample: %v", err)
+				}
+			}
+			got, present := schemaProperty(t, buildSingleTool(t, cmd), tc.flagName)["examples"]
+			if tc.want == nil {
+				if present {
+					t.Fatalf("examples = %#v, want it omitted", got)
+				}
+				return
+			}
+			if !reflect.DeepEqual(got, tc.want) {
+				t.Fatalf("examples = %#v, want %#v", got, tc.want)
+			}
+		})
 	}
 }

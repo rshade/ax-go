@@ -8,6 +8,7 @@ import (
 	"reflect"
 	"slices"
 	"testing"
+	"time"
 
 	"github.com/spf13/cobra"
 
@@ -255,5 +256,76 @@ func assertGolden(t *testing.T, path string, got []byte) {
 	}
 	if !bytes.Equal(got, want) {
 		t.Fatalf("golden mismatch for %s\ngot:  %s\nwant: %s", path, got, want)
+	}
+}
+
+// newEnrichedSchemaTestCommand declares every new __schema fact: enums on a
+// string and an int flag, examples on a persistent, a slice and a duration
+// flag, and capabilities with and without a note, plus a hidden classified
+// command that must stay out of the MCP tool set.
+func newEnrichedSchemaTestCommand(t *testing.T) *cobra.Command {
+	t.Helper()
+	noop := func(*cobra.Command, []string) error { return nil }
+	root := &cobra.Command{Use: "app", Short: "test app", RunE: noop}
+	root.PersistentFlags().String("region", "us", "deployment region")
+	root.Flags().String("config", "", "config file")
+
+	deploy := &cobra.Command{Use: "deploy", Short: "deploy a release", RunE: noop}
+	deploy.Flags().String("output", "json", "output format")
+	deploy.Flags().Int("replicas", 1, "replica count")
+	deploy.Flags().StringSlice("tags", nil, "release tags")
+	deploy.Flags().Duration("timeout", 30*time.Second, "deadline")
+	if err := deploy.MarkFlagRequired("output"); err != nil {
+		t.Fatalf("MarkFlagRequired: %v", err)
+	}
+	status := &cobra.Command{Use: "status", Short: "show release status", RunE: noop}
+	secret := &cobra.Command{Use: "secret", Short: "rotate secrets", Hidden: true, RunE: noop}
+	root.AddCommand(deploy, status, secret)
+
+	for _, declare := range []error{
+		WithFlagEnum(root, "region", "us", "eu"),
+		WithFlagExample(root, "region", "eu"),
+		WithFlagEnum(deploy, "output", "json", "table", "yaml"),
+		WithFlagEnum(deploy, "replicas", "1", "3", "5"),
+		WithFlagExample(deploy, "tags", "a,b"),
+		WithFlagExample(deploy, "timeout", "45s"),
+		WithCapability(deploy, CapabilityMutate, "idempotent by release name"),
+		WithCapability(status, CapabilityReadOnly, ""),
+		WithCapability(secret, CapabilityAdmin, ""),
+	} {
+		if declare != nil {
+			t.Fatalf("declaration failed: %v", declare)
+		}
+	}
+	return root
+}
+
+func TestBuildSchemaEnrichedGolden(t *testing.T) {
+	render := func() []byte {
+		var stdout bytes.Buffer
+		if err := contract.WriteJSON(&stdout, BuildSchema(newEnrichedSchemaTestCommand(t), WithSchemaVersion("v0.1.0"))); err != nil {
+			t.Fatalf("WriteJSON returned error: %v", err)
+		}
+		return stdout.Bytes()
+	}
+	first := render()
+	assertGolden(t, filepath.Join("..", "testdata", "schema_ax_enriched.golden.json"), first)
+	if second := render(); !bytes.Equal(first, second) {
+		t.Fatalf("enriched __schema not deterministic:\n%s\n%s", first, second)
+	}
+}
+
+func TestBuildMCPSchemaEnrichedGolden(t *testing.T) {
+	render := func() []byte {
+		var stdout bytes.Buffer
+		if err := contract.WriteJSON(&stdout, BuildMCPSchema(newEnrichedSchemaTestCommand(t))); err != nil {
+			t.Fatalf("WriteJSON returned error: %v", err)
+		}
+		return stdout.Bytes()
+	}
+	first := render()
+	assertGolden(t, filepath.Join("..", "testdata", "schema_mcp_enriched.golden.json"), first)
+	if second := render(); !bytes.Equal(first, second) {
+		t.Fatalf("enriched --as=mcp not deterministic:\n%s\n%s", first, second)
 	}
 }

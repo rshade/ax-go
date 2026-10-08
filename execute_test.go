@@ -1870,3 +1870,153 @@ func TestExecutePersistentHookCombinedDryRunYesEnvelopeMeta(t *testing.T) {
 		)
 	}
 }
+
+// TestExecuteRejectsOutOfSetEnum asserts an out-of-set enum value is rejected
+// at flag-parse time: exit 2, empty stdout, one validation_error envelope on
+// stderr that never echoes the input, and neither the author's
+// PersistentPreRunE nor RunE runs — including under --dry-run and for an
+// inherited persistent flag. The same rejection is byte-identical across runs
+// after masking trace_id (FR-007, FR-014, SC-007).
+func TestExecuteRejectsOutOfSetEnum(t *testing.T) {
+	const rawInput = "s3cr3t-value"
+	cases := []struct {
+		name            string
+		args            []string
+		wantCode        int
+		wantFlag        string
+		wantAllowed     []any
+		wantSuggestions []any
+	}{
+		{
+			name:            "plain out-of-set",
+			args:            []string{"deploy", "--output=" + rawInput},
+			wantCode:        ExitValidation,
+			wantFlag:        "output",
+			wantAllowed:     []any{"json", "table"},
+			wantSuggestions: []any{"--output=json", "--output=table"},
+		},
+		{
+			name:            "out-of-set under dry-run",
+			args:            []string{"deploy", "--dry-run", "--output=" + rawInput},
+			wantCode:        ExitValidation,
+			wantFlag:        "output",
+			wantAllowed:     []any{"json", "table"},
+			wantSuggestions: []any{"--output=json", "--output=table"},
+		},
+		{
+			name:            "inherited persistent flag",
+			args:            []string{"deploy", "--region=" + rawInput},
+			wantCode:        ExitValidation,
+			wantFlag:        "region",
+			wantAllowed:     []any{"us", "eu"},
+			wantSuggestions: []any{"--region=us", "--region=eu"},
+		},
+		{
+			name:     "non-canonical int member succeeds",
+			args:     []string{"deploy", "--n=03"},
+			wantCode: ExitSuccess,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			run := func() (int, string, string, int, int) {
+				var preRuns, runs int
+				root := &cobra.Command{
+					Use: "app",
+					PersistentPreRunE: func(*cobra.Command, []string) error {
+						preRuns++
+						return nil
+					},
+				}
+				root.PersistentFlags().String("region", "us", "region")
+				deploy := &cobra.Command{Use: "deploy", RunE: func(*cobra.Command, []string) error {
+					runs++
+					return nil
+				}}
+				deploy.Flags().String("output", "json", "output")
+				deploy.Flags().Int("n", 1, "n")
+				root.AddCommand(deploy)
+				root.SetArgs(tc.args)
+				for _, declare := range []error{
+					WithFlagEnum(root, "region", "us", "eu"),
+					WithFlagEnum(deploy, "output", "json", "table"),
+					WithFlagEnum(deploy, "n", "1", "3"),
+				} {
+					if declare != nil {
+						t.Fatalf("WithFlagEnum: %v", declare)
+					}
+				}
+
+				var stdout, stderr bytes.Buffer
+				code := Execute(
+					context.Background(),
+					root,
+					WithStdout(&stdout),
+					WithStderr(&stderr),
+					WithVersion("v0.1.0"),
+					WithEnv(func(string) string { return "" }),
+					WithStdoutIsTTY(false),
+				)
+				return code, stdout.String(), stderr.String(), preRuns, runs
+			}
+
+			code, stdout, stderr, preRuns, runs := run()
+			if code != tc.wantCode {
+				t.Fatalf("exit code = %d, want %d (stderr %q)", code, tc.wantCode, stderr)
+			}
+			if tc.wantCode == ExitSuccess {
+				if runs != 1 {
+					t.Fatalf("RunE ran %d times, want 1", runs)
+				}
+				return
+			}
+			if stdout != "" {
+				t.Fatalf("stdout = %q, want empty", stdout)
+			}
+			if preRuns != 0 || runs != 0 {
+				t.Fatalf("PersistentPreRunE ran %d, RunE ran %d; want neither", preRuns, runs)
+			}
+			if strings.Contains(stderr, rawInput) {
+				t.Fatalf("stderr echoes the raw input: %q", stderr)
+			}
+			if strings.Count(strings.TrimSpace(stderr), "\n") != 0 {
+				t.Fatalf("stderr = %q, want exactly one envelope line", stderr)
+			}
+
+			var envelope map[string]any
+			if err := json.Unmarshal([]byte(stderr), &envelope); err != nil {
+				t.Fatalf("stderr is not JSON: %v", err)
+			}
+			if envelope["error_code"] != "validation_error" {
+				t.Fatalf("error_code = %v, want validation_error", envelope["error_code"])
+			}
+			wantContext := map[string]any{"flag": tc.wantFlag, "allowed": tc.wantAllowed}
+			if !reflect.DeepEqual(envelope["context"], wantContext) {
+				t.Fatalf("context = %#v, want %#v", envelope["context"], wantContext)
+			}
+			if !reflect.DeepEqual(envelope["suggestions"], tc.wantSuggestions) {
+				t.Fatalf("suggestions = %#v, want %#v", envelope["suggestions"], tc.wantSuggestions)
+			}
+
+			_, _, again, _, _ := run()
+			if maskTraceID(t, stderr) != maskTraceID(t, again) {
+				t.Fatalf("rejection not deterministic:\n%s\n%s", stderr, again)
+			}
+		})
+	}
+}
+
+func maskTraceID(t *testing.T, envelope string) string {
+	t.Helper()
+	var fields map[string]any
+	if err := json.Unmarshal([]byte(envelope), &fields); err != nil {
+		t.Fatalf("decode envelope: %v", err)
+	}
+	fields["trace_id"] = "<masked>"
+	masked, err := json.Marshal(fields)
+	if err != nil {
+		t.Fatalf("encode envelope: %v", err)
+	}
+	return string(masked)
+}

@@ -2,9 +2,12 @@ package schema_test
 
 import (
 	"fmt"
+	"os"
+	"time"
 
 	"github.com/spf13/cobra"
 
+	"github.com/rshade/ax-go/contract"
 	"github.com/rshade/ax-go/schema"
 )
 
@@ -89,4 +92,50 @@ func ExampleDeclareResource() {
 	// Output:
 	// app://docs/pricing-model text/markdown
 	// invalid resource declaration "docs/pricing": uri not_absolute
+}
+
+func ExampleWithFlagEnum() {
+	deploy := &cobra.Command{Use: "deploy"}
+	deploy.Flags().String("output", "json", "output format")
+	if err := schema.WithFlagEnum(deploy, "output", "json", "table", "yaml"); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if err := contract.WriteJSON(os.Stdout, schema.BuildSchema(deploy).Command.Flags); err != nil {
+		fmt.Println(err)
+	}
+	// Output:
+	// [{"name":"output","type":"string","default":"json","usage":"output format","enum":["json","table","yaml"]}]
+}
+
+func ExampleWithFlagExample() {
+	deploy := &cobra.Command{Use: "deploy"}
+	deploy.Flags().Duration("timeout", 30*time.Second, "deadline")
+	if err := schema.WithFlagExample(deploy, "timeout", "45s"); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if err := contract.WriteJSON(os.Stdout, schema.BuildSchema(deploy).Command.Flags); err != nil {
+		fmt.Println(err)
+	}
+	// Output:
+	// [{"name":"timeout","type":"duration","default":"30s","usage":"deadline","example":"45s"}]
+}
+
+func ExampleWithCapability() {
+	root := &cobra.Command{Use: "app"}
+	deploy := &cobra.Command{Use: "deploy"}
+	root.AddCommand(deploy)
+	if err := schema.WithCapability(deploy, schema.CapabilityMutate, "idempotent by release name"); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if err := contract.WriteJSON(os.Stdout, schema.BuildSchema(root).Command.Commands[0].Capability); err != nil {
+		fmt.Println(err)
+	}
+	// Output:
+	// {"class":"mutate","note":"idempotent by release name"}
 }

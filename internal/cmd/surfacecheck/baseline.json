@@ -5,6 +5,42 @@
       "path": "github.com/rshade/ax-go",
       "features": [
         {
+          "id": "const:CapabilityAdmin",
+          "signature": "github.com/rshade/ax-go/schema.Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:CapabilityCreate",
+          "signature": "github.com/rshade/ax-go/schema.Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:CapabilityDelete",
+          "signature": "github.com/rshade/ax-go/schema.Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:CapabilityExternalNetwork",
+          "signature": "github.com/rshade/ax-go/schema.Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:CapabilityMutate",
+          "signature": "github.com/rshade/ax-go/schema.Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:CapabilityReadOnly",
+          "signature": "github.com/rshade/ax-go/schema.Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "const:ConfirmationApproved",
           "signature": "ConfirmationOutcome",
           "configurations": "all",
@@ -109,6 +145,24 @@
         {
           "id": "const:ZeroTraceID",
           "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CapabilitySchema.Class",
+          "signature": "github.com/rshade/ax-go/schema.Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CapabilitySchema.Note",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Capability",
+          "signature": "*github.com/rshade/ax-go/schema.CapabilitySchema",
           "configurations": "all",
           "profiles": "all"
         },
@@ -287,6 +341,18 @@
           "profiles": "all"
         },
         {
+          "id": "field:FlagSchema.Enum",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Example",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:FlagSchema.Name",
           "signature": "string",
           "configurations": "all",
@@ -443,6 +509,18 @@
           "profiles": "all"
         },
         {
+          "id": "field:MCPTool.Annotations",
+          "signature": "*github.com/rshade/ax-go/schema.MCPToolAnnotations",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPTool.Capability",
+          "signature": "*github.com/rshade/ax-go/schema.CapabilitySchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:MCPTool.Description",
           "signature": "string",
           "configurations": "all",
@@ -463,6 +541,24 @@
         {
           "id": "field:MCPTool.NonDeterministicFields",
           "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPToolAnnotations.DestructiveHint",
+          "signature": "*bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPToolAnnotations.OpenWorldHint",
+          "signature": "*bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPToolAnnotations.ReadOnlyHint",
+          "signature": "bool",
           "configurations": "all",
           "profiles": "all"
         },
@@ -872,6 +968,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:WithCapability",
+          "signature": "func(*github.com/spf13/cobra.Command, Capability, string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:WithDryRun",
           "signature": "func(context.Context, bool) context.Context",
           "configurations": "all",
@@ -910,6 +1012,18 @@
         {
           "id": "func:WithErrorVersion",
           "signature": "func(string) ErrorOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithFlagEnum",
+          "signature": "func(*github.com/spf13/cobra.Command, string, ...string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithFlagExample",
+          "signature": "func(*github.com/spf13/cobra.Command, string, string) error",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1154,6 +1268,18 @@
           "profiles": "all"
         },
         {
+          "id": "type:Capability",
+          "signature": "= github.com/rshade/ax-go/schema.Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:CapabilitySchema",
+          "signature": "= github.com/rshade/ax-go/schema.CapabilitySchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "type:CommandSchema",
           "signature": "= github.com/rshade/ax-go/schema.CommandSchema",
           "configurations": "all",
@@ -1256,6 +1382,12 @@
           "profiles": "all"
         },
         {
+          "id": "type:MCPToolAnnotations",
+          "signature": "= github.com/rshade/ax-go/schema.MCPToolAnnotations",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "type:Metadata",
           "signature": "= github.com/rshade/ax-go/contract.Metadata",
           "configurations": "all",
@@ -1318,6 +1450,12 @@
         {
           "id": "type:Warning",
           "signature": "= github.com/rshade/ax-go/contract.Warning",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "var:ErrInvalidDeclaration",
+          "signature": "error",
           "configurations": "all",
           "profiles": "all"
         }
@@ -2071,8 +2209,62 @@
       "path": "github.com/rshade/ax-go/schema",
       "features": [
         {
+          "id": "const:CapabilityAdmin",
+          "signature": "Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:CapabilityCreate",
+          "signature": "Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:CapabilityDelete",
+          "signature": "Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:CapabilityExternalNetwork",
+          "signature": "Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:CapabilityMutate",
+          "signature": "Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:CapabilityReadOnly",
+          "signature": "Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "const:SchemaVersion",
           "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CapabilitySchema.Class",
+          "signature": "Capability",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CapabilitySchema.Note",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Capability",
+          "signature": "*CapabilitySchema",
           "configurations": "all",
           "profiles": "all"
         },
@@ -2162,6 +2354,18 @@
         },
         {
           "id": "field:FlagSchema.Default",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Enum",
+          "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:FlagSchema.Example",
           "signature": "string",
           "configurations": "all",
           "profiles": "all"
@@ -2299,6 +2503,18 @@
           "profiles": "all"
         },
         {
+          "id": "field:MCPTool.Annotations",
+          "signature": "*MCPToolAnnotations",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPTool.Capability",
+          "signature": "*CapabilitySchema",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:MCPTool.Description",
           "signature": "string",
           "configurations": "all",
@@ -2319,6 +2535,24 @@
         {
           "id": "field:MCPTool.NonDeterministicFields",
           "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPToolAnnotations.DestructiveHint",
+          "signature": "*bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPToolAnnotations.OpenWorldHint",
+          "signature": "*bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPToolAnnotations.ReadOnlyHint",
+          "signature": "bool",
           "configurations": "all",
           "profiles": "all"
         },
@@ -2473,6 +2707,24 @@
           "profiles": "all"
         },
         {
+          "id": "func:WithCapability",
+          "signature": "func(*github.com/spf13/cobra.Command, Capability, string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithFlagEnum",
+          "signature": "func(*github.com/spf13/cobra.Command, string, ...string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithFlagExample",
+          "signature": "func(*github.com/spf13/cobra.Command, string, string) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:WithNonDeterministicFields",
           "signature": "func[T any](*github.com/spf13/cobra.Command)",
           "configurations": "all",
@@ -2485,8 +2737,20 @@
           "profiles": "all"
         },
         {
+          "id": "type:Capability",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:CapabilitySchema",
+          "signature": "struct{Class Capability \"json:\\\"class\\\"\"; Note string \"json:\\\"note,omitempty\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "type:CommandSchema",
-          "signature": "struct{Use string \"json:\\\"use\\\"\"; Short string \"json:\\\"short,omitempty\\\"\"; Long string \"json:\\\"long,omitempty\\\"\"; Example string \"json:\\\"example,omitempty\\\"\"; Flags []FlagSchema \"json:\\\"flags,omitempty\\\"\"; Commands []CommandSchema \"json:\\\"commands,omitempty\\\"\"; Prompts []Prompt \"json:\\\"prompts,omitempty\\\"\"; Resources []Resource \"json:\\\"resources,omitempty\\\"\"; NonDeterministicFields []string \"json:\\\"non_deterministic_fields\\\"\"}",
+          "signature": "struct{Use string \"json:\\\"use\\\"\"; Short string \"json:\\\"short,omitempty\\\"\"; Long string \"json:\\\"long,omitempty\\\"\"; Example string \"json:\\\"example,omitempty\\\"\"; Flags []FlagSchema \"json:\\\"flags,omitempty\\\"\"; Commands []CommandSchema \"json:\\\"commands,omitempty\\\"\"; Prompts []Prompt \"json:\\\"prompts,omitempty\\\"\"; Resources []Resource \"json:\\\"resources,omitempty\\\"\"; Capability *CapabilitySchema \"json:\\\"capability,omitempty\\\"\"; NonDeterministicFields []string \"json:\\\"non_deterministic_fields\\\"\"}",
           "configurations": "all",
           "profiles": "all"
         },
@@ -2498,7 +2762,7 @@
         },
         {
           "id": "type:FlagSchema",
-          "signature": "struct{Name string \"json:\\\"name\\\"\"; Shorthand string \"json:\\\"shorthand,omitempty\\\"\"; Type string \"json:\\\"type\\\"\"; Default string \"json:\\\"default,omitempty\\\"\"; Usage string \"json:\\\"usage,omitempty\\\"\"; Required bool \"json:\\\"required,omitempty\\\"\"}",
+          "signature": "struct{Name string \"json:\\\"name\\\"\"; Shorthand string \"json:\\\"shorthand,omitempty\\\"\"; Type string \"json:\\\"type\\\"\"; Default string \"json:\\\"default,omitempty\\\"\"; Usage string \"json:\\\"usage,omitempty\\\"\"; Required bool \"json:\\\"required,omitempty\\\"\"; Enum []string \"json:\\\"enum,omitempty\\\"\"; Example string \"json:\\\"example,omitempty\\\"\"}",
           "configurations": "all",
           "profiles": "all"
         },
@@ -2528,7 +2792,13 @@
         },
         {
           "id": "type:MCPTool",
-          "signature": "struct{Name string \"json:\\\"name\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; InputSchema map[string]any \"json:\\\"inputSchema\\\"\"; NonDeterministicFields []string \"json:\\\"nonDeterministicFields\\\"\"}",
+          "signature": "struct{Name string \"json:\\\"name\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; InputSchema map[string]any \"json:\\\"inputSchema\\\"\"; NonDeterministicFields []string \"json:\\\"nonDeterministicFields\\\"\"; Capability *CapabilitySchema \"json:\\\"capability,omitempty\\\"\"; Annotations *MCPToolAnnotations \"json:\\\"annotations,omitempty\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:MCPToolAnnotations",
+          "signature": "struct{ReadOnlyHint bool \"json:\\\"readOnlyHint,omitempty\\\"\"; DestructiveHint *bool \"json:\\\"destructiveHint,omitempty\\\"\"; OpenWorldHint *bool \"json:\\\"openWorldHint,omitempty\\\"\"}",
           "configurations": "all",
           "profiles": "all"
         },
@@ -2559,6 +2829,12 @@
         {
           "id": "type:Schema",
           "signature": "struct{SchemaVersion string \"json:\\\"schema_version\\\"\"; Tool string \"json:\\\"tool\\\"\"; Version string \"json:\\\"version\\\"\"; ModeDetection string \"json:\\\"mode_detection\\\"\"; Command CommandSchema \"json:\\\"command\\\"\"; ErrorEnvelope ErrorSchemaInfo \"json:\\\"error_envelope\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "var:ErrInvalidDeclaration",
+          "signature": "error",
           "configurations": "all",
           "profiles": "all"
         }
