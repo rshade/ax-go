@@ -39,7 +39,7 @@ must stay byte-identical. That is the SC-004 backward-compatibility proof. New
 
 ## Technical Context
 
-**Language/Version**: Go 1.26.5 (module `github.com/rshade/ax-go`)
+**Language/Version**: Go 1.27.1 (module `github.com/rshade/ax-go`)
 
 **Primary Dependencies**: `github.com/spf13/cobra` v1.10.2, `github.com/spf13/pflag`
 v1.0.10 (`InvalidValueError` + `Unwrap`, verified in `flag.go:495` /
@@ -88,7 +88,7 @@ decision it changes, so no ADR is absorbed or retired.
 | Principle | Gate | Status |
 |-----------|------|--------|
 | I. Stream Separation | `__schema` output stays on stdout; the enum rejection is an `ax.Error` on stderr, written by `ax.Execute` | PASS |
-| II. Determinism & Exit Codes | The enum keeps the author's order and rejects duplicates. Struct fields are used, not maps, except the existing `inputSchema` map, which `encoding/json` key-sorts. The rejection is exit `2`, and the declaration error has no exit code of its own. Identical input produces an identical rejection envelope. | PASS |
+| II. Determinism & Exit Codes | The enum keeps the author's order and rejects duplicates. Struct fields are used, not maps, except the existing `inputSchema` map, which `encoding/json` key-sorts. The rejection is exit `2`, and a declaration error is `invalid_schema_declaration`, also exit `2`. Identical input produces an identical rejection envelope. | PASS |
 | III. Machine Discoverability | Additive fields in both `__schema` and `--as=mcp`. Golden files guard the enriched output, and the existing golden files stay unchanged. | PASS |
 | IV. Agent-Safety Primitives | Enforcement happens in pflag `Set`, so it precedes `PersistentPreRunE` and the `Guard`/`Perform` dry-run helpers (FR-014, US1-AS5) | PASS |
 | V. Asymmetric JSON I/O | No change | N/A |
@@ -166,7 +166,7 @@ testdata/
 
 examples/integration/     # declare an enum, example, and capability on existing commands; regenerate goldens
 internal/cmd/surfacecheck/baseline.json          # regenerated (make surface-update)
-specs/015-internalize-helpers/public-surface-audit.json  # append root-package audit rows
+specs/023-internalize-helpers/public-surface-audit.json  # append root-package audit rows
 README.md, AGENTS.md      # document the declaration API and output fields
 ```
 
