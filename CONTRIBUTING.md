@@ -85,6 +85,10 @@ make dead-check
 All commands must exit cleanly. See [`AGENTS.md`](AGENTS.md) for the full
 development workflow and coverage floor policy.
 
+`make slop` is a separate report for assertion-free subtests. It is not part
+of `make ci`, and findings do not fail the build. ast-grep has no type
+information; read its output as a triage list, not as a gate.
+
 ## Documentation standards
 
 - Every exported Go symbol must carry a doc comment (`golangci-lint` gates this).

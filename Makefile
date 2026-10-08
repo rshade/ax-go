@@ -161,6 +161,21 @@ size-check:
 	go run ./internal/cmd/sizecheck
 
 # Reachability includes tests and intersects all four tag configurations.
+# Report assertion-free subtests. Not part of ci, and findings do not fail
+# the build: ast-grep exit 0 and 1 are both success here. A missing binary
+# or a broken rule still fails. ast-grep has no type information, so a
+# subtest that asserts only through a helper this rule does not name is
+# reported. The checked-in fixture under .slop/testdata is excluded; scan
+# it with the same binary and --config when changing the rule.
+.PHONY: slop
+slop:
+	@test -x node_modules/.bin/ast-grep || (echo "node_modules/.bin/ast-grep missing. Run: npm install"; exit 1)
+	@find . -name '*_test.go' -not -path './.slop/*' -not -path './node_modules/*' -print0 \
+		| xargs -0 -r node_modules/.bin/ast-grep scan --config .slop/sgconfig.yml --report-style short; \
+		status=$$?; \
+		if [ $$status -eq 0 ] || [ $$status -eq 1 ]; then exit 0; fi; \
+		exit $$status
+
 .PHONY: dead-check
 dead-check:
 	@go run ./internal/cmd/deadcheck
@@ -281,6 +296,7 @@ help:
 	@echo "  surface-update - Regenerate the exported-surface baseline for review"
 	@echo "  size-check    - Enforce the isolated logging binary ceiling and reduction ratio"
 	@echo "  dead-check    - Gate unreachable unexported/internal functions across build tags (tests included)"
+	@echo "  slop          - Report assertion-free subtests (not part of ci; does not fail the build)"
 	@echo "  lint          - Run golangci-lint per build-tag combination, markdownlint, actionlint"
 	@echo "  lint-actions  - Run actionlint on GitHub workflows"
 	@echo "  validate      - Check gofmt, go mod tidy, and go vet across the build-tag matrix"

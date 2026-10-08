@@ -1,0 +1,62 @@
+id: subtest-asserts-nothing
+language: go
+message: subtest body has no assertion
+severity: warning
+# Exported Go calls parse as type conversions unless the pattern is a
+# call_expression inside a function. stopBy: end looks through the
+# function literal; the default has-rule stops at the immediate child.
+# ast-grep has no type information, so a local helper that calls t.Fatal
+# is still reported until this rule names it.
+rule:
+  pattern: t.Run($NAME, func($T *testing.T) { $$$BODY })
+  not:
+    has:
+      stopBy: end
+      any:
+        - pattern:
+            context: "func wrapper() { assert.$_($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { require.$_($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { $T.Error($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { $T.Errorf($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { $T.Fatal($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { $T.Fatalf($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { $T.Fail($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { $T.FailNow($$$ARGS) }"
+            selector: call_expression
+        # These helpers assert. axtest.Run does not, so it is not listed.
+        - pattern:
+            context: "func wrapper() { axtest.Decode($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { axtest.RunAndDecode($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { testutil.CompareOutputs($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { testutil.ValidateTimestamps($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { testutil.AssertFullyTyped($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { testutil.AssertNoForbiddenImports($$$ARGS) }"
+            selector: call_expression
+note: |
+  ast-grep does not see types. A local helper that calls t.Fatal is still
+  reported until the rule names that helper. axtest.Run returns a result
+  and does not assert, so a subtest that only calls it is reported.

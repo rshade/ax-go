@@ -1,0 +1,8 @@
+# ast-grep has no type information. A helper that asserts only by calling
+# t.Fatal is reported until this rule names it. Typed patterns, such as a
+# value assigned and never read, are out of reach.
+#
+# Rules live in rules/ so this file is not parsed as a rule. ast-grep treats
+# every yaml file in a rule directory as a rule.
+ruleDirs:
+  - rules

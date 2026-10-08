@@ -189,6 +189,18 @@ conflicts with the constitution, the constitution wins.
    gate across all build configurations and platforms. See **Build
    Configurations** below.
 
+### Assertion-free subtest report
+
+`make slop` runs the pinned `@ast-grep/cli` binary at `node_modules/.bin/ast-grep`
+(install with `npm install`; do not use a `PATH` copy) over `*_test.go`. It
+prints `subtest-asserts-nothing` findings and exits 0 even when it finds
+some. It is not a dependency of `make ci` or `make lint`. ast-grep has no
+type information, so a subtest that checks behavior only through a helper
+the rule does not name is reported, and anything that needs types is out of
+reach. `axtest.Run` is not an assertion; a subtest whose only call is
+`axtest.Run` is reported. The fixture at `.slop/testdata/` is excluded from
+`make slop`.
+
 ### Internal Reachability Gate
 
 Run `make dead-check` before handing work back. It is included in `make ci`
