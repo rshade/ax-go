@@ -10,8 +10,9 @@ import (
 // preserveDeclarationOrder makes prompts/list and resources/list return entries
 // in declaration-walk order, the order __schema --as=mcp projects them in. The
 // SDK pages its listings sorted by name or URI so cursors stay stable; this
-// middleware restores the walk order within each page. The served sets are
-// small and fixed, far below the SDK page size, so one page holds every entry.
+// middleware restores the walk order within a page, which is global only when
+// one page holds every entry. serverOptions guarantees that by growing the SDK
+// page size to the largest declared set.
 func preserveDeclarationOrder(server *sdk.Server, promptNames, resourceURIs []string) {
 	if len(promptNames) == 0 && len(resourceURIs) == 0 {
 		return

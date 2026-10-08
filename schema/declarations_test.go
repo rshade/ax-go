@@ -478,8 +478,11 @@ func TestResourceContentIsNeverProjected(t *testing.T) {
 	if err != nil || bytes.Contains(direct, []byte("SECRET-BODY")) {
 		t.Fatalf("marshaling Resource leaked Content (err %v): %s", err, direct)
 	}
-	if got := BuildSchema(root).Command.Resources[0].Content; got != "" {
-		t.Errorf("BuildSchema carries Content %q, want it cleared", got)
+	if got := BuildSchema(root).Command.Resources[0].Content; got != "SECRET-BODY" {
+		t.Errorf(
+			"BuildSchema Content = %q, want the declared content retained in memory (only marshaling omits it)",
+			got,
+		)
 	}
 }
 

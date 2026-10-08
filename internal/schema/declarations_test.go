@@ -872,8 +872,44 @@ func FuzzRenderTemplate(f *testing.F) {
 		if bound := len(template) + len(names)*len(value); len(got) > bound {
 			t.Fatalf("render of %q grew to %d bytes, bound %d: a value was re-expanded", template, len(got), bound)
 		}
+		if size := RenderedLen(template, values); size != int64(len(got)) {
+			t.Fatalf("RenderedLen(%q) = %d, but the render is %d bytes", template, size, len(got))
+		}
 		if empty := RenderTemplate(template, nil); len(empty) > len(template) {
 			t.Fatalf("rendering with no values grew %q to %q", template, empty)
 		}
 	})
+}
+
+func TestRenderedLenMatchesRender(t *testing.T) {
+	cases := []struct {
+		template string
+		values   map[string]string
+	}{
+		{"", nil},
+		{"no placeholders", nil},
+		{"{{a}} {{b}} {{a}}", map[string]string{"a": "xyz", "b": ""}},
+		{"[{{missing}}]", map[string]string{}},
+		{"{{{x}}} {{ a }} {{{{a}}", map[string]string{"a": "é日本"}},
+		{strings.Repeat("{{a}}", 100), map[string]string{"a": strings.Repeat("v", 50)}},
+	}
+	for _, tc := range cases {
+		if got, want := RenderedLen(
+			tc.template,
+			tc.values,
+		), int64(
+			len(RenderTemplate(tc.template, tc.values)),
+		); got != want {
+			t.Errorf("RenderedLen(%q) = %d, want %d (len of the render)", tc.template, got, want)
+		}
+	}
+}
+
+func TestRenderedLenCountsAmplificationWithoutAllocating(t *testing.T) {
+	template := strings.Repeat("{{a}}", maxTemplateBytes/len("{{a}}"))
+	values := map[string]string{"a": strings.Repeat("v", 64<<10)}
+
+	if got, floor := RenderedLen(template, values), int64(512<<20); got < floor {
+		t.Fatalf("RenderedLen = %d, want it to report the amplified size (at least %d)", got, floor)
+	}
 }

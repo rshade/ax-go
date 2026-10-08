@@ -15,6 +15,13 @@ import (
 // the template cap, so a value can fill a template-sized slot.
 const maxPromptArgumentBytes = 64 << 10
 
+// maxRenderedPromptBytes bounds the text one prompts/get response carries. The
+// per-argument cap alone is not enough: a 64 KiB template can repeat one
+// placeholder thousands of times, so a single 64 KiB value would otherwise
+// expand to hundreds of MiB (Constitution IX). It matches the resource content
+// cap, so a rendered prompt is never larger than a document the server serves.
+const maxRenderedPromptBytes = 1 << 20
+
 // registerPrompts serves every declared prompt over prompts/list and
 // prompts/get. The caller passes the set from the same aggregation
 // __schema --as=mcp projects (internalschema.CollectDeclarations), so the two
@@ -71,6 +78,10 @@ func promptHandler(prompt internalschema.Prompt) sdk.PromptHandler {
 					return nil, invalidParams("missing required argument %q for prompt %q", argument.Name, prompt.Name)
 				}
 			}
+		}
+		if size := internalschema.RenderedLen(prompt.Template, values); size > maxRenderedPromptBytes {
+			return nil, invalidParams("prompt %q would render %d bytes, over the %d-byte limit",
+				prompt.Name, size, maxRenderedPromptBytes)
 		}
 		return &sdk.GetPromptResult{
 			Description: prompt.Description,

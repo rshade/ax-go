@@ -2,6 +2,7 @@ package mcpserver
 
 import (
 	"context"
+	"fmt"
 	"reflect"
 	"testing"
 
@@ -74,4 +75,38 @@ func TestResourcesReadRejectsUndeclaredAndHiddenURIs(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestListsStayInDeclarationOrderPastOneSDKPage(t *testing.T) {
+	const count = sdk.DefaultPageSize + 50
+	root := fixedRoot()
+	for i := count - 1; i >= 0; i-- {
+		name := fmt.Sprintf("p%05d", i)
+		mustAddPromptTo(t, root, name)
+		mustAddResourceTo(t, root, "demo://docs/"+name)
+	}
+
+	session := newInMemorySession(t, newServerWithConfig(t, context.Background(), root, Config{}))
+	prompts, err := session.ListPrompts(context.Background(), nil)
+	if err != nil || len(prompts.Prompts) != count || prompts.NextCursor != "" {
+		t.Fatalf("prompts/list = %d entries, cursor %q, err %v; want all %d in one page",
+			len(prompts.Prompts), prompts.NextCursor, err, count)
+	}
+	resources, err := session.ListResources(context.Background(), nil)
+	if err != nil || len(resources.Resources) != count || resources.NextCursor != "" {
+		t.Fatalf("resources/list = %d entries, cursor %q, err %v; want all %d in one page",
+			len(resources.Resources), resources.NextCursor, err, count)
+	}
+	wantPrompts := schema.BuildMCPSchema(root).Prompts
+	for i, p := range prompts.Prompts {
+		if p.Name != wantPrompts[i].Name {
+			t.Fatalf("prompts/list[%d] = %s, want %s (declaration order)", i, p.Name, wantPrompts[i].Name)
+		}
+	}
+	wantResources := schema.BuildMCPSchema(root).Resources
+	for i, r := range resources.Resources {
+		if r.URI != wantResources[i].URI {
+			t.Fatalf("resources/list[%d] = %s, want %s (declaration order)", i, r.URI, wantResources[i].URI)
+		}
+	}
 }

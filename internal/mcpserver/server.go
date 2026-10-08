@@ -159,6 +159,22 @@ func validateInstructions(ctx context.Context, text string) error {
 	}
 }
 
+// serverOptions returns nil when nothing differs from the SDK defaults, which
+// keeps the handshake of a CLI that sets nothing identical to v0.8.0. A listing
+// larger than one SDK page would split across pages sorted by name or URI, which
+// preserveDeclarationOrder cannot reorder globally, so the page size grows to
+// hold the largest declared set and every list stays one page in walk order.
+func serverOptions(cfg Config, declared int) *sdk.ServerOptions {
+	opts := sdk.ServerOptions{Instructions: cfg.Instructions}
+	if declared > sdk.DefaultPageSize {
+		opts.PageSize = declared
+	}
+	if opts.Instructions == "" && opts.PageSize == 0 {
+		return nil
+	}
+	return &opts
+}
+
 func promptNames(prompts []internalschema.Prompt) []string {
 	names := make([]string, 0, len(prompts))
 	for _, prompt := range prompts {
@@ -193,10 +209,8 @@ func validateDeclarations(ctx context.Context, root *cobra.Command) error {
 // with the shared dispatch handler, then the declared prompts and resources. The implementation name and version come
 // from cfg and surface in the initialize handshake (C-1).
 func newMCPServer(dispatch *dispatcher, cfg Config) *sdk.Server {
-	var opts *sdk.ServerOptions
-	if cfg.Instructions != "" {
-		opts = &sdk.ServerOptions{Instructions: cfg.Instructions}
-	}
+	prompts, resources := internalschema.CollectDeclarations(dispatch.root)
+	opts := serverOptions(cfg, max(len(prompts), len(resources)))
 	server := sdk.NewServer(&sdk.Implementation{
 		Name:    cfg.ServerName,
 		Version: cfg.Version,
@@ -209,7 +223,6 @@ func newMCPServer(dispatch *dispatcher, cfg Config) *sdk.Server {
 			Annotations: sdkAnnotations(tool.Annotations),
 		}, dispatch.handle)
 	}
-	prompts, resources := internalschema.CollectDeclarations(dispatch.root)
 	registerPrompts(server, prompts)
 	registerResources(server, resources)
 	preserveDeclarationOrder(server, promptNames(prompts), resourceURIs(resources))
