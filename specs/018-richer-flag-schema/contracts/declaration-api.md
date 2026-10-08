@@ -98,7 +98,8 @@ argv. For a slice flag, write the elements as CSV, for example `a,b`.
 - **Errors** (see the authoring-error contract):
   - `cmd` is nil or the flag is not found;
   - the example is empty (`example`/`required`);
-  - the example does not parse as the flag's known type
+  - the example does not parse as the flag's known type, or is a `NaN` or
+    `±Inf` float that the `--as=mcp` JSON form cannot carry
     (`example`/`invalid_value`);
   - the example is not a member of the flag's declared enum
     (`example`/`not_in_enum`).

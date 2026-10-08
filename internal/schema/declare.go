@@ -229,8 +229,9 @@ func FlagEnum(flag *pflag.Flag) []string {
 // of cmd. It validates before mutating, so a non-nil *Violation leaves the
 // previous example in place: cmd is nil (cmd/nil_command) or does not own the
 // flag (flag/flag_not_found), the example is empty (example/required), it does
-// not parse as the flag's known type (example/invalid_value; custom types are
-// unchecked), or the flag has an enum and the example is not a member
+// not parse as the flag's known type or is a non-finite float that --as=mcp
+// cannot carry (example/invalid_value; custom types are unchecked), or the flag
+// has an enum and the example is not a member
 // (example/not_in_enum). Re-declaring replaces the example.
 func AddFlagExample(cmd *cobra.Command, name, example string) *Violation {
 	flag, violation := lookupFlag(cmd, name)
@@ -251,10 +252,16 @@ func AddFlagExample(cmd *cobra.Command, name, example string) *Violation {
 }
 
 // exampleProblem returns the Violation reason example fails on flag, or ""
-// when it is acceptable: it must parse as the flag's type and, under an enum,
-// be a member.
+// when it is acceptable: it must parse as the flag's type, convert to the
+// --as=mcp JSON form (NaN and ±Inf parse but do not), and, under an enum, be a
+// member. A declared example therefore appears on both schema surfaces or
+// neither.
 func exampleProblem(flag *pflag.Flag, example string) Reason {
-	if err := ValidateValue(flag.Value.Type(), example); err != nil {
+	flagType := flag.Value.Type()
+	if err := ValidateValue(flagType, example); err != nil {
+		return ReasonInvalidValue
+	}
+	if _, ok := ExampleJSON(flagType, example); !ok {
 		return ReasonInvalidValue
 	}
 	if wrapper, ok := flag.Value.(*enumValue); ok && !isMember(wrapper.flagType, wrapper.canonical, example) {
