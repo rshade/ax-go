@@ -85,6 +85,7 @@ No governing ADR; nothing to absorb or retire.
   declared, a missing required argument, or a value over the cap returns an
   invalid-params error (SDK `jsonrpc2` invalid-params code, as `tools/call`
   does for unknown flags). Message names the argument, never echoes the value.
+- **Rendered size**: the per-value cap alone does not bound the response, since a 64 KiB template repeating one placeholder expands a single 64 KiB value to hundreds of MiB. `schema.RenderedLen` computes the rendered size without allocating, and the handler rejects over 1 MiB (`maxRenderedPromptBytes`) before rendering.
 - **Rationale**: Matches `dispatch.go`'s strictness; no partial render.
 - **Unknown prompt name**: The SDK returns its own invalid-params error when no
   prompt is registered under that name, so the handler is never reached.

@@ -249,10 +249,7 @@ func toMCPPrompt(prompt internalschema.Prompt) MCPPrompt {
 	}
 }
 
-func fromInternalResource(resource internalschema.Resource) Resource {
-	resource.Content = ""
-	return Resource(resource)
-}
+func fromInternalResource(resource internalschema.Resource) Resource { return Resource(resource) }
 
 func toMCPResource(resource internalschema.Resource) MCPResource {
 	return MCPResource{

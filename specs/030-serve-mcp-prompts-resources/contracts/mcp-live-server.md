@@ -52,6 +52,7 @@ prompt description.
 | argument not declared by the prompt | invalid-params error, no text |
 | unknown prompt name | invalid-params error |
 | argument value over 64 KiB | invalid-params error |
+| rendered text over 1 MiB (checked before rendering) | invalid-params error |
 
 ## `resources/list` and `resources/read`
 

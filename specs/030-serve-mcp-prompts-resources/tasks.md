@@ -103,7 +103,7 @@ description: "Task list for feature 030: serve declared MCP prompts, resources a
 **Goal**: End-to-end proof in Claude Code, plus the adopter-facing example.
 
 - [X] T023 [US5] Update `examples/integration/main.go` to declare one prompt, one resource with content, and `mcp.WithInstructions`; add the additive goldens and tests in `examples/integration/golden_test.go` (`prompts/get`, `resources/read`), keeping existing integration goldens byte-identical except additions
-- [ ] T024 [US5] Manual verification in Claude Code: `claude mcp add` the integration example, then confirm and record in the PR the Claude Code version and steps: instructions in context, prompt as `/mcp__<server>__<prompt>` slash command rendering with arguments, resource attachable by `@`, and the model reading the resource through `ReadMcpResource` with no `@` mention after seeing only the instructions
+- [ ] T024 [US5] Manual verification in Claude Code: `claude mcp add` the integration example, then confirm and record in the PR the Claude Code version and steps: instructions in context, prompt as `/mcp__<server>__<prompt>` slash command rendering with arguments, resource attachable by `@`, and the model reading the resource through `ReadMcpResource` with no `@` mention after seeing only the instructions. Evidence so far (headless `claude -p`, Claude Code 2.1.294, recorded in the PR): connect, instructions, unprompted `ReadMcpResource`, and the slash-command prompt were exercised; the `@` mention was not (it needs an interactive session), so this task stays open until it is run or explicitly waived
 
 ---
 

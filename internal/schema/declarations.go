@@ -346,6 +346,19 @@ func RenderTemplate(template string, values map[string]string) string {
 	return out.String()
 }
 
+// RenderedLen returns len(RenderTemplate(template, values)) without building
+// the string. A template full of one placeholder multiplies a single bounded
+// argument value by the placeholder count, so a caller that must bound the
+// rendered size checks this before rendering. It is int64 so the product cannot
+// overflow on 32-bit platforms.
+func RenderedLen(template string, values map[string]string) int64 {
+	total := int64(len(template))
+	scanPlaceholders(template, func(start, end int, name string) {
+		total += int64(len(values[name])) - int64(end-start)
+	})
+	return total
+}
+
 // scanPlaceholders calls visit for each placeholder in template, in order, with
 // the byte offsets [start, end) of the whole "{{name}}" span and its name. Each
 // "{{" is paired with the next "}}" and accepted only when the whole span

@@ -10,8 +10,12 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
 
+	internalschema "github.com/rshade/ax-go/internal/schema"
 	"github.com/rshade/ax-go/schema"
 )
+
+// maxTemplateForTest is the largest template declaration allows (64 KiB).
+const maxTemplateForTest = 64 << 10
 
 const decideRendered = "Decide: Should we ship?\nContext: \nLiteral {x} and {{ spaced }} stay."
 
@@ -146,6 +150,38 @@ func TestPromptsGetIsDeterministic(t *testing.T) {
 			} else if text != first {
 				t.Fatalf("call %d rendered %q, want %q", i, text, first)
 			}
+		}
+	})
+}
+
+func TestPromptsGetRejectsAmplifiedRenderBeforeAllocating(t *testing.T) {
+	root := fixedRoot()
+	if v := internalschema.AddPrompt(root, internalschema.Prompt{
+		Name:      "amplify",
+		Arguments: []internalschema.PromptArgument{{Name: "a", Required: true}},
+		Template:  strings.Repeat("{{a}}", maxTemplateForTest/len("{{a}}")),
+	}); v != nil {
+		t.Fatalf("AddPrompt: %+v", v)
+	}
+	if v := internalschema.AddPrompt(root, internalschema.Prompt{
+		Name:      "modest",
+		Arguments: []internalschema.PromptArgument{{Name: "a", Required: true}},
+		Template:  strings.Repeat("{{a}}", 8),
+	}); v != nil {
+		t.Fatalf("AddPrompt: %+v", v)
+	}
+
+	forEachTransport(t, root, Config{}, func(t *testing.T, session *sdk.ClientSession) {
+		big := map[string]string{"a": strings.Repeat("v", maxPromptArgumentBytes)}
+		res, err := session.GetPrompt(context.Background(), &sdk.GetPromptParams{Name: "amplify", Arguments: big})
+		var rpcErr *jsonrpc.Error
+		if res != nil || !errors.As(err, &rpcErr) || rpcErr.Code != jsonrpc.CodeInvalidParams {
+			t.Fatalf("amplified render = (%+v, %v), want an invalid-params error and no result", res, err)
+		}
+
+		res, err = session.GetPrompt(context.Background(), &sdk.GetPromptParams{Name: "modest", Arguments: big})
+		if err != nil || len(res.Messages[0].Content.(*sdk.TextContent).Text) != 8*maxPromptArgumentBytes {
+			t.Fatalf("a render within the bound failed: %v", err)
 		}
 	})
 }
