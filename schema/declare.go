@@ -73,7 +73,8 @@ func DeclareFlagEnum(cmd *cobra.Command, flag string, values ...string) error {
 // It returns a *contract.Error with error_code invalid_schema_declaration
 // (exit 2) and context {field, reason}, leaving the previous example in place,
 // when cmd is nil or the flag is not found, the example is empty, the example
-// does not parse as the flag's built-in type, or the flag has an enum
+// does not parse as the flag's built-in type or is NaN or ±Inf (which JSON
+// cannot carry into --as=mcp), or the flag has an enum
 // (DeclareFlagEnum) and the example is not a member. Values for custom
 // pflag.Value types are not type-checked.
 func DeclareFlagExample(cmd *cobra.Command, flag string, example string) error {

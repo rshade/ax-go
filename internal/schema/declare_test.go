@@ -281,6 +281,8 @@ func TestAddFlagExample(t *testing.T) {
 		cmd.Flags().Duration("timeout", 0, "timeout")
 		cmd.Flags().StringSlice("tags", nil, "tags")
 		cmd.Flags().IntSlice("ports", nil, "ports")
+		cmd.Flags().Float64("ratio", 0, "ratio")
+		cmd.Flags().Float64Slice("weights", nil, "weights")
 		cmd.Flags().Var(&formatValue{}, "format", "format")
 		cmd.Flags().String("output", "json", "output")
 		if err := AddFlagEnum(cmd, "output", []string{"json", "table"}); err != nil {
@@ -295,6 +297,26 @@ func TestAddFlagExample(t *testing.T) {
 		example string
 		want    *Violation
 	}{
+		{name: "float", flag: "ratio", example: "1.5"},
+		{name: "float64Slice", flag: "weights", example: "0.5,2"},
+		{
+			name:    "float NaN not representable in MCP",
+			flag:    "ratio",
+			example: "NaN",
+			want:    &Violation{Field: "example", Reason: ReasonInvalidValue},
+		},
+		{
+			name:    "float +Inf not representable in MCP",
+			flag:    "ratio",
+			example: "+Inf",
+			want:    &Violation{Field: "example", Reason: ReasonInvalidValue},
+		},
+		{
+			name:    "float64Slice -Inf element not representable in MCP",
+			flag:    "weights",
+			example: "1,-Inf",
+			want:    &Violation{Field: "example", Reason: ReasonInvalidValue},
+		},
 		{name: "string", flag: "service", example: "svc-a"},
 		{name: "int", flag: "n", example: "5"},
 		{name: "duration", flag: "timeout", example: "45s"},
@@ -361,6 +383,14 @@ func TestAddFlagExample(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("hand-edited non-finite annotation reads as no example", func(t *testing.T) {
+		flag := newCmd(t).Flags().Lookup("ratio")
+		flag.Annotations = map[string][]string{exampleAnnotationKey: {"NaN"}}
+		if got := FlagExample(flag); got != "" {
+			t.Fatalf("FlagExample() = %q, want \"\"", got)
+		}
+	})
 
 	t.Run("re-declaration replaces", func(t *testing.T) {
 		cmd := newCmd(t)
