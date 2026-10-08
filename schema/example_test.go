@@ -41,3 +41,52 @@ func ExampleBuildMCPSchema() {
 	// app
 	// object
 }
+
+func ExampleDeclarePrompt() {
+	root := &cobra.Command{Use: "app"}
+	err := schema.DeclarePrompt(root, schema.Prompt{
+		Name:  "triage-spike",
+		Title: "Triage a cost spike",
+		Arguments: []schema.PromptArgument{
+			{Name: "window", Description: "lookback, e.g. 7d", Required: true},
+		},
+		Template: "Run `app report --since={{window}}`, then explain the top line item.",
+	})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	prompt := schema.BuildMCPSchema(root).Prompts[0]
+	fmt.Println(prompt.Name, prompt.Arguments[0].Name)
+
+	// A placeholder must name a declared argument.
+	err = schema.DeclarePrompt(root, schema.Prompt{Name: "broken", Template: "{{missing}}"})
+	fmt.Println(err)
+	// Output:
+	// triage-spike window
+	// invalid prompt declaration "broken": template undeclared_placeholder
+}
+
+func ExampleDeclareResource() {
+	root := &cobra.Command{Use: "app"}
+	err := schema.DeclareResource(root, schema.Resource{
+		URI:      "app://docs/pricing-model",
+		Name:     "pricing-model",
+		MIMEType: "text/markdown",
+	})
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	resource := schema.BuildSchema(root).Command.Resources[0]
+	fmt.Println(resource.URI, resource.MIMEType)
+
+	// Resources are addressed by an absolute URI.
+	err = schema.DeclareResource(root, schema.Resource{URI: "docs/pricing", Name: "relative"})
+	fmt.Println(err)
+	// Output:
+	// app://docs/pricing-model text/markdown
+	// invalid resource declaration "docs/pricing": uri not_absolute
+}
