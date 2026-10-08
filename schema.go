@@ -60,3 +60,36 @@ type MCPTool = isolatedschema.MCPTool
 func BuildMCPSchema(root *cobra.Command) MCPSchema {
 	return isolatedschema.BuildMCPSchema(root)
 }
+
+// Prompt is a static workflow template declared on a command with
+// DeclarePrompt and projected into __schema.
+type Prompt = isolatedschema.Prompt
+
+// PromptArgument is one declared input of a Prompt.
+type PromptArgument = isolatedschema.PromptArgument
+
+// Resource is static, read-only reference metadata declared on a command with
+// DeclareResource and projected into __schema.
+type Resource = isolatedschema.Resource
+
+// MCPPrompt is a Prompt in the __schema --as=mcp adapter shape.
+type MCPPrompt = isolatedschema.MCPPrompt
+
+// MCPPromptArgument is a PromptArgument in the MCP adapter shape.
+type MCPPromptArgument = isolatedschema.MCPPromptArgument
+
+// MCPResource is a Resource in the MCP resources/list shape.
+type MCPResource = isolatedschema.MCPResource
+
+// DeclarePrompt validates prompt and records a copy of it on cmd. It returns
+// an *Error with error_code invalid_schema_declaration (exit 2) on a nil cmd,
+// an invalid prompt, or a name already declared on cmd, leaving cmd unchanged.
+func DeclarePrompt(cmd *cobra.Command, prompt Prompt) error {
+	return isolatedschema.DeclarePrompt(cmd, prompt)
+}
+
+// DeclareResource validates resource and records a copy of it on cmd, with the
+// same error contract as DeclarePrompt; resources are keyed by URI.
+func DeclareResource(cmd *cobra.Command, resource Resource) error {
+	return isolatedschema.DeclareResource(cmd, resource)
+}

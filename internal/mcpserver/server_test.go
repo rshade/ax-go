@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/cobra"
 
 	"github.com/rshade/ax-go/contract"
+	internalschema "github.com/rshade/ax-go/internal/schema"
 	"github.com/rshade/ax-go/schema"
 )
 
@@ -237,5 +238,41 @@ func TestInitializeAndToolsListOverInMemory(t *testing.T) {
 		if live[excluded] {
 			t.Errorf("live tools/list should exclude %q", excluded)
 		}
+	}
+}
+
+// TestDeclarationsAreNotServedInPhaseOne pins the Phase 2 trigger boundary
+// (spec 028 FR-011): prompt and resource declarations on the command tree are
+// projected by __schema only. The live server registers neither, so its
+// initialize capabilities advertise no prompts or resources and its tool set
+// is byte-identical to the declaration-free golden.
+func TestDeclarationsAreNotServedInPhaseOne(t *testing.T) {
+	root := fixedRoot()
+	if v := internalschema.AddPrompt(root, internalschema.Prompt{Name: "triage", Template: "t"}); v != nil {
+		t.Fatalf("AddPrompt: %+v", v)
+	}
+	if v := internalschema.AddResource(root, internalschema.Resource{URI: "demo://docs", Name: "docs"}); v != nil {
+		t.Fatalf("AddResource: %+v", v)
+	}
+
+	session := newInMemorySession(t, newTestServer(t, root))
+	caps := session.InitializeResult().Capabilities
+	if caps == nil {
+		t.Fatal("initialize result missing capabilities")
+	}
+	if caps.Prompts != nil || caps.Resources != nil {
+		t.Fatalf("capabilities advertise prompts=%v resources=%v, want neither", caps.Prompts, caps.Resources)
+	}
+
+	var buf bytes.Buffer
+	if err := contract.WriteJSON(&buf, schema.MCPSchema{Tools: newTestDispatcher(root).tools}); err != nil {
+		t.Fatalf("marshal tools list: %v", err)
+	}
+	want, err := os.ReadFile(filepath.Join("..", "..", "testdata", "mcp_tools_list.golden.json"))
+	if err != nil {
+		t.Fatalf("read golden: %v", err)
+	}
+	if !bytes.Equal(buf.Bytes(), want) {
+		t.Fatalf("declarations changed the live tool set\nwant: %s\ngot:  %s", want, buf.Bytes())
 	}
 }

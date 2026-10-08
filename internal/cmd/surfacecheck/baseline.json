@@ -143,6 +143,18 @@
           "profiles": "all"
         },
         {
+          "id": "field:CommandSchema.Prompts",
+          "signature": "[]github.com/rshade/ax-go/schema.Prompt",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Resources",
+          "signature": "[]github.com/rshade/ax-go/schema.Resource",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:CommandSchema.Short",
           "signature": "string",
           "configurations": "all",
@@ -317,6 +329,102 @@
           "profiles": "all"
         },
         {
+          "id": "field:MCPPrompt.Arguments",
+          "signature": "[]github.com/rshade/ax-go/schema.MCPPromptArgument",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPrompt.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPrompt.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPrompt.Template",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPrompt.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPromptArgument.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPromptArgument.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPromptArgument.Required",
+          "signature": "bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPromptArgument.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPResource.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPResource.MIMEType",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPResource.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPResource.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPResource.URI",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPSchema.Prompts",
+          "signature": "[]github.com/rshade/ax-go/schema.MCPPrompt",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPSchema.Resources",
+          "signature": "[]github.com/rshade/ax-go/schema.MCPResource",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:MCPSchema.Tools",
           "signature": "[]github.com/rshade/ax-go/schema.MCPTool",
           "configurations": "all",
@@ -366,6 +474,90 @@
         },
         {
           "id": "field:Metadata.TraceID",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Prompt.Arguments",
+          "signature": "[]github.com/rshade/ax-go/schema.PromptArgument",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Prompt.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Prompt.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Prompt.Template",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Prompt.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:PromptArgument.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:PromptArgument.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:PromptArgument.Required",
+          "signature": "bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:PromptArgument.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Resource.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Resource.MIMEType",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Resource.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Resource.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Resource.URI",
           "signature": "string",
           "configurations": "all",
           "profiles": "all"
@@ -439,6 +631,18 @@
         {
           "id": "func:Confirm",
           "signature": "func(context.Context, string) (ConfirmationOutcome, error)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:DeclarePrompt",
+          "signature": "func(*github.com/spf13/cobra.Command, Prompt) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:DeclareResource",
+          "signature": "func(*github.com/spf13/cobra.Command, Resource) error",
           "configurations": "all",
           "profiles": "all"
         },
@@ -992,6 +1196,24 @@
           "profiles": "all"
         },
         {
+          "id": "type:MCPPrompt",
+          "signature": "= github.com/rshade/ax-go/schema.MCPPrompt",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:MCPPromptArgument",
+          "signature": "= github.com/rshade/ax-go/schema.MCPPromptArgument",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:MCPResource",
+          "signature": "= github.com/rshade/ax-go/schema.MCPResource",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "type:MCPSchema",
           "signature": "= github.com/rshade/ax-go/schema.MCPSchema",
           "configurations": "all",
@@ -1018,6 +1240,24 @@
         {
           "id": "type:ParseConfigOption",
           "signature": "= github.com/rshade/ax-go/config.Option",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Prompt",
+          "signature": "= github.com/rshade/ax-go/schema.Prompt",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:PromptArgument",
+          "signature": "= github.com/rshade/ax-go/schema.PromptArgument",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Resource",
+          "signature": "= github.com/rshade/ax-go/schema.Resource",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1789,6 +2029,18 @@
           "profiles": "all"
         },
         {
+          "id": "field:CommandSchema.Prompts",
+          "signature": "[]Prompt",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:CommandSchema.Resources",
+          "signature": "[]Resource",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:CommandSchema.Short",
           "signature": "string",
           "configurations": "all",
@@ -1861,6 +2113,102 @@
           "profiles": "all"
         },
         {
+          "id": "field:MCPPrompt.Arguments",
+          "signature": "[]MCPPromptArgument",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPrompt.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPrompt.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPrompt.Template",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPrompt.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPromptArgument.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPromptArgument.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPromptArgument.Required",
+          "signature": "bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPPromptArgument.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPResource.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPResource.MIMEType",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPResource.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPResource.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPResource.URI",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPSchema.Prompts",
+          "signature": "[]MCPPrompt",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:MCPSchema.Resources",
+          "signature": "[]MCPResource",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:MCPSchema.Tools",
           "signature": "[]MCPTool",
           "configurations": "all",
@@ -1887,6 +2235,90 @@
         {
           "id": "field:MCPTool.NonDeterministicFields",
           "signature": "[]string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Prompt.Arguments",
+          "signature": "[]PromptArgument",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Prompt.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Prompt.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Prompt.Template",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Prompt.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:PromptArgument.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:PromptArgument.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:PromptArgument.Required",
+          "signature": "bool",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:PromptArgument.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Resource.Description",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Resource.MIMEType",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Resource.Name",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Resource.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Resource.URI",
+          "signature": "string",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1939,6 +2371,18 @@
           "profiles": "all"
         },
         {
+          "id": "func:DeclarePrompt",
+          "signature": "func(*github.com/spf13/cobra.Command, Prompt) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:DeclareResource",
+          "signature": "func(*github.com/spf13/cobra.Command, Resource) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:NewSchemaCommand",
           "signature": "func(*github.com/spf13/cobra.Command, ...Option) *github.com/spf13/cobra.Command",
           "configurations": "all",
@@ -1958,7 +2402,7 @@
         },
         {
           "id": "type:CommandSchema",
-          "signature": "struct{Use string \"json:\\\"use\\\"\"; Short string \"json:\\\"short,omitempty\\\"\"; Long string \"json:\\\"long,omitempty\\\"\"; Example string \"json:\\\"example,omitempty\\\"\"; Flags []FlagSchema \"json:\\\"flags,omitempty\\\"\"; Commands []CommandSchema \"json:\\\"commands,omitempty\\\"\"; NonDeterministicFields []string \"json:\\\"non_deterministic_fields\\\"\"}",
+          "signature": "struct{Use string \"json:\\\"use\\\"\"; Short string \"json:\\\"short,omitempty\\\"\"; Long string \"json:\\\"long,omitempty\\\"\"; Example string \"json:\\\"example,omitempty\\\"\"; Flags []FlagSchema \"json:\\\"flags,omitempty\\\"\"; Commands []CommandSchema \"json:\\\"commands,omitempty\\\"\"; Prompts []Prompt \"json:\\\"prompts,omitempty\\\"\"; Resources []Resource \"json:\\\"resources,omitempty\\\"\"; NonDeterministicFields []string \"json:\\\"non_deterministic_fields\\\"\"}",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1975,8 +2419,26 @@
           "profiles": "all"
         },
         {
+          "id": "type:MCPPrompt",
+          "signature": "struct{Name string \"json:\\\"name\\\"\"; Title string \"json:\\\"title,omitempty\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; Arguments []MCPPromptArgument \"json:\\\"arguments,omitempty\\\"\"; Template string \"json:\\\"template\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:MCPPromptArgument",
+          "signature": "struct{Name string \"json:\\\"name\\\"\"; Title string \"json:\\\"title,omitempty\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; Required bool \"json:\\\"required,omitempty\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:MCPResource",
+          "signature": "struct{URI string \"json:\\\"uri\\\"\"; Name string \"json:\\\"name\\\"\"; Title string \"json:\\\"title,omitempty\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; MIMEType string \"json:\\\"mimeType,omitempty\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "type:MCPSchema",
-          "signature": "struct{Tools []MCPTool \"json:\\\"tools\\\"\"}",
+          "signature": "struct{Tools []MCPTool \"json:\\\"tools\\\"\"; Prompts []MCPPrompt \"json:\\\"prompts,omitempty\\\"\"; Resources []MCPResource \"json:\\\"resources,omitempty\\\"\"}",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1989,6 +2451,24 @@
         {
           "id": "type:Option",
           "signature": "func(*options)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Prompt",
+          "signature": "struct{Name string \"json:\\\"name\\\"\"; Title string \"json:\\\"title,omitempty\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; Arguments []PromptArgument \"json:\\\"arguments,omitempty\\\"\"; Template string \"json:\\\"template\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:PromptArgument",
+          "signature": "struct{Name string \"json:\\\"name\\\"\"; Title string \"json:\\\"title,omitempty\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; Required bool \"json:\\\"required,omitempty\\\"\"}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Resource",
+          "signature": "struct{URI string \"json:\\\"uri\\\"\"; Name string \"json:\\\"name\\\"\"; Title string \"json:\\\"title,omitempty\\\"\"; Description string \"json:\\\"description,omitempty\\\"\"; MIMEType string \"json:\\\"mime_type,omitempty\\\"\"}",
           "configurations": "all",
           "profiles": "all"
         },
