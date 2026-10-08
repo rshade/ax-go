@@ -606,7 +606,7 @@ type panicOnReplaceSlice struct{ values []string }
 
 func (v *panicOnReplaceSlice) String() string        { return "[" + strings.Join(v.values, ",") + "]" }
 func (v *panicOnReplaceSlice) Set(s string) error    { v.values = append(v.values, s); return nil }
-func (v *panicOnReplaceSlice) Type() string          { return "panicSlice" }
+func (*panicOnReplaceSlice) Type() string            { return "panicSlice" }
 func (v *panicOnReplaceSlice) Append(s string) error { v.values = append(v.values, s); return nil }
 func (v *panicOnReplaceSlice) GetSlice() []string    { return v.values }
 func (v *panicOnReplaceSlice) Replace(values []string) error {

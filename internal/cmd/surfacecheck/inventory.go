@@ -831,7 +831,7 @@ func (c *collector) methods(named *types.Named, owner, access string) {
 			continue
 		}
 		valueSet[m.Id()] = true
-		c.addMethod(owner, m, false, memberAccess(access, sel))
+		c.addMethod(owner, m, kindMethod+":"+owner+"."+m.Name(), memberAccess(access, sel))
 	}
 	msP := types.NewMethodSet(types.NewPointer(named))
 	for sel := range msP.Methods() {
@@ -839,18 +839,14 @@ func (c *collector) methods(named *types.Named, owner, access string) {
 		if !isFunc || !m.Exported() || valueSet[m.Id()] {
 			continue
 		}
-		c.addMethod(owner, m, true, memberAccess(access, sel))
+		c.addMethod(owner, m, kindMethod+":*"+owner+"."+m.Name(), memberAccess(access, sel))
 	}
 }
 
 // addMethod records one method feature and walks its signature for exposed
-// hidden types.
-func (c *collector) addMethod(owner string, m *types.Func, pointerOnly bool, access string) {
-	id := kindMethod + ":"
-	if pointerOnly {
-		id += "*"
-	}
-	id += owner + "." + m.Name()
+// hidden types. id is the feature id, including the pointer-receiver marker
+// the caller already decided, so this method does not take a control flag.
+func (c *collector) addMethod(owner string, m *types.Func, id, access string) {
 	sig, _ := m.Type().(*types.Signature)
 	c.add(Feature{ID: id, Kind: kindMethod, Owner: owner, Name: m.Name(),
 		Signature: canonicalSignature(sig, c.qf), Access: access, sourceID: c.selectorSourceID(m, id)})

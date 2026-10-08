@@ -24,15 +24,20 @@ const (
 // WithVersion and WithLoggerLabels so __schema.version, ax.Error.version, and
 // the logger "version" label agree.
 func ResolveVersion(injected string) string {
+	// A false ok means build info is unavailable. Drop the pointer here so
+	// resolveVersionFrom does not take that bool as a control flag.
 	info, ok := debug.ReadBuildInfo()
-	return resolveVersionFrom(injected, info, ok)
+	if !ok {
+		info = nil
+	}
+	return resolveVersionFrom(injected, info)
 }
 
-func resolveVersionFrom(injected string, info *debug.BuildInfo, ok bool) string {
+func resolveVersionFrom(injected string, info *debug.BuildInfo) string {
 	if isUsableVersion(injected) {
 		return injected
 	}
-	if !ok || info == nil {
+	if info == nil {
 		return versionUnknown
 	}
 
