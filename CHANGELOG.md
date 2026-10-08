@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.9.0](https://github.com/rshade/ax-go/compare/v0.8.0...v0.9.0) (2026-10-08)
+
+
+### Added
+
+* **ax:** add success warnings and --strict escalation ([8c7eb3b](https://github.com/rshade/ax-go/commit/8c7eb3b859ce65da05efc1ae9c57ae1b111b5c42)), closes [#123](https://github.com/rshade/ax-go/issues/123)
+* **mcp:** serve declared prompts, resources and instructions ([8563165](https://github.com/rshade/ax-go/commit/8563165108d51a08e257606d0a0dabc07f38aa9a)), closes [#270](https://github.com/rshade/ax-go/issues/270)
+* **schema:** add per-flag enum/example and command capability class to __schema ([#28](https://github.com/rshade/ax-go/issues/28)) ([3af30db](https://github.com/rshade/ax-go/commit/3af30db2bb3cfa0d14b54c7f63a1cceba9a52024))
+
+
+### Fixed
+
+* **ax:** reset --strict across Execute calls ([4ff59d5](https://github.com/rshade/ax-go/commit/4ff59d540b23dec869040d2e51ef025ea54e48ca)), closes [#123](https://github.com/rshade/ax-go/issues/123)
+* **mcp:** bound rendered prompt size and keep list order past one page ([56fe4da](https://github.com/rshade/ax-go/commit/56fe4da6756be14e107586811ce341a0221f63a2))
+* **mcp:** dispatch subtree tools/call on the real root ([23fb685](https://github.com/rshade/ax-go/commit/23fb685fc18572895b2a895b7ddb53420660956e)), closes [#237](https://github.com/rshade/ax-go/issues/237)
+* **schema:** reject flag examples that --as=mcp cannot carry ([#28](https://github.com/rshade/ax-go/issues/28)) ([3ee5cca](https://github.com/rshade/ax-go/commit/3ee5cca1f299fe3533a3724d0bfc782ce387affa))
+* **schema:** reject non-finite floats and validate built-in example types ([#28](https://github.com/rshade/ax-go/issues/28)) ([dd19e20](https://github.com/rshade/ax-go/commit/dd19e208c6166ba3b026dcc35dcd8f2ec39bf012))
+
+
+### Changed
+
+* **schema:** adapt flag declarations to the 0.8.0 declaration types ([#28](https://github.com/rshade/ax-go/issues/28)) ([4dcd2f3](https://github.com/rshade/ax-go/commit/4dcd2f36dbe456bb3a9e96da05274b4e0f5485e8))
+* **schema:** align flag and capability declarations with spec 028 ([#28](https://github.com/rshade/ax-go/issues/28)) ([2938fa3](https://github.com/rshade/ax-go/commit/2938fa375188a415d9fa8e2430b6c5ef3b2b3a91))
+
+
+### Documentation
+
+* **spec:** add plan for richer per-flag __schema semantics ([#28](https://github.com/rshade/ax-go/issues/28)) ([73cf656](https://github.com/rshade/ax-go/commit/73cf65688947333a6b9c6b639ac5f9e780274ef6))
+* **spec:** add tasks for richer per-flag __schema semantics ([#28](https://github.com/rshade/ax-go/issues/28)) ([0274c79](https://github.com/rshade/ax-go/commit/0274c79f03aaa90cb5377e35cca77e0e3e607960))
+* **spec:** align richer flag schema declarations with spec 028 contract ([#28](https://github.com/rshade/ax-go/issues/28)) ([1e6215f](https://github.com/rshade/ax-go/commit/1e6215ffc12d77fc3ab2d5d8d8bc4557c2ad3a88))
+* **spec:** correct Go version, exit code, and audit path in richer flag schema plan ([#28](https://github.com/rshade/ax-go/issues/28)) ([a047e76](https://github.com/rshade/ax-go/commit/a047e76e68311e0658131efef14d16435f60cb89))
+* **spec:** mark spec 028 alignment tasks complete ([#28](https://github.com/rshade/ax-go/issues/28)) ([17bd51a](https://github.com/rshade/ax-go/commit/17bd51a7a92c23e8af6076bdeab334414ee1d3cb))
+* **spec:** record actionable_fix in declaration contract and close tasks ([#28](https://github.com/rshade/ax-go/issues/28)) ([56d03da](https://github.com/rshade/ax-go/commit/56d03da1e7b870452655a2f06d6d754809a16516))
+* **spec:** resolve analyze findings for richer flag schema ([#28](https://github.com/rshade/ax-go/issues/28)) ([edd8c5a](https://github.com/rshade/ax-go/commit/edd8c5ae7c81cd1367896ef04515d7e08d7bcfa4))
+* **spec:** specify serving MCP prompts, resources and instructions ([8afb4b6](https://github.com/rshade/ax-go/commit/8afb4b64ea1c33a15f40e97a07eb4e7aa5b5713b))
+
 ## [0.8.0](https://github.com/rshade/ax-go/compare/v0.7.0...v0.8.0) (2026-10-08)
 
 
