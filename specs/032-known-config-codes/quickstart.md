@@ -29,7 +29,11 @@ The code it prints is in the list above.
 ## Match a code in Go without linking the runtime
 
 ```go
-import "github.com/rshade/ax-go/contract"
+import (
+    "errors"
+
+    "github.com/rshade/ax-go/contract"
+)
 
 if axErr, ok := errors.AsType[*contract.Error](err); ok &&
     axErr.ErrorCode == contract.ErrorCodeConfigTooLarge {
