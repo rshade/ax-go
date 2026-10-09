@@ -80,6 +80,28 @@ func TestRunBrokenModule(t *testing.T) {
 	checkEnvelope(t, &stdout, &stderr, codeAnalysis)
 }
 
+func TestRunUnreadableSource(t *testing.T) {
+	dir := t.TempDir()
+	src := filepath.Join(dir, "a.go")
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module unreadable\n\ngo 1.27\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(src, []byte("package unreadable\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(src, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.ReadFile(src); err == nil {
+		t.Skip("a mode-0 file is still readable here (root, or no POSIX permissions)")
+	}
+	var stdout, stderr bytes.Buffer
+	if got := run(t.Context(), unreadfield.Run, []string{"-dir", dir}, &stdout, &stderr); got != contract.ExitAuth {
+		t.Errorf("exit %d, want %d: %s", got, contract.ExitAuth, &stderr)
+	}
+	checkEnvelope(t, &stdout, &stderr, codePermission)
+}
+
 func TestRunGolden(t *testing.T) {
 	for _, tc := range []struct {
 		name, dir, stdoutGolden, stderrGolden string

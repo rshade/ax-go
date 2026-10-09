@@ -24,9 +24,9 @@ type FieldKey struct {
 	Field   string
 }
 
-// Position is a source location. Run reports File slash-separated and
-// relative to the analyzed module root; Analyze reports it as the file set
-// recorded it.
+// Position is a physical source location: //line directives are ignored.
+// Run reports File slash-separated and relative to the analyzed module root;
+// Analyze reports it as the file set recorded the parsed file's name.
 type Position struct {
 	File string
 	Line int

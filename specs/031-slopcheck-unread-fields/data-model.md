@@ -21,7 +21,7 @@ so it serves directly as a map key.
 
 | Field | Type | Rule |
 | --- | --- | --- |
-| `File` | `string` | Module-relative, slash-separated |
+| `File` | `string` | Module-relative, slash-separated; physical, so `//line` directives are ignored |
 | `Line` | `int` | ≥ 1 |
 | `Col` | `int` | ≥ 1 |
 

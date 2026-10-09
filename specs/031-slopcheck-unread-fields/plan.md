@@ -13,7 +13,7 @@ is assigned in a composite literal and never read: the table-test
 over `go/types` information. Two front ends consume it:
 
 - the gate (`internal/cmd/slopcheck`), which loads every package with its tests
-  through `go list -deps -export -test -json` under all four build-tag
+  through `go list -e -deps -export -test -json` under all four build-tag
   configurations, intersects the results, and speaks the repository's
   stdout-JSON / stderr-`ax.Error` contract;
 - a `go/analysis` adapter (`internal/unreadfield/analyzer`), tested with
@@ -106,7 +106,7 @@ internal/unreadfield/
 ├── analyze.go                # Analyze: candidates, assignments, reads (R4–R7)
 ├── scope.go                  # candidate scope rules (R6)
 ├── escape.go                 # whole-value allow-list (R5)
-├── load.go                   # go list -deps -export -test -json loader (R2)
+├── load.go                   # go list -e -deps -export -test -json loader (R2)
 ├── run.go                    # Run: per-configuration load + intersection (R3, R9)
 ├── analyze_test.go           # fixture-driven table tests
 ├── run_test.go               # intersection, failure classification, BUILD_TAG_MATRIX sync

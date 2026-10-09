@@ -24,7 +24,7 @@ type Configuration struct {
 }
 
 // Run loads every package under dir (./..., tests included) once per
-// configuration with go list -deps -export -test -json, analyzes each unit,
+// configuration with go list -e -deps -export -test -json, analyzes each unit,
 // and intersects results across configurations. A load or type-check failure
 // returns *AnalysisError; a timeout returns an error wrapping
 // context.DeadlineExceeded, including one that fires while go list runs;

@@ -28,8 +28,9 @@ type analysis struct {
 // Analyze classifies one type-checked unit. info must have Types, Defs, Uses,
 // and Selections populated. A field is a finding when a composite literal in
 // files assigns it and no load-position selector (research R4) or whole-value
-// use (research R5) reads it. Positions are reported as fset records them.
-// Analyze keeps no state between calls, and its result is sorted, so equal
+// use (research R5) reads it. Positions are physical: //line directives are
+// ignored, so every position names the file and line that was parsed. Analyze
+// keeps no state between calls, and its result is sorted, so equal
 // inputs give equal results.
 func Analyze(fset *token.FileSet, files []*ast.File, pkg *types.Package, info *types.Info) Result {
 	a := &analysis{fset: fset, pkg: pkg, info: info, cands: make(map[*types.Var]*candidate)}
@@ -91,11 +92,11 @@ func (a *analysis) assign(v *types.Var, pos token.Pos) {
 }
 
 // recordSelector applies the research R4 load/store table to a field
-// selector. Every embedded field on a promoted path is read, because
-// selecting through it dereferences it.
+// selector. Every embedded field on a promoted path, whether it leads to a
+// field or a method, is read, because selecting through it dereferences it.
 func (a *analysis) recordSelector(sel *ast.SelectorExpr, stack []ast.Node) {
 	selection, ok := a.info.Selections[sel]
-	if !ok || selection.Kind() != types.FieldVal {
+	if !ok {
 		return
 	}
 	recv := selection.Recv()
@@ -131,7 +132,9 @@ func (a *analysis) isLoad(sel *ast.SelectorExpr, parent ast.Node) bool {
 }
 
 // isSelfAssignment reports whether rhs appears in x.F = x.F: the same field of
-// the same base expression in the matching position.
+// the same base expression in the matching position, where the base has no
+// calls or receives. Two evaluations of next() or <-c can yield different
+// values, so next().F = next().F really reads F.
 func (a *analysis) isSelfAssignment(assign *ast.AssignStmt, rhs *ast.SelectorExpr) bool {
 	if assign.Tok != token.ASSIGN || len(assign.Lhs) != len(assign.Rhs) {
 		return false
@@ -142,7 +145,24 @@ func (a *analysis) isSelfAssignment(assign *ast.AssignStmt, rhs *ast.SelectorExp
 		return false
 	}
 	ls, rs := a.info.Selections[lhs], a.info.Selections[rhs]
-	return ls != nil && rs != nil && ls.Obj() == rs.Obj() && types.ExprString(lhs.X) == types.ExprString(rhs.X)
+	return ls != nil && rs != nil && ls.Obj() == rs.Obj() &&
+		types.ExprString(lhs.X) == types.ExprString(rhs.X) && stable(rhs.X)
+}
+
+// stable reports whether evaluating e twice yields the same value: e contains
+// no call and no channel receive.
+func stable(e ast.Expr) bool {
+	ok := true
+	ast.Inspect(e, func(n ast.Node) bool {
+		switch n := n.(type) {
+		case *ast.CallExpr:
+			ok = false
+		case *ast.UnaryExpr:
+			ok = ok && n.Op != token.ARROW
+		}
+		return ok
+	})
+	return ok
 }
 
 func (a *analysis) markRead(v *types.Var) {
@@ -178,7 +198,7 @@ func (a *analysis) result() Result {
 }
 
 func (a *analysis) position(pos token.Pos) Position {
-	p := a.fset.Position(pos)
+	p := a.fset.PositionFor(pos, false)
 	return Position{File: p.Filename, Line: p.Line, Col: p.Column}
 }
 
