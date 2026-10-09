@@ -10,9 +10,8 @@
 All open items are filed as GitHub issues and carry `roadmap/*` + `effort/*`
 labels synced to the sections below. Level-of-effort indicators: `[S]` Small
 (1-2h), `[M]` Medium (½-1d), `[L]` Large (multi-day). release-please is live:
-`v0.0.1`–`v0.8.0` have been cut automatically with generated `CHANGELOG.md`
-entries, and the `v0.9.0` release PR (#279) is open; the `v0.1.0` output
-contracts remain frozen.
+`v0.0.1`–`v0.9.0` have been cut automatically with generated `CHANGELOG.md`
+entries; the `v0.1.0` output contracts remain frozen.
 
 The governance foundations have all shipped: the stability + deprecation
 policy (#17, Principles XI + XII), the coverage policy + CI gate (#21), the
@@ -58,6 +57,13 @@ and #123 all shipped on 2026-10-08, which retires both deliberate exceptions.
 Immediate Focus now holds what is actually in flight: #270, claimed through
 `/pick-issue`, and #28, which open PR #272 implements.
 
+**2026-10-09 sync**: #270, #28, #274, and #232 all shipped, and `v0.9.0` was
+released. Immediate Focus is back at single-WIP with #284 (PR #296 open), so
+the Promotion Gate passed silently. The operator then promoted the
+follow-up, #285, by hand, stacked on #284's branch. `main`'s CI had been red
+since a Renovate `x/tools` bump left stale `go.sum` hashes; #295 fixed that on
+2026-10-09.
+
 ## Vision
 
 Make every `rshade` Go CLI predictable for LLM agents and ergonomic for humans,
@@ -68,20 +74,21 @@ primitives, and short-lived-process-correct observability.
 ## Immediate Focus (v0.3.0 — v1.0 readiness & governance)
 
 Single-WIP per the Promotion Gate (`target_focus_depth: 1`). Two items are in
-flight, one over target: both were already underway when this sync ran, so it
-recorded them rather than choosing between them.
+flight, one over target: the operator promoted #285 by hand while #284 was in
+review, because #285 stacks directly on #284's branch.
 
-- [ ] #270 MCP server: serve declared prompts, resources, and instructions
-  [L] — Phase 2 of #138: the live `mcp-server` serves `prompts/get` and
-  `resources/read` from the declarations, plus a new `mcp.WithInstructions`
-  option. Its spec-028 trigger fired via `rshade/go-decide#22`. *Claimed via
-  `/pick-issue`; recorded by /roadmap sync on 2026-10-08. Epic-eligible because
-  its parent #138 shipped.*
-- [ ] #28 Richer per-flag `__schema` semantics [M] — `DeclareFlagEnum`,
-  `DeclareFlagExample`, and `DeclareCapability`, with enums enforced at parse
-  time. In review as PR #272. Its side-effect `capability` class overlaps
-  #122's "declared side-effect class". *Recorded by /roadmap sync on 2026-10-08
-  from the open PR.*
+- [ ] #284 `__schema` `known_codes` omits the config package's runtime error
+  codes [S] — the list grows from 4 to 9 codes. The five `config_*` codes become
+  `contract` constants, and spec 032 records the scope rule. In review as PR
+  #296. *Claimed via `/pick-issue`; recorded by /roadmap sync on 2026-10-09.*
+- [ ] #285 `error_code` values are unregistered string literals, so
+  `known_codes` can drift [M] — give every runtime code a `contract` constant,
+  plus an explicit authoring-time exclusion for `invalid_schema_declaration`.
+  Convert the remaining emit sites (`execute.go`, `confirm.go`, the MCP server,
+  `mcp`, `schema`) and add a source-walking test that fails on any `NewError`
+  code that is not a registered constant. Unblocks #125 and #130. *Promoted
+  from Near-Term by the operator on 2026-10-09 via `/pick-issue 285`, stacked
+  on #284's branch until PR #296 merges.*
 
 ## Near-Term Vision (v0.3.0 — governance queue)
 
@@ -90,16 +97,11 @@ recorded them rather than choosing between them.
   applied. Extends the shipped #13 `--dry-run` guards. *Demoted from
   Immediate Focus on 2026-10-07: a default-inverting public-contract change
   needs an attended Spec Kit run.*
-- [ ] #274 Assert the no-op contract in the nil-command `RegisterEnvelope`
-  subtest [S] — the one real `make slop` finding #229 surfaced
-  (`internal/schema/nondeterministic_test.go`); the other nine hits were
-  helper-assertion false positives.
-
-**On deck for the next single-WIP promotion:** #137 (declare per-command MCP
-elicitation points) is epic-eligible now that its parent #121 has shipped,
-but its `roadmap-meta trigger-pending: issue-121-shipped` field is stale —
-worth clearing before treating it as ready. See Recommendations below for
-the fuller candidate list.
+**On deck for the next single-WIP promotion:** #234 (mutation-testing
+spike), whose trigger fired on 2026-10-09 and which consumes no lane. #137
+(declare per-command MCP elicitation points) is epic-eligible now that its
+parent #121 has shipped, but its `roadmap-meta trigger-pending:
+issue-121-shipped` field is stale. Clear it before treating #137 as ready.
 
 ## Future Vision (Long-Term)
 
@@ -182,12 +184,9 @@ a runtime contract.*
 ### Quality gates & slop detection (new — 2026-09-08)
 
 *Filed from a Go slop-detection audit. #229, #230, and #231 shipped
-2026-10-08; the remainder are below. #234's trigger is half-fired: #229 has
-landed, and #232 has not.*
+2026-10-08, and #232 shipped 2026-10-09. The two spikes remain. #234's trigger
+("run after #229 and #232 land") has now fully fired.*
 
-- [ ] #232 `slopcheck` — type-aware pass for struct fields assigned but never
-  read [M] — the one slop signature no off-the-shelf linter covers. The
-  analysis harness is an open decision in the issue, so it is `spec-first`.
 - [ ] #233 NilAway periodic sweep for interprocedural nil-flow findings —
   **spike**, `timebox/1d`. Deliverable: triaged first-run findings plus a
   sweep-cadence decision; deliberately not a CI gate.
@@ -216,6 +215,10 @@ landed, and #232 has not.*
 
 ### 2026-Q4
 
+- [x] #232 `slopcheck` gate for struct fields assigned but never read. Closed 2026-10-09. [M]
+- [x] #270 Live `mcp-server` serves declared prompts, resources, instructions. Closed 2026-10-08. [L]
+- [x] #28 Per-flag `__schema` enums, examples, and capability classes. Closed 2026-10-08. [M]
+- [x] #274 Nil-command `RegisterEnvelope` subtest asserts its no-op contract. Closed 2026-10-08. [S]
 - [x] #123 Structured success warnings with `--strict` escalation. Closed 2026-10-08. [M]
 - [x] #237 MCP subtree `tools/call` dispatches on the real root. Closed 2026-10-08. [M]
 - [x] #231 Report-only `dupl` clone detection over test files. Closed 2026-10-08. [M]
