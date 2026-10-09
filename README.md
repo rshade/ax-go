@@ -464,9 +464,13 @@ Config read rejections are standard `ax.Error` envelopes. Oversized input uses
 the frozen `error_code` `config_too_large`; an out-of-range cap (negative or
 above `ax.MaxConfigBytesCeiling`, 1 GiB) uses `config_max_bytes_invalid`.
 Invalid Hujson or schema mismatches use `config_invalid`, and a nil
-`ParseConfigOption` uses `config_option_invalid`. All map to exit code `2` and
-are discoverable with `errors.As(err, &axErr)`. Reads accept Hujson extensions,
-but payload writes remain strict JSON.
+`ParseConfigOption` uses `config_option_invalid`. `ax.PatchConfig` reports an
+invalid RFC 6902 patch, or a patch operation that fails, as
+`config_patch_invalid`. All map to exit code `2` and are discoverable with
+`errors.As(err, &axErr)`. Each code is exported as a `contract.ErrorCodeConfig*`
+constant, and `__schema` lists all of them under `error_envelope.known_codes`
+so an agent can plan for them before the first call. Reads accept Hujson
+extensions, but payload writes remain strict JSON.
 
 To mutate an existing Hujson config without stripping user comments,
 `ax.PatchConfig(ctx, reader, patch, ...)` and

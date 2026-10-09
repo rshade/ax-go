@@ -5,6 +5,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 
@@ -174,6 +175,9 @@ func assertContractError(t *testing.T, err error, wantCode string) {
 	}
 	if contractErr.ErrorCode != wantCode {
 		t.Fatalf("ErrorCode = %q, want %q", contractErr.ErrorCode, wantCode)
+	}
+	if !slices.Contains(contract.KnownErrorCodes(), wantCode) {
+		t.Fatalf("ErrorCode %q is missing from contract.KnownErrorCodes()", wantCode)
 	}
 	if got := contract.ErrorExitCode(err); got != contract.ExitValidation {
 		t.Fatalf("ErrorExitCode = %d, want %d", got, contract.ExitValidation)
