@@ -37,4 +37,22 @@ func TestSubtestAssertionFixtures(t *testing.T) {
 	t.Run("run only", func(t *testing.T) {
 		_, _ = axtest.Run(t, nil, nil)
 	})
+	t.Run("logging surface isolated asserts", func(t *testing.T) {
+		testutil.AssertLoggingSurfaceIsolated(nil, t, "")
+	})
+	t.Run("no production import asserts", func(t *testing.T) {
+		testutil.AssertNoProductionImport(nil, t, "", "", testutil.Profile{})
+	})
+	t.Run("config error helper asserts", func(t *testing.T) {
+		assertConfigError(t, nil, "")
+	})
+	t.Run("patch error helper asserts", func(t *testing.T) {
+		assertPatchError(t, nil, "")
+	})
+	t.Run("contract error helper asserts", func(t *testing.T) {
+		assertContractError(t, nil, "")
+	})
+	t.Run("drift helper asserts", func(t *testing.T) {
+		assertDrift(t, nil, nil)
+	})
 }

@@ -56,6 +56,25 @@ rule:
         - pattern:
             context: "func wrapper() { testutil.AssertNoForbiddenImports($$$ARGS) }"
             selector: call_expression
+        - pattern:
+            context: "func wrapper() { testutil.AssertLoggingSurfaceIsolated($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { testutil.AssertNoProductionImport($$$ARGS) }"
+            selector: call_expression
+        # Package-local helpers that end in t.Fatal or t.Errorf.
+        - pattern:
+            context: "func wrapper() { assertConfigError($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { assertPatchError($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { assertContractError($$$ARGS) }"
+            selector: call_expression
+        - pattern:
+            context: "func wrapper() { assertDrift($$$ARGS) }"
+            selector: call_expression
 note: |
   ast-grep does not see types. A local helper that calls t.Fatal is still
   reported until the rule names that helper. axtest.Run returns a result
