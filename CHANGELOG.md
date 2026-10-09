@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.10.0](https://github.com/rshade/ax-go/compare/v0.9.0...v0.10.0) (2026-10-09)
+
+
+### Added
+
+* **gates:** add slopcheck unread struct-field gate ([991c37a](https://github.com/rshade/ax-go/commit/991c37afbef5faf649919cde31b7eb13badb63d1)), closes [#232](https://github.com/rshade/ax-go/issues/232)
+
+
+### Fixed
+
+* **deps:** require Go 1.27.2 and golang.org/x/net v0.60.0 ([9cb3bd8](https://github.com/rshade/ax-go/commit/9cb3bd8609bff825ee1c6ec87a2c199ab5160005))
+* **deps:** update module golang.org/x/tools to v0.51.0 ([7877267](https://github.com/rshade/ax-go/commit/78772676fb11ddbe14feb2694609adfd214b4cf7))
+* **gates:** close slopcheck false findings raised in PR review ([b209f4f](https://github.com/rshade/ax-go/commit/b209f4fd343da9183abcb3cd3d20e70d051affbd))
+
+
+### Documentation
+
+* **roadmap:** sync ROADMAP.md and labels with GitHub state ([2265c91](https://github.com/rshade/ax-go/commit/2265c91be0ee3e403fa6d2a158dac4fbd5e131ff))
+
 ## [0.9.0](https://github.com/rshade/ax-go/compare/v0.8.0...v0.9.0) (2026-10-08)
 
 
