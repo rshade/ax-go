@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"runtime"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -641,6 +642,91 @@ func TestRunPatchConfigCommandRequiresFlags(t *testing.T) {
 	}
 	if stdout.Len() != 0 {
 		t.Fatalf("stdout not empty on validation failure: %s", stdout.String())
+	}
+}
+
+// TestRunConfigErrorCodesAreKnown pins spec 032 SC-002 end to end: a config
+// failure raised inside a command reaches the agent with an error_code that the
+// same CLI's __schema already advertised in error_envelope.known_codes.
+func TestRunConfigErrorCodesAreKnown(t *testing.T) {
+	var schemaOut bytes.Buffer
+	var schemaErr bytes.Buffer
+	if code := run(
+		context.Background(),
+		[]string{"__schema"},
+		strings.NewReader(""),
+		&schemaOut,
+		&schemaErr,
+		func(string) string { return "" },
+	); code != ax.ExitSuccess {
+		t.Fatalf("__schema exit code = %d, want %d; stderr=%s", code, ax.ExitSuccess, schemaErr.String())
+	}
+	var schema ax.Schema
+	if err := json.Unmarshal(schemaOut.Bytes(), &schema); err != nil {
+		t.Fatalf("stdout was not schema JSON: %v", err)
+	}
+	knownCodes := schema.ErrorEnvelope.KnownCodes
+
+	path := filepath.Join(t.TempDir(), "config.hujson")
+	if err := os.WriteFile(path, []byte(`{"count": 2}`), 0o600); err != nil {
+		t.Fatalf("write config file: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		args     []string
+		stdin    string
+		wantCode string
+	}{
+		{
+			name:     "oversized config",
+			args:     []string{"--format=json", "--idempotency-key=test-key", "--config=-"},
+			stdin:    strings.Repeat(" ", int(ax.DefaultMaxConfigBytes)) + "{}",
+			wantCode: "config_too_large",
+		},
+		{
+			name: "invalid patch",
+			args: []string{
+				"patch-config",
+				"--format=json",
+				"--dry-run",
+				"--config=" + path,
+				`--patch=[{"op":"remove","path":"/nonexistent"}]`,
+			},
+			wantCode: "config_patch_invalid",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			var stdout bytes.Buffer
+			var stderr bytes.Buffer
+			code := run(
+				context.Background(),
+				tc.args,
+				strings.NewReader(tc.stdin),
+				&stdout,
+				&stderr,
+				func(string) string { return "" },
+			)
+
+			if code != ax.ExitValidation {
+				t.Fatalf("exit code = %d, want %d; stderr=%s", code, ax.ExitValidation, stderr.String())
+			}
+			if stdout.Len() != 0 {
+				t.Fatalf("stdout = %q, want empty", stdout.String())
+			}
+			var got ax.Error
+			if err := json.Unmarshal(stderr.Bytes(), &got); err != nil {
+				t.Fatalf("stderr was not an error envelope: %v", err)
+			}
+			if got.ErrorCode != tc.wantCode {
+				t.Fatalf("error code = %q, want %q", got.ErrorCode, tc.wantCode)
+			}
+			if !slices.Contains(knownCodes, got.ErrorCode) {
+				t.Fatalf("error code %q is missing from __schema known_codes %q", got.ErrorCode, knownCodes)
+			}
+		})
 	}
 }
 

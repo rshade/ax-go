@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/rshade/ax-go/contract"
 )
@@ -61,4 +62,20 @@ func ExampleEnvelope() {
 		fmt.Println("error:", err)
 	}
 	// Output: {"data":"hello","meta":{"trace_id":"00000000000000000000000000000000"}}
+}
+
+// ExampleKnownErrorCodes lists every error_code __schema publishes under
+// error_envelope.known_codes, in the order it publishes them.
+func ExampleKnownErrorCodes() {
+	fmt.Println(strings.Join(contract.KnownErrorCodes(), "\n"))
+	// Output:
+	// config_invalid
+	// config_max_bytes_invalid
+	// config_option_invalid
+	// config_patch_invalid
+	// config_too_large
+	// confirmation_required
+	// internal_error
+	// validation_error
+	// warnings_as_errors
 }

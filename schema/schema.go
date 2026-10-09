@@ -31,9 +31,15 @@ type Schema struct {
 
 // ErrorSchemaInfo describes the shared stderr error envelope.
 type ErrorSchemaInfo struct {
-	SchemaVersion          string   `json:"schema_version"`
-	Required               []string `json:"required"`
-	Optional               []string `json:"optional"`
+	SchemaVersion string   `json:"schema_version"`
+	Required      []string `json:"required"`
+	Optional      []string `json:"optional"`
+	// KnownCodes lists, sorted, every error_code ax-go itself can return from
+	// a command run, including from helper packages such as config. It is not
+	// exhaustive for the CLI: the adopting CLI's own codes are not listed.
+	// Authoring-time codes (invalid_schema_declaration) and this repository's
+	// gate-tool codes are excluded. contract.KnownErrorCodes is the source and
+	// states the full scope rule.
 	KnownCodes             []string `json:"known_codes"`
 	NonDeterministicFields []string `json:"non_deterministic_fields"`
 }

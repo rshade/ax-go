@@ -2,8 +2,13 @@
 
 ## Read the list an agent sees
 
+Build the integration CLI once. `go run` would add its own `exit status`
+line to stderr, which breaks the envelope parsing below.
+
 ```bash
-go run ./examples/integration __schema --format=json | jq -c '.error_envelope.known_codes'
+BIN="$(mktemp -d)/ax-integration"
+go build -o "$BIN" ./examples/integration
+"$BIN" __schema --format=json | jq -c '.error_envelope.known_codes'
 ```
 
 ```json
@@ -14,7 +19,7 @@ go run ./examples/integration __schema --format=json | jq -c '.error_envelope.kn
 
 ```bash
 head -c 2000000 /dev/zero | tr '\0' ' ' \
-  | go run ./examples/integration --format=json --config=- 2>&1 >/dev/null \
+  | "$BIN" --format=json --config=- 2>&1 >/dev/null \
   | jq -r .error_code
 # config_too_large
 ```

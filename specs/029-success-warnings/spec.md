@@ -143,6 +143,10 @@ find `warnings_as_errors` among the known codes.
   the success payload and records them for the runner. Recording is what
   makes `--strict` deterministic even though the command writes its own
   stdout.
-- Known error codes published in `__schema` are the runtime's own codes:
-  `confirmation_required`, `internal_error`, `validation_error`, and
-  `warnings_as_errors`. Adopter-defined codes are not listed.
+- Known error codes published in `__schema` are every `error_code` ax-go
+  library code can return from a command run, including codes from public
+  helper packages such as `config`. Adopter-defined codes, authoring-time
+  codes (`invalid_schema_declaration`), and the repository's gate-tool codes
+  are not listed. Amended by specs/032-known-config-codes (FR-001); this
+  feature introduced the list with `confirmation_required`,
+  `internal_error`, `validation_error`, and `warnings_as_errors`.
