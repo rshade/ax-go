@@ -80,9 +80,13 @@ func forEachTransport(
 	fn func(t *testing.T, session *sdk.ClientSession),
 ) {
 	t.Helper()
+	// Each subtest delegates its assertions to fn, which every caller supplies;
+	// the type-free slop rule cannot see through the callback.
+	// ast-grep-ignore: subtest-asserts-nothing
 	t.Run("stdio", func(t *testing.T) {
 		fn(t, newInMemorySession(t, newServerWithConfig(t, context.Background(), root, cfg)))
 	})
+	// ast-grep-ignore: subtest-asserts-nothing
 	t.Run("http", func(t *testing.T) {
 		fn(t, connectHTTP(t, serveHTTPForServer(t, newServerWithConfig(t, context.Background(), root, cfg))))
 	})

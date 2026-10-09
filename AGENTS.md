@@ -214,6 +214,15 @@ reach. `axtest.Run` is not an assertion; a subtest whose only call is
 `axtest.Run` is reported. The fixture at `.slop/testdata/` is excluded from
 `make slop`.
 
+A finding is fixed in one of three ways. If the subtest really checks
+nothing, add the assertion. If it asserts through a helper that ends in
+`t.Fatal` or `t.Errorf`, name that helper in
+`.slop/rules/subtest-asserts-nothing.yml`, and add a fixture case that is
+reported before the rule change and clean after it. If it delegates to a
+callback the caller supplies (`forEachTransport` in `internal/mcpserver`), put
+`// ast-grep-ignore: subtest-asserts-nothing` above the `t.Run`, with a
+comment saying where the assertions live.
+
 `make clone-report` runs `dupl -t 100` from the mise pin (`github.com/mibk/dupl`
 1.1.0, via `mise exec`) over `*_test.go`. It prints each pair once and exits 0.
 It is not a dependency of `make ci`. The recorded baseline is 8 intentional
