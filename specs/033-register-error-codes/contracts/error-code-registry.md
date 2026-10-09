@@ -91,8 +91,10 @@ I/O).
 | Test | Asserts |
 | --- | --- |
 | `internal/testutil` `TestFindErrorCodeViolationsFixture` | The fixture yields exactly its planted violations, one or more of each kind, at their file and line; excluded paths and valid sites yield none. |
-| `internal/testutil` validation table | Each invalid configuration returns an error. |
+| `internal/testutil` `TestFindErrorCodeViolationsRejectsInvalidGuard` | Each invalid configuration returns an error. |
+| `internal/testutil` `TestParseStringConstants` | The fixture's `contract` directory yields exactly its exported string constants. |
+| `contract` `TestErrorCodeConstantSpellings` | Each of the ten constants holds its frozen spelling. |
 | `contract` `TestErrorCodesAreRegistered` | This module yields zero violations. |
-| `contract` `TestErrorCodeRegistryConsistency` | Constant ↔ list bijection and list disjointness (research R6). |
+| `contract` `TestErrorCodeRegistryConsistency` | Constant ↔ list bijection, list disjointness, and list entries named only by identifiers (research R6). |
 | `contract` `TestKnownErrorCodesProperties` (existing) | Sorted, unique, excludes the authoring-time code, fresh slice. |
 | `contract` `ExampleKnownErrorCodes` (existing) | The exact nine codes. |

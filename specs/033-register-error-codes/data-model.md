@@ -65,7 +65,8 @@ exported `contract` constant whose value is in either list.
 
 Validation (returned as an error, fail closed): `ModuleDir`, `ModulePath`,
 and `RootPackageName` are non-empty; `Registered` is non-empty; every exclusion
-and pass-through carries a non-empty reason.
+and pass-through carries a non-empty reason; `ModuleDir/contract` exists and
+parses.
 
 ## Violation (`internal/testutil.ErrorCodeViolation`)
 

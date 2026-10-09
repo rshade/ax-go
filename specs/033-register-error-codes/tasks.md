@@ -61,7 +61,7 @@ not priority order: the drift guard (US1) needs the registry it enforces
 
 **Goal**: every code ax-go emits has exactly one exported `contract` constant (FR-001, FR-002, FR-012).
 
-**Independent Test**: `go test -count=1 -run TestErrorCodeConstantSpellings ./contract/` passes, pinning each of the ten constants to its frozen spelling.
+**Independent Test**: `go test -count=1 -run TestErrorCodeConstantSpellings ./contract/` passes, pinning each of the ten constants to its frozen spelling. The existing envelope tests pin each failure path to the same spelling (spec US2).
 
 - [ ] T005 [US2] Add `TestErrorCodeConstantSpellings` to `contract/codes_test.go`: a table mapping each of the ten `ErrorCode*` constants (data-model.md) to its string literal, asserting equality. The literals stay literals; they pin the frozen spellings (FR-006 of spec 032, FR-011 here). It fails to compile now because four constants do not exist.
 - [ ] T006 [US2] In `contract/codes.go`, add `ErrorCodeConfirmationRequired`, `ErrorCodeInternalError`, `ErrorCodeValidationError`, and `ErrorCodeInvalidSchemaDeclaration` (untyped `string`) with contract-style doc comments stating the condition and exit code. Replace the three remaining literals in `KnownErrorCodes()` with the constants, keeping byte-wise order. Run `go test -count=1 -race ./contract/` and confirm T005, `TestKnownErrorCodesProperties`, and `ExampleKnownErrorCodes` pass.
@@ -74,7 +74,7 @@ not priority order: the drift guard (US1) needs the registry it enforces
 
 **Independent Test**: `go test -count=1 -run TestErrorCodeRegistryConsistency ./contract/` passes; adding an `ErrorCode*` constant to neither list makes it fail.
 
-- [ ] T007 [US4] Add `TestErrorCodeRegistryConsistency` to `contract/codes_test.go` (research R6): parse the `contract` directory with `testutil.ParseStringConstants`, take the `ErrorCode*` names, and assert each value is in exactly one of `KnownErrorCodes()` and `authoringTimeErrorCodes()`, each list entry is the value of exactly one such constant, the lists are disjoint, and the authoring-time list is sorted and unique. It fails to compile now because `authoringTimeErrorCodes` does not exist.
+- [ ] T007 [US4] Add `TestErrorCodeRegistryConsistency` to `contract/codes_test.go` (research R6): parse the `contract` directory with `testutil.ParseStringConstants`, take the `ErrorCode*` names, and assert each value is in exactly one of `KnownErrorCodes()` and `authoringTimeErrorCodes()`, each list entry is the value of exactly one such constant, the lists are disjoint, and the authoring-time list is sorted and unique. It also parses `contract/codes.go` with `go/parser` and asserts every element of the slice literal returned by `KnownErrorCodes` and `authoringTimeErrorCodes` is an `*ast.Ident` (FR-002: named by a constant, never a literal). It fails to compile now because `authoringTimeErrorCodes` does not exist.
 - [ ] T008 [US4] In `contract/codes.go`, add the unexported `authoringTimeErrorCodes() []string` returning a new slice holding `ErrorCodeInvalidSchemaDeclaration`, with a comment stating spec 032 FR-001's reason (returned while the command tree is built, before `Execute` dispatches a command, so a run never returns it). Extend the `KnownErrorCodes` doc comment to say the list names only registry constants. Run `go test -count=1 -race ./contract/` and confirm T007 passes. Temporarily add an unlisted `ErrorCode*` constant, confirm T007 fails naming it, then remove it.
 
 ---
@@ -92,7 +92,7 @@ not priority order: the drift guard (US1) needs the registry it enforces
 - [ ] T013 [P] [US1] In `internal/schema/declare.go` and `internal/schema/conflict_error.go`, use `contract.ErrorCodeValidationError`.
 - [ ] T014 [P] [US1] In `mcp/command.go`, use `contract.ErrorCodeValidationError`.
 - [ ] T015 [P] [US1] In `schema/schema.go`, use `contract.ErrorCodeValidationError`; in `schema/declarations.go`, delete `invalidDeclarationCode` and use `contract.ErrorCodeInvalidSchemaDeclaration`.
-- [ ] T016 [US1] Run `go test -count=1 -race ./contract/ ./internal/testutil/` and confirm `TestErrorCodesAreRegistered` reports zero violations and the fixture test is unchanged. Confirm with `grep -rn 'NewError(' --include=*.go . | grep -v _test.go | grep -v internal/cmd/ | grep -v examples/` that no remaining call passes a literal.
+- [ ] T016 [US1] Run `go test -count=1 -race ./contract/ ./internal/testutil/` and confirm `TestErrorCodesAreRegistered` reports zero violations and the fixture test is unchanged. As a secondary check (the guard is authoritative), confirm `grep -rnE '"(validation_error|internal_error|confirmation_required|warnings_as_errors|invalid_schema_declaration)"' --include=*.go . | grep -v _test.go | grep -v internal/cmd/ | grep -v examples/ | grep -v contract/codes.go` prints nothing; this searches for the spellings, so it also sees literals on a call's continuation lines and the `dispatch.go` JSON fallback.
 
 ---
 
@@ -102,7 +102,7 @@ not priority order: the drift guard (US1) needs the registry it enforces
 
 **Independent Test**: the full suite passes with no file under any `testdata/` changed and `ExampleBuildSchema` untouched.
 
-- [ ] T017 [US3] Run `go test -count=1 -race ./...` and confirm every golden, envelope, exit-code, and `__schema` test passes. Confirm `git diff --stat -- '*.golden.json' example_test.go schema/example_test.go` is empty.
+- [ ] T017 [US3] Run `go test -count=1 -race ./...` and confirm every golden, envelope, exit-code, and `__schema` test passes, including `contract`'s `TestImportIsolation` (FR-012: the registry adds no import to `contract`). Confirm `git diff --stat -- '*.golden.json' example_test.go schema/example_test.go` is empty.
 - [ ] T018 [US3] Re-run the T001 `known_codes` command and confirm the output is byte-identical to the recorded one.
 - [ ] T019 [US3] Run `make surface-update`, then confirm `git diff internal/cmd/surfacecheck/baseline.json` adds exactly four `github.com/rshade/ax-go/contract` `const:` features (`ErrorCodeConfirmationRequired`, `ErrorCodeInternalError`, `ErrorCodeInvalidSchemaDeclaration`, `ErrorCodeValidationError`) with signature `untyped string`, present in `all` configurations and profiles, and nothing else. Confirm `specs/023-internalize-helpers/public-surface-audit.json` is unchanged. Run `make surface-check`.
 

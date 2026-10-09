@@ -204,7 +204,12 @@ every exported constant named `ErrorCode*`, and asserts:
   `authoringTimeErrorCodes()`;
 - each entry of both lists is the value of exactly one such constant;
 - the two lists are disjoint, and the authoring-time list is sorted and has no
-  duplicates.
+  duplicates;
+- every element of the slice literal each list function returns is a bare
+  identifier, never a string literal (spec FR-002). The value checks above
+  cannot see this, because a literal with a registered spelling has the same
+  value as its constant, so the test parses `contract/codes.go` and inspects
+  the two return statements.
 
 Together with the guard, adding a runtime code takes exactly one registry
 edit, and forgetting either half fails (spec SC-005): a constant with no list
@@ -215,14 +220,16 @@ entry fails this test, and a code with no constant cannot pass the guard.
 1. Fixture and checker test first. It fails to compile until the checker
    exists, then passes once the checker reports exactly the fixture's planted
    violations.
-2. Module guard test next, against the registry as it stands. It must fail
-   and list the 21 sites from R1 (plus nothing else). This is the proof that
-   the guard sees the real repository.
-3. Registry consistency test. It fails to compile until the four constants
-   and `authoringTimeErrorCodes()` exist.
-4. Add the constants and the authoring-time list, then convert the emit sites.
-   The guard and consistency tests pass; every golden and envelope test passes
-   unchanged.
+2. Constant-spelling test, then the four constants. The test fails to compile
+   until the constants exist.
+3. Registry consistency test, then `authoringTimeErrorCodes()`. The test fails
+   to compile until the list exists.
+4. Module guard test. It reads the registered set from both lists, so it comes
+   after step 3, but no emit site has been converted yet: it must fail and
+   list exactly the 21 sites from R1. This is the proof that the guard sees the
+   real repository.
+5. Convert the emit sites. The guard passes, and every golden and envelope
+   test passes unchanged.
 
 Run with `-count=1` after a literal-to-constant swap, because `go test`
 caches results for byte-identical behavior.
