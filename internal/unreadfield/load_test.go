@@ -1,6 +1,9 @@
 package unreadfield
 
 import (
+	"errors"
+	"io/fs"
+	"os"
 	"path/filepath"
 	"slices"
 	"testing"
@@ -67,8 +70,40 @@ func TestLoadUnitsAppliesTags(t *testing.T) {
 }
 
 func TestLoadUnitsFailsClosed(t *testing.T) {
-	if _, err := loadUnits(t.Context(), "testdata/broken", nil, goList); err == nil {
+	_, err := loadUnits(t.Context(), "testdata/broken", nil, goList)
+	if err == nil {
 		t.Fatal("loadUnits succeeded on a package that does not type-check")
+	}
+	if errors.Is(err, fs.ErrPermission) {
+		t.Errorf("a type error was reported as a permission failure: %v", err)
+	}
+}
+
+// unreadableModule returns a module whose only source file cannot be opened,
+// or skips when this platform or user can still read it.
+func unreadableModule(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	src := filepath.Join(dir, "a.go")
+	if err := os.WriteFile(filepath.Join(dir, "go.mod"), []byte("module unreadable\n\ngo 1.27\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(src, []byte("package unreadable\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(src, 0); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.ReadFile(src); err == nil {
+		t.Skip("a mode-0 file is still readable here (root, or no POSIX permissions)")
+	}
+	return dir
+}
+
+func TestLoadUnitsTypesPermissionFailure(t *testing.T) {
+	_, err := loadUnits(t.Context(), unreadableModule(t), nil, goList)
+	if !errors.Is(err, fs.ErrPermission) {
+		t.Fatalf("loadUnits error = %v, want one wrapping fs.ErrPermission", err)
 	}
 }
 
@@ -115,4 +150,26 @@ func FuzzDecodeListing(f *testing.F) {
 			t.Fatal("decodeListing accepted input over the ceiling")
 		}
 	})
+}
+
+func TestBrokenPackage(t *testing.T) {
+	for _, tc := range []struct {
+		name    string
+		pkg     listedPackage
+		wantErr bool
+	}{
+		{name: "clean", pkg: listedPackage{ImportPath: "a"}},
+		{name: "own error", pkg: listedPackage{ImportPath: "a", Error: &listError{Err: "bad"}}, wantErr: true},
+		{name: "dependency error", pkg: listedPackage{ImportPath: "a", DepsErrors: []*listError{{Err: "bad"}}}, wantErr: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := brokenPackage([]listedPackage{tc.pkg})
+			if (err != nil) != tc.wantErr {
+				t.Fatalf("brokenPackage error = %v, wantErr %v", err, tc.wantErr)
+			}
+			if errors.Is(err, fs.ErrPermission) {
+				t.Errorf("a reported package error was typed as a permission failure: %v", err)
+			}
+		})
+	}
 }

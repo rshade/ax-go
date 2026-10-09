@@ -38,8 +38,8 @@ func run(pass *analysis.Pass) (any, error) {
 }
 
 // declaration maps a finding's position back to a token.Pos in pass's file
-// set. Analyze reports positions exactly as the file set records them, so the
-// file is always found.
+// set. Analyze reports physical positions, which ignore //line directives, so
+// the parsed file and line always exist.
 func declaration(pass *analysis.Pass, p unreadfield.Position) token.Pos {
 	for _, file := range pass.Files {
 		tf := pass.Fset.File(file.Pos())

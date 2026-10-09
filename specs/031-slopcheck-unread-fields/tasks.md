@@ -202,6 +202,16 @@ job. This phase **starts with a stop point**.
 
   Validate it with `cat PR_MESSAGE.md | npx commitlint`.
 
+- [X] T032 Remediate the PR #286 review. It supersedes the rules recorded in T013–T015 and the loader flags above; research R2, R4, R5 and R6 are authoritative. Each fix lands behind a fixture in `internal/unreadfield/testdata/fixtures/` that failed first:
+  - physical positions, ignoring `//line` (`linedirective/`);
+  - promoted method calls read the embedded field (`promotedmethod/`);
+  - self-assignment exempt only for a call- and receive-free base (`effectfulbase/`);
+  - one same-field-object copy rule at every copy site (`anoncopy/`, which also covers `genericparam/`);
+  - `append` judged by element type, `delete` keys escape (`builtins/`);
+  - function signatures carry structs, and the callee position is harmless (`funcvalue/`);
+  - exposure by reachability from exported declarations (`aliasforms/`);
+  - `go list -e`, so an unreadable source file returns a typed `fs.ErrPermission` and exits `4` (`load_test.go`, `main_test.go`).
+
 ---
 
 ## Dependencies & execution order
@@ -211,7 +221,7 @@ job. This phase **starts with a stop point**.
 - **US1 (T007–T016)** blocks US2 (the gate consumes `Run`) and US3 (the adapter consumes `Analyze` and the shared fixtures).
 - **US2** and **US3** are independent of each other after US1.
 - **US4** needs US2. T024 is a hard gate in front of T025–T026.
-- **Polish** runs last; T030 must be green before T031.
+- **Polish** runs last; T030 must be green before T031. T032 follows PR review and reruns T030's gates.
 
 Within each story, tests come before implementation, and implementation does
 not start until its tests have failed for the right reason.
@@ -234,5 +244,5 @@ not start until its tests have failed for the right reason.
 
 ## Format validation
 
-All 31 tasks use `- [ ] T### [P?] [US?] description with path`. Story labels
+All 32 tasks use `- [ ] T### [P?] [US?] description with path`. Story labels
 appear only in Phases 3–6. Setup, Foundational and Polish tasks carry none.

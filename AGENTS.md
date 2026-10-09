@@ -264,11 +264,11 @@ which owns the stream contract, and a `go/analysis` adapter
 (`internal/unreadfield/analyzer`) tested with `analysistest`. Both call the
 same `Analyze`, and a parity test keeps them equal.
 
-The gate loads `./...` with `go list -deps -export -test` under default,
+The gate loads `./...` with `go list -e -deps -export -test` under default,
 `ax_no_grpc`, `ax_no_otlp`, and both tags on the host GOOS/GOARCH, and
 reports a field only when it is unread in every configuration that assigns
-it. Tests count as readers. Exported fields of types nameable outside the
-package are skipped. A value used whole in any way the analysis cannot follow
+it. Tests count as readers. Exported and embedded fields reachable from the
+package's exported declarations are skipped. A value used whole in any way the analysis cannot follow
 (equality, interface conversion, reflection, a call into another package)
 counts as reading every field, so the gate misses rather than over-reports.
 There is no allowlist: read the field where it matters, or delete it.

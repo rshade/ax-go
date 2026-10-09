@@ -137,17 +137,19 @@ and confirm a run with a planted unread field fails CI.
 - **A field read only from test code**: not reported. Tests are readers, as
   they are roots for `deadcheck`.
 - **Exported field of an exported type**: skipped. A library's exported field
-  may be written here and read only by a downstream consumer.
-- **Exported field of an unexported type, or any field of an anonymous struct
-  type** (the usual table-test shape): in scope.
+  may be written here and read only by a downstream consumer. The same holds
+  for any exported or embedded field a downstream package can reach from an
+  exported type, alias, variable, or function, including through a pointer
+  alias (`type Ptr = *hidden`), an alias of an anonymous struct, or the
+  `export_test.go` alias an external test package reads.
+- **Exported field of an unexported type that nothing exported reaches, or any
+  field of an anonymous struct type in a function body** (the usual
+  table-test shape): in scope.
 - **A struct value consumed whole** — compared with `==`/`!=`, converted to an
   interface (including formatting, encoding, or reflection-based comparison),
   or passed to code outside the analyzed package: every field of that value
   counts as read. The gate cannot see a reflection-based reader, so it must not
   guess that there is none.
-- **A type reachable from the external test package through an exported
-  alias**: its fields count as readable from outside the package and are not
-  reported.
 - **Blank (`_`) fields and fields declared in generated files** (`// Code
   generated ... DO NOT EDIT.`): never reported.
 - **A field declared in another package** (assigned here, declared there):
@@ -170,11 +172,12 @@ and confirm a run with a planted unread field fails CI.
   store, or both: a plain assignment target is a store only; a compound
   assignment or increment/decrement is both; taking the address, passing as an
   argument, and any other value use are loads; a self-assignment (`x.F = x.F`)
-  is not a read.
+  is not a read, unless its base contains a call or a channel receive
+  (`next().F = next().F` reads `F`).
 - **FR-003**: A positional composite literal MUST mark every field of its type
   as assigned.
-- **FR-004**: A field read through promotion from an embedding type MUST count
-  as a read of the embedded field.
+- **FR-004**: A field read or method called through promotion from an
+  embedding type MUST count as a read of the embedded field.
 - **FR-005**: Any use of a struct value, or of a value containing one (a
   pointer, slice, array, map key or element, or channel of it), outside a
   closed set of harmless positions MUST count as reading every field of that
@@ -182,12 +185,16 @@ and confirm a run with a planted unread field fails CI.
   selector base, assignment (including to `_`), range, composite-literal
   element, an argument to a statically resolved same-package function, and the
   return of an unexported function (the full list is in the plan's research).
-  Uses outside that set include equality comparison, interface conversion,
-  calls to functions outside the package, dynamic calls, and returns from
-  exported functions.
-- **FR-006**: Exported fields of exported types, blank fields, fields declared
-  in generated files, and fields declared outside the analyzed package MUST
-  NOT be reported.
+  A copy is harmless only into a type that keeps the same field objects. Uses
+  outside that set include equality comparison, interface conversion, a copy
+  into a distinct but identical struct type, calls to functions outside the
+  package, a generic parameter such as `*T`, dynamic calls, a `delete` key,
+  and returns from exported functions, including of a function value whose
+  signature carries the struct.
+- **FR-006**: Exported or embedded fields reachable from the package's
+  exported declarations (which includes exported fields of exported types),
+  blank fields, fields declared in generated files, and fields declared
+  outside the analyzed package MUST NOT be reported.
 - **FR-007**: The gate MUST analyze all four build-tag configurations
   (default, `ax_no_grpc`, `ax_no_otlp`, both) on the host platform and report a
   field only when it is a finding in every configuration in which it is
@@ -280,9 +287,9 @@ and confirm a run with a planted unread field fails CI.
   rather than either fixing findings here or weakening the gate.
 - Platform: like `deadcheck`, the gate analyzes the host `GOOS`/`GOARCH` only;
   a field read only under another platform's build constraint can be reported.
-- The analysis is package-scoped. Given the exported-field skip, a field in
-  scope cannot be read from another package except through an exported alias,
-  which FR-005/edge cases treat as a read.
+- The analysis is package-scoped. Given the exposed-field skip (FR-006), a
+  field in scope cannot be read from another package except through a value
+  that leaves the package, which FR-005 treats as a read.
 - Out of scope: exporting the analyzer as public API, fixing findings in this
   repository, unused locals/parameters/identifiers (already covered),
   type-free structural rules (#229), whole-program reachability (#227), and

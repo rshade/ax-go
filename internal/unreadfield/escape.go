@@ -24,11 +24,12 @@ func (a *analysis) checkWholeValue(e ast.Expr, stack []ast.Node) {
 
 // harmless reports whether e's parent only copies, accesses, or passes the
 // value to code this analysis sees. A wrapper parent (parentheses, &, *, an
-// index or slice base, a receive) is harmless here because the wrapper is
-// itself an expression whose own parent is judged.
+// index or slice base, a receive, the callee of a call) is harmless here
+// because the wrapper is itself an expression whose own parent is judged.
+// Every copy is judged by copyHarmless against the type it is stored as.
 func (a *analysis) harmless(e ast.Expr, stack []ast.Node) bool {
 	switch p := stack[len(stack)-1].(type) {
-	case *ast.ParenExpr, *ast.StarExpr, *ast.ExprStmt, *ast.RangeStmt:
+	case *ast.ParenExpr, *ast.StarExpr, *ast.ExprStmt:
 		return true
 	case *ast.UnaryExpr:
 		return p.Op == token.AND || p.Op == token.ARROW
@@ -38,70 +39,131 @@ func (a *analysis) harmless(e ast.Expr, stack []ast.Node) bool {
 		return p.X == e
 	case *ast.SliceExpr:
 		return p.X == e
+	case *ast.RangeStmt:
+		return a.rangeHarmless(p, e)
 	case *ast.AssignStmt:
 		return a.assignHarmless(p, e)
 	case *ast.ValueSpec:
-		return p.Type == nil || !types.IsInterface(a.info.TypeOf(p.Type))
+		return p.Type == nil || a.copyHarmless(a.info.TypeOf(e), a.info.TypeOf(p.Type))
 	case *ast.CompositeLit:
-		return a.elementHarmless(p, slices.Index(p.Elts, e))
+		return a.copyHarmless(a.info.TypeOf(e), a.elementType(p, slices.Index(p.Elts, e)))
 	case *ast.KeyValueExpr:
 		return p.Value == e && len(stack) > 1 && a.keyedValueHarmless(stack[len(stack)-2], p)
 	case *ast.SendStmt:
-		return p.Chan == e || !types.IsInterface(chanElem(a.info.TypeOf(p.Chan)))
+		return p.Chan == e || a.copyHarmless(a.info.TypeOf(e), chanElem(a.info.TypeOf(p.Chan)))
 	case *ast.CallExpr:
-		return a.argHarmless(p, e)
+		return p.Fun == e || a.argHarmless(p, e)
 	case *ast.ReturnStmt:
 		return a.returnHarmless(p, e, stack)
 	}
 	return false
 }
 
-// assignHarmless allows both sides of = and :=, provided every destination
-// the value reaches is a blank identifier or has a non-interface type.
+// copyHarmless reports whether storing a value of type src as type dst keeps
+// every candidate field src carries reachable through the same field object,
+// so a later read through the copy is seen. An interface or type-parameter
+// destination reaches no field, and a distinct but identical struct type (two
+// anonymous struct literals) reaches different field objects.
+func (a *analysis) copyHarmless(src, dst types.Type) bool {
+	reach := make(map[*types.Var]bool)
+	if dst != nil {
+		a.visitType(dst, make(map[types.Type]bool), func(v *types.Var) { reach[v.Origin()] = true })
+	}
+	harmless := true
+	if src != nil {
+		a.visitType(src, make(map[types.Type]bool), func(v *types.Var) {
+			harmless = harmless && (a.cands[v.Origin()] == nil || reach[v.Origin()])
+		})
+	}
+	return harmless
+}
+
+// assignHarmless allows the left side of = and :=, and a right-hand value
+// every destination of which is harmless. A single tuple-valued right-hand
+// side (a call, or a comma-ok form) is paired with the destinations
+// element by element.
 func (a *analysis) assignHarmless(assign *ast.AssignStmt, e ast.Expr) bool {
 	if slices.Contains(assign.Lhs, e) {
 		return true
 	}
+	src := a.info.TypeOf(e)
 	if len(assign.Lhs) == len(assign.Rhs) {
-		return a.destinationHarmless(assign.Lhs[slices.Index(assign.Rhs, e)])
+		return a.destinationHarmless(src, assign.Lhs[slices.Index(assign.Rhs, e)])
 	}
-	for _, lhs := range assign.Lhs {
-		if !a.destinationHarmless(lhs) {
+	tuple, ok := src.(*types.Tuple)
+	if !ok || tuple.Len() != len(assign.Lhs) {
+		return false
+	}
+	for i, lhs := range assign.Lhs {
+		if !a.destinationHarmless(tuple.At(i).Type(), lhs) {
 			return false
 		}
 	}
 	return true
 }
 
-// destinationHarmless treats _ as harmless before any type check: go/types
-// records no type for the blank identifier.
-func (a *analysis) destinationHarmless(lhs ast.Expr) bool {
+// destinationHarmless judges storing a src value into lhs. An absent or blank
+// destination discards the value and is checked before any type lookup:
+// go/types records no type for the blank identifier.
+func (a *analysis) destinationHarmless(src types.Type, lhs ast.Expr) bool {
+	if lhs == nil {
+		return true
+	}
 	if id, ok := lhs.(*ast.Ident); ok && id.Name == "_" {
 		return true
 	}
-	t := a.info.TypeOf(lhs)
-	return t != nil && !types.IsInterface(t)
+	return a.copyHarmless(src, a.info.TypeOf(lhs))
 }
 
-// elementHarmless judges the i-th positional element of a composite literal
-// by the type the literal stores it as.
-func (a *analysis) elementHarmless(lit *ast.CompositeLit, i int) bool {
+// rangeHarmless allows the key and value variables themselves, and a ranged
+// collection whose elements are copied into new variables (:=) or into
+// existing ones that store them harmlessly (=). A range over a function
+// iterator that assigns to existing variables is not judged.
+func (a *analysis) rangeHarmless(r *ast.RangeStmt, e ast.Expr) bool {
+	if r.X != e || r.Tok != token.ASSIGN {
+		return true
+	}
+	t := a.info.TypeOf(e)
+	if p, ok := t.Underlying().(*types.Pointer); ok {
+		t = p.Elem()
+	}
+	var key, value types.Type
+	switch u := t.Underlying().(type) {
+	case *types.Slice:
+		value = u.Elem()
+	case *types.Array:
+		value = u.Elem()
+	case *types.Map:
+		key, value = u.Key(), u.Elem()
+	case *types.Chan:
+		key = u.Elem()
+	default:
+		return false
+	}
+	return a.destinationHarmless(key, r.Key) && a.destinationHarmless(value, r.Value)
+}
+
+// elementType returns the type a composite literal stores its i-th positional
+// element as, or nil.
+func (a *analysis) elementType(lit *ast.CompositeLit, i int) types.Type {
 	t := a.info.TypeOf(lit)
 	if t == nil {
-		return false
+		return nil
 	}
 	if p, ok := t.Underlying().(*types.Pointer); ok {
 		t = p.Elem()
 	}
 	switch u := t.Underlying().(type) {
 	case *types.Struct:
-		return i < u.NumFields() && !types.IsInterface(u.Field(i).Type())
+		if i >= 0 && i < u.NumFields() {
+			return u.Field(i).Type()
+		}
 	case *types.Slice:
-		return !types.IsInterface(u.Elem())
+		return u.Elem()
 	case *types.Array:
-		return !types.IsInterface(u.Elem())
+		return u.Elem()
 	}
-	return false
+	return nil
 }
 
 // keyedValueHarmless judges the value of a key: value element. Keys are never
@@ -111,10 +173,11 @@ func (a *analysis) keyedValueHarmless(parent ast.Node, kv *ast.KeyValueExpr) boo
 	if !ok {
 		return false
 	}
+	src := a.info.TypeOf(kv.Value)
 	if s := structOf(a.info.TypeOf(lit)); s != nil {
 		key, _ := kv.Key.(*ast.Ident)
 		field, isField := a.info.Uses[key].(*types.Var)
-		return isField && !types.IsInterface(field.Type())
+		return isField && a.copyHarmless(src, field.Type())
 	}
 	t := a.info.TypeOf(lit)
 	if t == nil {
@@ -122,19 +185,21 @@ func (a *analysis) keyedValueHarmless(parent ast.Node, kv *ast.KeyValueExpr) boo
 	}
 	switch u := t.Underlying().(type) {
 	case *types.Map:
-		return !types.IsInterface(u.Elem())
+		return a.copyHarmless(src, u.Elem())
 	case *types.Slice:
-		return !types.IsInterface(u.Elem())
+		return a.copyHarmless(src, u.Elem())
 	case *types.Array:
-		return !types.IsInterface(u.Elem())
+		return a.copyHarmless(src, u.Elem())
 	}
 	return false
 }
 
 // argHarmless allows an argument to the builtins that only move values, or to
-// a function or method that resolves statically to this package and takes a
-// non-interface, non-type-parameter parameter. Conversions, dynamic callees,
-// and functions in other packages are not allowed.
+// a function or method that resolves statically to this package and stores
+// the argument harmlessly as its parameter type. The parameter is taken from
+// the generic origin, so a *T or []T parameter reaches no field: a generic
+// callee can pass it on to code that sees only an interface. Conversions,
+// dynamic callees, and functions in other packages are not allowed.
 func (a *analysis) argHarmless(call *ast.CallExpr, e ast.Expr) bool {
 	fun := ast.Unparen(call.Fun)
 	tv := a.info.Types[fun]
@@ -142,8 +207,7 @@ func (a *analysis) argHarmless(call *ast.CallExpr, e ast.Expr) bool {
 		return false
 	}
 	if tv.IsBuiltin() {
-		id, _ := fun.(*ast.Ident)
-		return id != nil && slices.Contains([]string{"append", "len", "cap", "copy", "delete", "clear"}, id.Name)
+		return a.builtinArgHarmless(call, fun, e)
 	}
 	fn := a.staticCallee(fun)
 	if fn == nil || fn.Pkg() != a.pkg {
@@ -154,7 +218,37 @@ func (a *analysis) argHarmless(call *ast.CallExpr, e ast.Expr) bool {
 		return false
 	}
 	param := paramType(sig, call, slices.Index(call.Args, e))
-	return param != nil && !types.IsInterface(param)
+	return param != nil && a.copyHarmless(a.info.TypeOf(e), param)
+}
+
+// builtinArgHarmless allows the slice, map, or channel operand of a builtin
+// that only measures or moves values, and an appended value the slice element
+// type stores harmlessly. A delete key is hashed and compared, so it is never
+// harmless.
+func (a *analysis) builtinArgHarmless(call *ast.CallExpr, fun, e ast.Expr) bool {
+	id, _ := fun.(*ast.Ident)
+	if id == nil {
+		return false
+	}
+	switch id.Name {
+	case "len", "cap", "copy", "clear":
+		return true
+	case "delete":
+		return slices.Index(call.Args, e) == 0
+	case "append":
+		if slices.Index(call.Args, e) == 0 {
+			return true
+		}
+		s, ok := a.info.TypeOf(call).Underlying().(*types.Slice)
+		if !ok {
+			return false
+		}
+		if call.Ellipsis.IsValid() {
+			return a.copyHarmless(a.info.TypeOf(e), s)
+		}
+		return a.copyHarmless(a.info.TypeOf(e), s.Elem())
+	}
+	return false
 }
 
 // staticCallee resolves fun to the function or method it always calls, or
@@ -183,8 +277,10 @@ func (a *analysis) staticCallee(fun ast.Expr) *types.Func {
 }
 
 // returnHarmless allows a return from an unexported function or a function
-// literal whose result types are not interfaces: its callers are in this
-// package, where the analysis sees what they do with the value.
+// literal that stores the value harmlessly as its result type: its callers
+// are in this package, where the analysis sees what they do with the value.
+// A function literal is itself a value carrying its result types, judged
+// wherever it goes.
 func (a *analysis) returnHarmless(ret *ast.ReturnStmt, e ast.Expr, stack []ast.Node) bool {
 	var results *ast.FieldList
 	for i := len(stack) - 1; i >= 0 && results == nil; i-- {
@@ -208,12 +304,18 @@ func (a *analysis) returnHarmless(ret *ast.ReturnStmt, e ast.Expr, stack []ast.N
 		}
 	}
 	// One expression per result is judged by its own result type; a single
-	// call spread across several results must fit every one of them.
+	// call spread across several results is paired with them element by
+	// element.
+	src := a.info.TypeOf(e)
 	if i := slices.Index(ret.Results, e); len(ret.Results) == len(resultTypes) && i >= 0 {
-		resultTypes = resultTypes[i : i+1]
+		return a.copyHarmless(src, resultTypes[i])
 	}
-	for _, t := range resultTypes {
-		if t == nil || types.IsInterface(t) {
+	tuple, ok := src.(*types.Tuple)
+	if !ok || tuple.Len() != len(resultTypes) {
+		return false
+	}
+	for i, t := range resultTypes {
+		if !a.copyHarmless(tuple.At(i).Type(), t) {
 			return false
 		}
 	}
@@ -235,8 +337,10 @@ func (a *analysis) markType(t types.Type, seen map[types.Type]bool) {
 }
 
 // visitType calls visit for every struct field reachable from t through
-// pointers, slices, arrays, maps, channels, tuples, nested struct fields, and
-// type arguments. seen guards against recursive types.
+// pointers, slices, arrays, maps, channels, function parameters and results,
+// tuples, nested struct fields, and type arguments. A function value carries
+// the structs its signature mentions: code that receives it can obtain them.
+// seen guards against recursive types.
 func (a *analysis) visitType(t types.Type, seen map[types.Type]bool, visit func(*types.Var)) {
 	t = types.Unalias(t)
 	if t == nil || seen[t] {
@@ -262,6 +366,9 @@ func (a *analysis) visitType(t types.Type, seen map[types.Type]bool, visit func(
 	case *types.Map:
 		a.visitType(u.Key(), seen, visit)
 		a.visitType(u.Elem(), seen, visit)
+	case *types.Signature:
+		a.visitType(u.Params(), seen, visit)
+		a.visitType(u.Results(), seen, visit)
 	case *types.Tuple:
 		for v := range u.Variables() {
 			a.visitType(v.Type(), seen, visit)

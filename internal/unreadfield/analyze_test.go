@@ -1,6 +1,7 @@
 package unreadfield
 
 import (
+	"path/filepath"
 	"reflect"
 	"slices"
 	"testing"
@@ -33,26 +34,35 @@ func TestAnalyzeFixtures(t *testing.T) {
 		{pkg: "readloop"},
 		{pkg: "addrof"},
 		{pkg: "selfassign", want: []string{"state.count"}},
+		{pkg: "effectfulbase"},
 		{pkg: "compound"},
 		{pkg: "positional", want: []string{"pair.left", "pair.right"}},
 		{pkg: "promoted"},
+		{pkg: "promotedmethod"},
 		// Research R4 store forms.
 		{pkg: "storeforms", want: []string{"ranged.key"}},
+		// Positions ignore //line directives.
+		{pkg: "linedirective", want: []string{"long.unread", "renamed.unread"}},
 		// Research R5 whole-value uses.
 		{pkg: "escapeeq"},
 		{pkg: "escapereflect"},
 		{pkg: "escapeiface"},
 		{pkg: "escapenested"},
 		{pkg: "escapecontainer", want: []string{"row.skip"}},
+		{pkg: "builtins", want: []string{"kept.value"}},
 		{pkg: "samepkgcall", want: []string{"job.retries"}},
 		{pkg: "dynamiccall"},
+		{pkg: "funcvalue", want: []string{"local.value"}},
+		{pkg: "genericparam", want: []string{"plain.value"}},
 		{pkg: "assignrhs", want: []string{"settings.port"}},
+		{pkg: "anoncopy", want: []string{"control.kept"}},
 		// Research R6 scope rules.
 		{pkg: "exportedtype", want: []string{"Options.retries"}},
 		{pkg: "unexportedtype", want: []string{"result.Status"}},
 		{pkg: "blank"},
 		{pkg: "generated"},
 		{pkg: "alias", want: []string{"impl.cache"}},
+		{pkg: "aliasforms", want: []string{"private.Hidden"}},
 		{pkg: "generic", want: []string{"box.label"}},
 		{pkg: "anontable", want: []string{
 			"row@anontable.go:18:7.hidden",
@@ -111,4 +121,23 @@ func TestAnalyzeAssignmentPositions(t *testing.T) {
 		return
 	}
 	t.Fatal("fixtures/positional did not load")
+}
+
+func TestAnalyzeIgnoresLineDirectives(t *testing.T) {
+	units, err := loadUnits(t.Context(), "testdata/fixtures", nil, goList)
+	if err != nil {
+		t.Fatalf("loadUnits: %v", err)
+	}
+	for _, u := range units {
+		if u.key != "fixtures/linedirective" {
+			continue
+		}
+		for _, f := range Analyze(u.fset, u.files, u.pkg, u.info).Findings {
+			if filepath.Base(f.Declared.File) != "linedirective.go" || f.Declared.Line >= 1000 {
+				t.Errorf("%s declared at %v, want a physical position in linedirective.go", f.Key, f.Declared)
+			}
+		}
+		return
+	}
+	t.Fatal("fixtures/linedirective did not load")
 }

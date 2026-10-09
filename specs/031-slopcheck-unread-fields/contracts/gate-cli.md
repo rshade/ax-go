@@ -39,7 +39,7 @@ Every envelope is built with `contract.NewError` and sets `tool:"slopcheck"`,
 | --- | --- | --- | --- | --- |
 | `slopcheck_unread_field` | `2` | ≥ 1 finding after intersection | sorted findings joined by a semicolon and a space | read the field where it matters, or delete it and its assignments; review before deleting |
 | `invalid_slopcheck_artifact` | `2` | bad flag, positional argument, `-dir` not a module root | the reason | — |
-| `slopcheck_analysis_failed` | `2` | `go list` failure, type-check error, missing export data, oversized output | configuration name + first error | — |
+| `slopcheck_analysis_failed` | `2` | `go list` failure or a package it reports as broken (other than an unreadable source file), type-check error, missing export data, oversized output | configuration name + first error | — |
 | `slopcheck_timeout` | `3` | a configuration exceeded five minutes | configuration name | — |
 | `slopcheck_permission` | `4` | `fs.ErrPermission` reading sources or running `go` | path | — |
 | `slopcheck_internal` | `1` | anything else, including cancellation | the error | — |

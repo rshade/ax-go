@@ -37,12 +37,13 @@ no dependency in the gate itself) holds exactly.
   put `x/tools` back into the gate and give up the surfacecheck precedent
   below. Rejected.
 
-## R2. Loader: `go list -deps -export -test -json`
+## R2. Loader: `go list -e -deps -export -test -json`
 
-**Decision**: Reuse `surfacecheck`'s proven loader shape and add `-test`:
+**Decision**: Reuse `surfacecheck`'s proven loader shape and add `-test` and
+`-e`:
 
 ```text
-go list -deps -export -test -json [-tags=<config>] ./...
+go list -e -deps -export -test -json [-tags=<config>] ./...
 ```
 
 Verified on `internal/schema` (0.3 s warm). The stream contains, per tested
@@ -64,6 +65,15 @@ rewrites the path through the unit's `ImportMap` (so `p_test` gets `p
 file. Output is bounded by a byte ceiling (16 MiB, as `deadcheck`'s
 `maxReportBytes`; a whole-repository listing measured 2.4 MB). Any type-check error, missing export data, or `go list` failure fails
 the run closed (`slopcheck_analysis_failed`).
+
+`-e` exists for one case. Without it, an unreadable source file fails `go
+list` itself, and only its stderr text says why, so the gate can't tell a
+permission denial from a type error without matching text. With `-e`, `go
+list` exits `0` and reports the package with its `Error`, `DepsErrors` and
+`InvalidGoFiles` instead. The loader then reopens every `InvalidGoFiles`
+entry: one that fails to open yields a typed `*fs.PathError`, and
+`fs.ErrPermission` maps to `slopcheck_permission` (exit `4`). Every other
+reported package error still fails closed as `slopcheck_analysis_failed`.
 
 **Rationale**: Analyzing the test variant instead of the plain package gives
 one unit that already contains production code and internal tests, which is
@@ -108,11 +118,20 @@ instantiations collapse onto the declared field) is classified by its parent:
 | operand of `&` | load (address may be read through) |
 | base of a further selector, index, or slice (`x.F.G`, `x.F[i]`) | load |
 | `for x.F = range …` key/value | store |
-| RHS of `x.F = x.F` with the same field and same base expression | not a read |
+| RHS of `x.F = x.F` with the same field and same base expression, where the base contains no call or channel receive | not a read |
 | anything else | load |
 
 A promoted selector also marks every embedded field on its path as read,
-because the path dereferences each one.
+because the path dereferences each one. That holds for a promoted method
+(`w.ID()` through an embedded `base`), not only a promoted field.
+
+A base with a call or a receive is excluded from the self-assignment row:
+`next().F = next().F` evaluates `next()` twice, and the two results can be
+different values, so the right-hand side is a real read.
+
+Positions are physical: `//line` directives are ignored, so a reported
+position always names the file and line that was parsed, and the adapter can
+map it back to a `token.Pos`.
 
 **Rationale**: This is the issue's correctness core, encoded as a closed table
 so each row is one fixture case.
@@ -121,28 +140,53 @@ so each row is one fixture case.
 
 **Decision**: Use an allow-list of harmless positions. A **carrier** is any
 expression whose type contains a candidate struct `T`: `T` itself, or a
-pointer, array, slice, map (key or element) or channel whose element type is
-or contains `T`. Every use of a carrier outside the allow-list marks all fields
-of every candidate struct the type contains as read, recursing through nested
-struct field types with a cycle guard. The harmless positions are:
+pointer, array, slice, map (key or element), channel, or function signature
+(parameter or result) that is or contains `T`. A function value carries the
+structs its signature mentions: code that receives `func() T` can obtain a
+`T`. Every use of a carrier outside the allow-list marks all fields of every
+candidate struct the type contains as read, recursing through nested struct
+field types with a cycle guard.
+
+A **copy** is harmless only when the destination type reaches every
+candidate field the value carries through the **same field object**. An
+interface or type-parameter destination reaches none. A distinct but
+identical struct type reaches different objects: two `struct{ v int }`
+literals, or a named type assigned to an identical anonymous one. A read
+through such a copy names the other type's field, so the copy counts as
+reading every field. This one rule is applied at every copy site below, in
+place of an "is the destination an interface" test. The harmless positions
+are:
 
 - the base of a field or method selector;
 - the left-hand side of `=` or `:=`, a range key or value variable;
-- the **right-hand side** of `=` or `:=`, or a `var` initializer, when the
-  destination's type is not an interface (so `x := T{F: 1}`, `tc := tc` and
-  `got := build()` are harmless). A blank destination (`_ = x`) is harmless:
-  go/types records no type for `_`, so it must be special-cased before any
-  interface check, never treated as an interface;
-- the range expression of a `for … range` (so `range tests` is harmless);
-- an element or keyed value of a composite literal whose element or field
-  type is not an interface;
+- the **right-hand side** of `=` or `:=`, or a `var` initializer, when it is
+  a harmless copy into the destination (so `x := T{F: 1}`, `tc := tc` and
+  `got := build()` are harmless). A single tuple-valued right-hand side (a
+  call, or a comma-ok form) is paired with the destinations element by
+  element. A blank destination (`_ = x`) is harmless: go/types records no
+  type for `_`, so it must be special-cased before any type check;
+- the range expression of a `for … range` that declares its variables
+  (`:=`), so `range tests` is harmless. With `=`, each element must be a
+  harmless copy into the existing key and value variables. A range over a
+  function iterator that assigns with `=` is not allow-listed;
+- an element or keyed value of a composite literal that is a harmless copy
+  into its element or field type;
 - an argument to a function or method that resolves **statically** to a
-  `*types.Func` declared in the analyzed package, when the parameter type is
-  not an interface or a type parameter. Dynamic callees (func values, method
+  `*types.Func` declared in the analyzed package, when it is a harmless copy
+  into the parameter type taken from the generic origin. A `*T` or `[]T`
+  parameter therefore reaches no field: a generic callee can pass it on to
+  code that sees only an interface. Dynamic callees (func values, method
   values, interface methods) are not allow-listed;
-- a `return` operand of an **unexported** function whose result type is not
-  an interface;
-- an argument to the builtins `append`, `len`, `cap`, `copy`, `delete`;
+- the callee of a call (`f()` for a function value `f`). The result is its
+  own expression, judged where it is used;
+- a `return` operand of an **unexported** function or a function literal
+  that is a harmless copy into its result type. A function literal is itself
+  a value carrying its result types, judged wherever it goes, so `return
+  func() T {…}` from an exported function marks `T`'s fields read;
+- the slice, map, or channel operand of the builtins `append`, `len`, `cap`,
+  `copy`, `delete` and `clear`, and an appended value that is a harmless copy
+  into the slice's element type. A `delete` key is never harmless: it is
+  hashed and compared;
 - an index or slice base (`tests[i]`, `tests[1:]`), when the result is itself
   in a harmless position;
 - the operand of `&` or `*`, or a parenthesized expression, when the
@@ -167,19 +211,28 @@ reads every row's fields through a `[]T`. Rejected.
 1. It is declared in a file of the analyzed unit (`field.Pkg() == pkg`).
 2. Its declaring file is not generated (`ast.IsGenerated`).
 3. Its name is not `_`.
-4. It is not exported-and-externally-visible. An exported field is skipped
-   when its struct type expression lies lexically inside a package-level
-   declaration that declares an exported name (an exported `TypeSpec`, a
-   `ValueSpec` with an exported name, or an exported `FuncDecl`'s signature),
-   or when its named type is the target of an exported package-level alias
-   (`type Foo = foo`, the `export_test.go` pattern).
+4. It is not exposed. A field is exposed when it is exported or embedded and
+   belongs to a struct **reachable** from an exported package-level type,
+   alias, variable, or function. Reachability runs through pointers,
+   containers, signatures, type arguments, interface methods, the exported
+   methods of this package's named types, and exported or embedded struct
+   fields. An embedded field is exposed even when its own name is unexported,
+   because reading a field or calling a method it promotes reads it.
 
-Exported fields of unexported types and every field of an anonymous struct
-inside a function body (the table-test shape) remain in scope.
+So `type Ptr = *hidden`, `type Anon = anon` (an alias of an anonymous
+struct), `var Default = settings{…}`, an exported field of an unexported
+type, and an embedded unexported type all expose fields, as does the
+`export_test.go` pattern `type Foo = foo`. Exported fields of unexported types
+that nothing exported reaches, and every field of an anonymous struct inside
+a function body (the table-test shape), remain in scope.
 
 **Rationale**: Encodes the maintainer's "skip exported fields of exported
-types" decision so that it also covers the two ways an unexported type
-becomes nameable downstream.
+types" decision so that it covers every way a type becomes nameable
+downstream. A lexical rule (a struct written inside an exported declaration,
+or the direct target of an exported alias) missed pointer and
+anonymous-struct aliases, exported variables, and exported fields of
+unexported types. Values returned from exported functions are covered twice:
+by reachability, and by the R5 rule that such a return is not harmless.
 
 ## R7. Positional literals
 

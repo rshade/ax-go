@@ -24,6 +24,8 @@ func TestAnalyzerMatchesWants(t *testing.T) {
 
 // TestFrontEndsAgree asserts FR-012 / SC-003: the analyzer and the gate's
 // core report the same fields at the same lines with the same message.
+// Positions are compared physically, as the gate reports them, so the
+// linedirective fixture checks that the adapter survives //line remapping.
 func TestFrontEndsAgree(t *testing.T) {
 	root, err := filepath.Abs(fixtures)
 	if err != nil {
@@ -32,7 +34,7 @@ func TestFrontEndsAgree(t *testing.T) {
 	var fromAnalyzer []string
 	for _, r := range analysistest.Run(t, fixtures, analyzer.New(), "./...") {
 		for _, d := range r.Action.Diagnostics {
-			p := r.Action.Package.Fset.Position(d.Pos)
+			p := r.Action.Package.Fset.PositionFor(d.Pos, false)
 			rel, relErr := filepath.Rel(root, p.Filename)
 			if relErr != nil {
 				t.Fatal(relErr)
