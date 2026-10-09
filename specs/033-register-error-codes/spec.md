@@ -72,9 +72,10 @@ config and `--strict` codes published so far.
 **Why this priority**: A named value removes typo risk at every adopter match
 site, and it is the registry the drift guard enforces.
 
-**Independent Test**: Trigger each ax-go runtime failure (mode validation,
+**Independent Test**: Pin each published constant to its frozen spelling.
+The existing envelope tests already pin each failure path (mode validation,
 confirmation blocked, internal fallback, `--strict` escalation, each config
-failure) and compare the envelope's `error_code` with the matching published
+failure) to the same spelling, so every envelope's `error_code` equals its
 constant.
 
 **Acceptance Scenarios**:
@@ -289,9 +290,9 @@ are excluded.
   codes, and 0 code spellings or exit codes change.
 - **SC-004**: All 10 codes ax-go library code returns (9 runtime, 1
   authoring-time) have a published constant, up from 6.
-- **SC-005**: Adding a new runtime code later takes exactly one registry
-  edit (the constant plus its list entry); forgetting either fails the test
-  suite.
+- **SC-005**: Adding a new runtime code later takes two edits in one registry
+  file (the constant and its list entry), and forgetting either one fails the
+  test suite.
 
 ## Assumptions
 

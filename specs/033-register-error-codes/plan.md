@@ -59,7 +59,7 @@ update, README and AGENTS.md notes
 | IV Agent-safety primitives | `confirmation_required` keeps its spelling and exit code. ✅ |
 | V Asymmetric JSON I/O | Untouched. ✅ |
 | VI Library, not application | Only constants are added to the public surface. No mutable state: both lists are functions returning fresh slices. ✅ |
-| VII Test-first | The fixture test, the module guard (seen failing on 21 sites), and the consistency test land before the registry and emit-site changes (R7). ✅ |
+| VII Test-first | Each test lands before the code it covers: the fixture test before the checker, the spelling and consistency tests before the constants and lists, and the module guard, seen failing on 21 sites, before any emit site is converted (R7). ✅ |
 | VIII Observability and ID discipline | Untouched. ✅ |
 | IX Security and resource safety | No input handling changes. The guard reads only repository files in tests. ✅ |
 | X Idiomatic Go, minimal deps | Stdlib only. Errors wrapped with `%w`. The helper takes no context because it does no cancelable I/O. ✅ |
