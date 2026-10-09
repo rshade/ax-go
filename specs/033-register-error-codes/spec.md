@@ -17,6 +17,14 @@ is a string literal or an unregistered identifier, proven by a fixture.
 __schema output stays byte-identical; no code spellings, exit codes, or
 known_codes membership change."
 
+## Clarifications
+
+Clarification was not required. No material question about scope, the public
+contract, failure behavior, or acceptance remained after the survey. The
+operator was unavailable during this run, so the few naming and scope choices
+that have alternatives are recorded under "Agent decisions for operator
+review" at the end of this spec.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - A new error path cannot skip the registry (Priority: P1)
@@ -132,9 +140,11 @@ are excluded.
 
 - **Pass-through constructors.** The root `ax.NewError` is a public
   constructor that forwards its caller's `code` parameter to
-  `contract.NewError`. It is the only pass-through site in the library, and the
-  guard exempts it by an explicit, reviewed entry that names the file and the
-  enclosing function. Any other site that forwards a variable fails.
+  `contract.NewError`, which stores it in the envelope's `ErrorCode` field.
+  These two constructors are the only pass-through sites in the library, and
+  the guard exempts each by an explicit, reviewed entry that names the file,
+  the enclosing function, and the parameter. Any other site that forwards a
+  variable fails.
 - **Development gate tools.** The commands under `internal/cmd/` define their
   own codes (`surface_drift`, `size_build_failed`, ...) and route them through
   a local helper that takes a `code` parameter. Spec 032 FR-001 excludes
@@ -215,8 +225,11 @@ are excluded.
   `_test.go` files, `testdata/` directories, directories holding a nested
   `go.mod`, hidden directories, `node_modules`, `internal/cmd/` (gate tools,
   excluded by spec 032 FR-001), and `examples/` (adopter code). Its only
-  pass-through exemption MUST be the root `NewError` constructor's forwarding
-  of its own `code` parameter, recorded with a reason.
+  pass-through exemptions MUST be the two constructors themselves, each
+  recorded with a reason: the root `NewError` forwarding its own `code`
+  parameter, and `contract.NewError` storing its own `code` parameter in the
+  `ErrorCode` field. An exemption that matches no site MUST be reported, so a
+  stale entry cannot linger.
 - **FR-009**: The guard MUST prove it can fail: a committed fixture MUST
   contain at least a string-literal code, an unregistered identifier, a
   constant whose value is not registered, a non-call reference to
