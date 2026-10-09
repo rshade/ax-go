@@ -120,21 +120,24 @@ projection does not carry `known_codes`, so the MCP goldens do not change.
 - `contract` `ExampleKnownErrorCodes` with an `// Output:` block that pins
   the exact nine codes. The exact list is asserted once, in the verified
   example, rather than duplicated in a unit test.
-- `config/config_test.go`: a table over the six failure paths (nil option,
-  out-of-range cap, oversized input, invalid Hujson on read, invalid Hujson
-  on patch, invalid patch document) that asserts each envelope's
-  `ErrorCode` equals the matching `contract` constant and is in
-  `KnownErrorCodes()`.
+- `config/config_test.go`: the shared `assertContractError` helper, used by
+  the existing tests over the six failure paths (nil option, out-of-range
+  cap, oversized input, invalid Hujson on read, invalid Hujson on patch,
+  invalid patch document), also asserts that each emitted code is in
+  `KnownErrorCodes()`. The expected codes stay string literals rather than
+  the new constants, because the literals pin the frozen spellings (FR-006).
+  A constant comparison would still pass if a constant's value were changed.
 - `examples/integration/main_test.go`: run the integration CLI's `__schema`,
-  then trigger the existing oversized-config failure, and assert the
-  envelope's `error_code` appears in that CLI's `known_codes` (spec SC-002,
-  end to end).
+  then trigger the existing oversized-config and invalid-patch failures, and
+  assert each envelope's `error_code` appears in that CLI's `known_codes`
+  (spec SC-002, end to end).
 - Goldens (R5) cover the `__schema` byte shape.
 
 The new tests fail before the implementation for the right reason: the
-constants do not exist yet (compile failure), the example's output lists
-four codes, and the integration assertion finds `config_too_large` missing
-from `known_codes`.
+example's output lists four codes, the membership assertion reports each
+`config_*` code missing from `KnownErrorCodes()`, and the integration test
+finds `config_too_large` and `config_patch_invalid` missing from
+`known_codes`.
 
 ## R7. Gates this touches
 

@@ -158,8 +158,9 @@ states the scope rule in FR-001, including both exclusions.
   runtime.
 - Output stays deterministic: the list is a fixed, sorted value.
 - Every `__schema` golden changes. The diff is reviewed as a machine-contract
-  change, and the surface baseline and audit record the new constants in the
-  same change.
+  change, and the surface baseline records the new constants in the same
+  change. The surface audit covers the root package only, so it stays
+  unchanged (research R4).
 
 ### Key Entities
 

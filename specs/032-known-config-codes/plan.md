@@ -18,7 +18,7 @@ decisions.
 
 ## Technical Context
 
-**Language/Version**: Go 1.27.2 (pinned in `mise.toml`, matched by `go.mod`)
+**Language/Version**: Go, at the version pinned in `mise.toml` (which `go.mod` must match)
 
 **Primary Dependencies**: none new; stdlib plus the existing module graph
 
