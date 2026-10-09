@@ -123,7 +123,7 @@ func applyOptions(ctx context.Context, opts []Option) (options, error) {
 		if opt == nil {
 			return cfg, contract.NewError(
 				ctx,
-				"config_option_invalid",
+				contract.ErrorCodeConfigOptionInvalid,
 				"config parse option must not be nil",
 				contract.WithActionableFix("remove nil ParseConfigOption values before parsing config"),
 				contract.WithErrorExitCode(contract.ExitValidation),
@@ -138,7 +138,7 @@ func normalizeReadError(ctx context.Context, err error) error {
 	if invalidMax, ok := errors.AsType[internalconfig.InvalidMaxBytesError](err); ok {
 		return contract.NewError(
 			ctx,
-			"config_max_bytes_invalid",
+			contract.ErrorCodeConfigMaxBytesInvalid,
 			fmt.Sprintf("config max bytes must be between 0 and %d", MaxBytesCeiling),
 			contract.WithActionableFix("set a config byte limit between 0 and MaxConfigBytesCeiling"),
 			contract.WithErrorContext(map[string]any{"max_bytes": invalidMax.MaxBytes}),
@@ -149,7 +149,7 @@ func normalizeReadError(ctx context.Context, err error) error {
 	if tooLarge, ok := errors.AsType[internalconfig.TooLargeError](err); ok {
 		return contract.NewError(
 			ctx,
-			"config_too_large",
+			contract.ErrorCodeConfigTooLarge,
 			fmt.Sprintf("config exceeds maximum size of %d bytes", tooLarge.MaxBytes),
 			contract.WithActionableFix("reduce the config size or raise the limit with WithMaxConfigBytes"),
 			contract.WithErrorContext(map[string]any{"max_bytes": tooLarge.MaxBytes}),
@@ -166,7 +166,7 @@ func normalizeDecodeError(ctx context.Context, decodeErr error) error {
 
 	return contract.NewError(
 		ctx,
-		"config_invalid",
+		contract.ErrorCodeConfigInvalid,
 		"config is not valid Hujson or does not match the expected schema",
 		contract.WithActionableFix("fix the config syntax or field types and retry"),
 		contract.WithErrorCause(decodeErr),
@@ -178,7 +178,7 @@ func normalizePatchError(ctx context.Context, err error) error {
 	if parseErr, ok := errors.AsType[*internalconfig.HujsonParseError](err); ok {
 		return contract.NewError(
 			ctx,
-			"config_invalid",
+			contract.ErrorCodeConfigInvalid,
 			"config is not valid Hujson",
 			contract.WithActionableFix("fix the config syntax and retry"),
 			contract.WithErrorCause(parseErr.Err),
@@ -189,7 +189,7 @@ func normalizePatchError(ctx context.Context, err error) error {
 	if patchErr, ok := errors.AsType[*internalconfig.PatchApplyError](err); ok {
 		return contract.NewError(
 			ctx,
-			"config_patch_invalid",
+			contract.ErrorCodeConfigPatchInvalid,
 			"config patch is not a valid RFC 6902 document or a patch operation failed",
 			contract.WithActionableFix(
 				"verify the patch document is a valid RFC 6902 JSON array and all target paths exist",

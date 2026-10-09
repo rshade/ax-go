@@ -1565,6 +1565,36 @@
       "path": "github.com/rshade/ax-go/contract",
       "features": [
         {
+          "id": "const:ErrorCodeConfigInvalid",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ErrorCodeConfigMaxBytesInvalid",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ErrorCodeConfigOptionInvalid",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ErrorCodeConfigPatchInvalid",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ErrorCodeConfigTooLarge",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "const:ErrorCodeWarningsAsErrors",
           "signature": "untyped string",
           "configurations": "all",

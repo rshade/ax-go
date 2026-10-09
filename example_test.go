@@ -544,7 +544,7 @@ func ExampleBuildSchema() {
 	if err := ax.WriteJSON(os.Stdout, s); err != nil {
 		fmt.Println("error:", err)
 	}
-	// Output: {"schema_version":"1.0.0","tool":"app","version":"v0.1.0","mode_detection":"--format flag \u003e AGENT_MODE env \u003e TTY detection","command":{"use":"app","short":"test app","example":"app run","flags":[{"name":"config","type":"string","usage":"config file"}],"non_deterministic_fields":[]},"error_envelope":{"schema_version":"1.0.0","required":["error_code","message","trace_id","tool","version","schema_version"],"optional":["actionable_fix","context","suggestions"],"known_codes":["confirmation_required","internal_error","validation_error","warnings_as_errors"],"non_deterministic_fields":["trace_id"]}}
+	// Output: {"schema_version":"1.0.0","tool":"app","version":"v0.1.0","mode_detection":"--format flag \u003e AGENT_MODE env \u003e TTY detection","command":{"use":"app","short":"test app","example":"app run","flags":[{"name":"config","type":"string","usage":"config file"}],"non_deterministic_fields":[]},"error_envelope":{"schema_version":"1.0.0","required":["error_code","message","trace_id","tool","version","schema_version"],"optional":["actionable_fix","context","suggestions"],"known_codes":["config_invalid","config_max_bytes_invalid","config_option_invalid","config_patch_invalid","config_too_large","confirmation_required","internal_error","validation_error","warnings_as_errors"],"non_deterministic_fields":["trace_id"]}}
 }
 
 // ExampleBuildMCPSchema adapts the command tree to the MCP tools-list shape
