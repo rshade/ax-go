@@ -18,9 +18,9 @@ and `examples/`) found these nine plus `invalid_schema_declaration`:
 | Code | Emitted from | Runtime? |
 | --- | --- | --- |
 | `confirmation_required` | `confirm.go` | yes |
-| `internal_error` | `contract/error.go`, `internal/mcpserver/dispatch.go` | yes |
-| `validation_error` | `execute.go`, `mcp/command.go`, `internal/mcpserver/{server,transport,dispatch}.go` | yes |
-| `warnings_as_errors` | `execute.go` via `contract.ErrorCodeWarningsAsErrors` | yes |
+| `internal_error` | `execute.go`, `contract/error.go` (`WriteError` fallback), `internal/mcpserver/dispatch.go` | yes |
+| `validation_error` | `execute.go`, `mcp/command.go`, `schema/schema.go` (unknown `--as`), `internal/schema/declare.go` (enum rejection at parse time), `internal/schema/conflict_error.go` (duplicate or corrupt declaration), `internal/mcpserver/{server,transport,dispatch}.go` | yes |
+| `warnings_as_errors` | `execute.go`, through the root constant `contractErrorWarnings`, which duplicates `contract.ErrorCodeWarningsAsErrors` (#285 removes it) | yes |
 | `config_*` (five) | `config/config.go` | yes; adopter calls the helper inside `RunE` |
 | `invalid_schema_declaration` | `schema/declarations.go` | no; returned while the tree is built |
 
