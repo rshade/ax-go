@@ -6,7 +6,7 @@ actionlint = "1.7.12"
 "go:golang.org/x/tools/cmd/deadcode" = "0.51.0"
 "go:github.com/mibk/dupl" = "1.1.0"
 "go:github.com/joelanford/go-apidiff" = "0.8.3"
-"pipx:specify-cli" = "1.1.2"
+"pipx:specify-cli" = "1.1.3"
 node = "24"
 # Installed through node's npm backend. `make lint-markdown` and CI both run it.
 "npm:markdownlint-cli" = "0.49.1"
