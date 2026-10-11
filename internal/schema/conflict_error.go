@@ -25,7 +25,7 @@ func TreeDeclarationError(ctx context.Context, conflict *Conflict) error {
 	if conflict.Reason == ReasonCorruptAnnotation {
 		return contract.NewError(
 			ctx,
-			"validation_error",
+			contract.ErrorCodeValidationError,
 			fmt.Sprintf("corrupt %s annotation on command %q", conflict.Kind, conflict.Commands[0]),
 			contract.WithErrorExitCode(contract.ExitValidation),
 			contract.WithActionableFix(CorruptAnnotationFix),
@@ -52,7 +52,7 @@ func TreeDeclarationError(ctx context.Context, conflict *Conflict) error {
 	}
 	return contract.NewError(
 		ctx,
-		"validation_error",
+		contract.ErrorCodeValidationError,
 		fmt.Sprintf("duplicate %s %q declared on more than one command", label, TruncateKey(conflict.Key)),
 		contract.WithErrorExitCode(contract.ExitValidation),
 		contract.WithActionableFix("Rename or remove one of the duplicate declarations."),

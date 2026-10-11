@@ -1595,6 +1595,30 @@
           "profiles": "all"
         },
         {
+          "id": "const:ErrorCodeConfirmationRequired",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ErrorCodeInternalError",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ErrorCodeInvalidSchemaDeclaration",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "const:ErrorCodeValidationError",
+          "signature": "untyped string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "const:ErrorCodeWarningsAsErrors",
           "signature": "untyped string",
           "configurations": "all",

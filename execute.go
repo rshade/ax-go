@@ -15,6 +15,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
+	"github.com/rshade/ax-go/contract"
 	"github.com/rshade/ax-go/internal/cli"
 	"github.com/rshade/ax-go/internal/logcore"
 	internaltelemetry "github.com/rshade/ax-go/internal/telemetry"
@@ -228,8 +229,8 @@ func finishCommand(ctx context.Context, span trace.Span, root *cobra.Command, cf
 
 	state := warningStateFrom(root.Context())
 	if state != nil && state.strict && len(state.warnings) > 0 {
-		span.SetStatus(codes.Error, contractErrorWarnings)
-		escalated := NewError(root.Context(), contractErrorWarnings, "warnings escalated by --strict",
+		span.SetStatus(codes.Error, contract.ErrorCodeWarningsAsErrors)
+		escalated := NewError(root.Context(), contract.ErrorCodeWarningsAsErrors, "warnings escalated by --strict",
 			WithErrorExitCode(ExitValidation),
 			WithActionableFix("rerun without --strict to keep the success envelope"),
 			WithErrorContext(map[string]any{"warnings": state.warnings}),
@@ -243,9 +244,6 @@ func finishCommand(ctx context.Context, span trace.Span, root *cobra.Command, cf
 	}
 	return ExitSuccess
 }
-
-// contractErrorWarnings is the stderr error_code for a --strict escalation.
-const contractErrorWarnings = "warnings_as_errors"
 
 // rebindCommandContexts makes Execute's decorated context authoritative for
 // every command. Cobra does not replace a selected subcommand's non-nil cached
@@ -352,7 +350,9 @@ func wrapCommandPersistentPreRun(cmd *cobra.Command, cfg executeConfig) {
 
 		mode, err := ResolveMode(format, cfg.env("AGENT_MODE"), stdoutIsTTY)
 		if err != nil {
-			return NewError(invoked.Context(), "validation_error", err.Error(), WithErrorExitCode(ExitValidation))
+			return NewError(
+				invoked.Context(), contract.ErrorCodeValidationError, err.Error(), WithErrorExitCode(ExitValidation),
+			)
 		}
 
 		ctx := invoked.Context()
@@ -466,7 +466,7 @@ func normalizeExecuteError(ctx context.Context, tool, version string, err error)
 
 	return NewError(
 		ctx,
-		"internal_error",
+		contract.ErrorCodeInternalError,
 		err.Error(),
 		WithErrorTool(tool),
 		WithErrorVersion(version),

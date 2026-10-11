@@ -82,7 +82,7 @@ func Serve(ctx context.Context, root *cobra.Command, cfg Config) error {
 		ctx = context.Background()
 	}
 	if root == nil {
-		return contract.NewError(ctx, "validation_error", "mcp: root command is required",
+		return contract.NewError(ctx, contract.ErrorCodeValidationError, "mcp: root command is required",
 			contract.WithErrorExitCode(contract.ExitValidation))
 	}
 	if cfg.Stderr == nil {
@@ -110,7 +110,7 @@ func Serve(ctx context.Context, root *cobra.Command, cfg Config) error {
 	case TransportHTTP:
 		return serveHTTP(ctx, server, cfg)
 	default:
-		return contract.NewError(ctx, "validation_error",
+		return contract.NewError(ctx, contract.ErrorCodeValidationError,
 			fmt.Sprintf("mcp: unknown transport %d", cfg.Transport),
 			contract.WithErrorExitCode(contract.ExitValidation))
 	}
@@ -121,7 +121,7 @@ func Serve(ctx context.Context, root *cobra.Command, cfg Config) error {
 func validateVersion(ctx context.Context, version string) error {
 	switch strings.TrimSpace(version) {
 	case "", versionDev, versionUnknown:
-		return contract.NewError(ctx, "validation_error",
+		return contract.NewError(ctx, contract.ErrorCodeValidationError,
 			fmt.Sprintf(
 				"mcp: server version must be a real build version, got %q "+
 					"(inject one via WithVersion or -ldflags)", version),
@@ -139,7 +139,7 @@ func validateInstructions(ctx context.Context, text string) error {
 	case len(text) > maxInstructionsBytes:
 		return contract.NewError(
 			ctx,
-			"validation_error",
+			contract.ErrorCodeValidationError,
 			fmt.Sprintf(
 				"mcp: server instructions are %d bytes, over the %d-byte limit",
 				len(text),
@@ -151,7 +151,7 @@ func validateInstructions(ctx context.Context, text string) error {
 			),
 		)
 	case !utf8.ValidString(text):
-		return contract.NewError(ctx, "validation_error", "mcp: server instructions are not valid UTF-8",
+		return contract.NewError(ctx, contract.ErrorCodeValidationError, "mcp: server instructions are not valid UTF-8",
 			contract.WithErrorExitCode(contract.ExitValidation),
 			contract.WithActionableFix("Pass instructions as valid UTF-8 text."))
 	default:

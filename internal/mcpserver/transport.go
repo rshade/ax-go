@@ -49,12 +49,12 @@ func serveHTTP(ctx context.Context, server *sdk.Server, cfg Config) error {
 func loopbackListener(ctx context.Context, cfg Config) (net.Listener, error) {
 	host, _, splitErr := net.SplitHostPort(cfg.HTTPAddr)
 	if splitErr != nil {
-		return nil, contract.NewError(ctx, "validation_error",
+		return nil, contract.NewError(ctx, contract.ErrorCodeValidationError,
 			fmt.Sprintf("mcp: invalid http address %q: %v", cfg.HTTPAddr, splitErr),
 			contract.WithErrorExitCode(contract.ExitValidation))
 	}
 	if !cfg.AllowNonLoopback && !isLoopbackHost(host) {
-		return nil, contract.NewError(ctx, "validation_error",
+		return nil, contract.NewError(ctx, contract.ErrorCodeValidationError,
 			fmt.Sprintf(
 				"mcp: refusing to bind non-loopback address %q without WithAllowNonLoopback "+
 					"(fail-closed against accidental public exposure)", cfg.HTTPAddr),

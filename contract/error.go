@@ -169,7 +169,7 @@ func WriteError(w io.Writer, err error) error {
 
 	var contractErr *Error
 	if !errors.As(err, &contractErr) {
-		contractErr = NewError(context.Background(), "internal_error", err.Error())
+		contractErr = NewError(context.Background(), ErrorCodeInternalError, err.Error())
 	}
 
 	payload, marshalErr := json.Marshal(contractErr)

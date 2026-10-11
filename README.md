@@ -588,6 +588,15 @@ of just reporting:
 All optional fields are omitted when unset, so a default error envelope is
 byte-identical to one emitted before these fields existed.
 
+Every `error_code` ax-go itself returns has an exported constant in the
+import-isolated `contract` package (`contract.ErrorCodeValidationError`,
+`contract.ErrorCodeConfirmationRequired`, `contract.ErrorCodeConfigTooLarge`,
+and so on), so Go code can match a code by name instead of retyping its
+spelling. `__schema` lists the codes a command run can return under
+`error_envelope.known_codes`. `invalid_schema_declaration`
+(`contract.ErrorCodeInvalidSchemaDeclaration`) is returned while the command
+tree is built, before any command runs, so it is not in that list.
+
 ### Success warnings and `--strict`
 
 A success payload may include `warnings`, an array of `{code, message}`

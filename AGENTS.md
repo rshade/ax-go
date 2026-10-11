@@ -291,6 +291,28 @@ and `1` for cancellation or internal failures. The build-tag list is
 `unreadfield.BuildConfigurations()`, and a test keeps it equal to the
 Makefile `BUILD_TAG_MATRIX`.
 
+### Error Code Registry
+
+Every `error_code` ax-go library code emits is an exported constant in
+`contract/codes.go`. Codes a command run can return are listed in
+`KnownErrorCodes()`, which `__schema` publishes as `known_codes`. Codes
+returned only while the command tree is built (`invalid_schema_declaration`)
+are listed in the unexported `authoringTimeErrorCodes()` instead. Emit sites
+name the constant (`contract.NewError(ctx, contract.ErrorCodeValidationError,
+...)`), never a string literal or a local constant. Test expectations keep
+their literals so they pin the frozen spellings.
+
+Two `contract` tests enforce the registry. `TestErrorCodesAreRegistered`
+parses every non-test file in the module, whatever its build constraints, and
+fails on any `NewError` code argument, `ErrorCode` field value, or
+`ErrorCode` assignment that is not a registered constant.
+`TestErrorCodeRegistryConsistency` fails when an `ErrorCode*` constant is in
+neither list, or when a list entry is not a constant. `internal/cmd/` (gate
+tools) and `examples/` (adopter code) are excluded, because spec 032 keeps
+their codes out of `known_codes`. Adding a runtime code also changes every
+`known_codes` golden and `ExampleBuildSchema`'s `// Output:` block; see
+`specs/033-register-error-codes/quickstart.md`.
+
 ### Mandatory Spec Kit Workflow
 
 For every feature governed by Spec Kit, especially a public API or
@@ -959,5 +981,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/032-known-config-codes/plan.md
+at specs/033-register-error-codes/plan.md
 <!-- SPECKIT END -->
