@@ -321,6 +321,10 @@ The operator was not available during this run. Each decision below takes the
 smallest additive option; the alternatives are recorded so the reviewer can
 overturn one before merge.
 
+**Operator review, 2026-10-11:** decisions 1 (exact-transliteration names) and
+4 (the broader guard) were confirmed explicitly. Decisions 2, 3, and 5 stand
+as written and are open to PR review.
+
 1. **Constant names.** The new constants transliterate the spelling exactly:
    `ErrorCodeConfirmationRequired`, `ErrorCodeInternalError`,
    `ErrorCodeValidationError`, `ErrorCodeInvalidSchemaDeclaration`, matching

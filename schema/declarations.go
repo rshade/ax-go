@@ -10,8 +10,6 @@ import (
 	internalschema "github.com/rshade/ax-go/internal/schema"
 )
 
-const invalidDeclarationCode = "invalid_schema_declaration"
-
 // Prompt is a static, server-vended workflow template declared on a command
 // with DeclarePrompt. It appears on its declaring command in __schema and in
 // the top-level prompts array of __schema --as=mcp.
@@ -134,7 +132,7 @@ func declarationError(kind internalschema.Kind, key string, violation *internals
 	// without I/O, so there is no caller context to carry a trace ID.
 	return contract.NewError(
 		context.Background(),
-		invalidDeclarationCode,
+		contract.ErrorCodeInvalidSchemaDeclaration,
 		fmt.Sprintf(
 			"invalid %s declaration %q: %s %s",
 			kind,

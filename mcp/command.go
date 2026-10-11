@@ -101,7 +101,7 @@ func parseTransport(ctx context.Context, value string) (mcpserver.Transport, err
 	case transportHTTPValue:
 		return mcpserver.TransportHTTP, nil
 	default:
-		return 0, contract.NewError(ctx, "validation_error",
+		return 0, contract.NewError(ctx, contract.ErrorCodeValidationError,
 			fmt.Sprintf("mcp: unknown transport %q (want stdio or http)", value),
 			contract.WithErrorExitCode(contract.ExitValidation))
 	}

@@ -428,7 +428,7 @@ func (d *dispatcher) runRecovered(
 		d.forwardStderr(errBuf.Bytes())
 		if r := recover(); r != nil {
 			outBuf.Reset()
-			runErr = contract.NewError(ctx, "internal_error",
+			runErr = contract.NewError(ctx, contract.ErrorCodeInternalError,
 				fmt.Sprintf("recovered panic during tool dispatch: %v", r),
 				contract.WithErrorExitCode(contract.ExitInternal))
 		}
@@ -484,7 +484,8 @@ func (d *dispatcher) errorResult(ctx context.Context, err error) *sdk.CallToolRe
 	axErr := d.toAxError(ctx, err)
 	payload, marshalErr := json.Marshal(axErr)
 	if marshalErr != nil {
-		payload = []byte(`{"error_code":"internal_error","message":"failed to marshal error envelope"}`)
+		payload = []byte(`{"error_code":"` + contract.ErrorCodeInternalError +
+			`","message":"failed to marshal error envelope"}`)
 	}
 	return &sdk.CallToolResult{
 		IsError: true,
@@ -507,7 +508,7 @@ func (d *dispatcher) toAxError(ctx context.Context, err error) *contract.Error {
 		}
 		return axErr
 	}
-	return contract.NewError(ctx, "internal_error", err.Error(),
+	return contract.NewError(ctx, contract.ErrorCodeInternalError, err.Error(),
 		contract.WithErrorTool(d.serverName),
 		contract.WithErrorVersion(d.version),
 		contract.WithErrorExitCode(contract.ErrorExitCode(err)),
@@ -516,7 +517,7 @@ func (d *dispatcher) toAxError(ctx context.Context, err error) *contract.Error {
 
 // validationError builds a validation envelope (exit 2) for bad input.
 func (d *dispatcher) validationError(ctx context.Context, message string) *contract.Error {
-	return contract.NewError(ctx, "validation_error", message,
+	return contract.NewError(ctx, contract.ErrorCodeValidationError, message,
 		contract.WithErrorTool(d.serverName),
 		contract.WithErrorVersion(d.version),
 		contract.WithErrorExitCode(contract.ExitValidation),

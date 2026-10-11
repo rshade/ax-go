@@ -179,6 +179,16 @@ local variable that shadows an import name, or a type other than
 closed (they report, they do not hide), except a shadowed import name, which
 no code in this module uses.
 
+**The pre-serialized fallback is outside the guard, by decision.** The MCP
+dispatcher's marshal-failure fallback (`internal/mcpserver/dispatch.go`, R1)
+writes envelope JSON as raw bytes, so no `NewError` call, `ErrorCode` field, or
+assignment exists for the guard to check, and recognizing codes inside string
+contents would mean parsing JSON out of arbitrary literals. The site is
+converted instead: the JSON is concatenated around
+`contract.ErrorCodeInternalError`, so its code cannot drift from the constant,
+and T016's spelling grep (which matches inside string literals) confirms no
+bare spelling remains. It is the only such site in library code.
+
 ## R5. What the guard excludes, and why
 
 | Path | Why |

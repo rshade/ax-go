@@ -530,9 +530,9 @@ func TestDeclareRejectsOversizedContentAndTemplate(t *testing.T) {
 			if err := tc.declare(); !errors.As(err, &envelope) {
 				t.Fatalf("declare error = %v, want *contract.Error", err)
 			}
-			if envelope.ErrorCode != invalidDeclarationCode || envelope.Context["field"] != tc.field ||
+			if envelope.ErrorCode != "invalid_schema_declaration" || envelope.Context["field"] != tc.field ||
 				envelope.Context["reason"] != "too_long" {
-				t.Fatalf("envelope = %+v, want %s too_long on %s", envelope, invalidDeclarationCode, tc.field)
+				t.Fatalf("envelope = %+v, want %s too_long on %s", envelope, "invalid_schema_declaration", tc.field)
 			}
 			if !strings.Contains(envelope.ActionableFix, tc.fixHas) {
 				t.Fatalf("actionable_fix = %q, want it to name %q", envelope.ActionableFix, tc.fixHas)
