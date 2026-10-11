@@ -1,5 +1,33 @@
 # Changelog
 
+## [0.10.0](https://github.com/rshade/ax-go/compare/v0.9.0...v0.10.0) (2026-10-11)
+
+
+### Added
+
+* **contract:** list the config package's runtime codes in known_codes ([b639b94](https://github.com/rshade/ax-go/commit/b639b943bffe2b4482087e38ec46659c8c6a066a)), closes [#284](https://github.com/rshade/ax-go/issues/284)
+* **gates:** add slopcheck unread struct-field gate ([991c37a](https://github.com/rshade/ax-go/commit/991c37afbef5faf649919cde31b7eb13badb63d1)), closes [#232](https://github.com/rshade/ax-go/issues/232)
+
+
+### Fixed
+
+* **deps:** require Go 1.27.2 and golang.org/x/net v0.60.0 ([9cb3bd8](https://github.com/rshade/ax-go/commit/9cb3bd8609bff825ee1c6ec87a2c199ab5160005))
+* **deps:** update dependency starlight-links-validator to ^0.27.0 ([4b50059](https://github.com/rshade/ax-go/commit/4b50059ad97cfa20ba28cbd767fab4b037f480d6))
+* **deps:** update golang.org/x/perf digest to be2c69f ([a410085](https://github.com/rshade/ax-go/commit/a410085d7df9cbd93458363f0483aec30748f6e6))
+* **deps:** update module golang.org/x/tools to v0.51.0 ([7877267](https://github.com/rshade/ax-go/commit/78772676fb11ddbe14feb2694609adfd214b4cf7))
+* **deps:** update module golang.org/x/tools to v0.52.0 ([5640fac](https://github.com/rshade/ax-go/commit/5640fac3d83753f99b5c1dba2549af1be89fe2d0))
+* **gates:** close slopcheck false findings raised in PR review ([b209f4f](https://github.com/rshade/ax-go/commit/b209f4fd343da9183abcb3cd3d20e70d051affbd))
+
+
+### Documentation
+
+* **roadmap:** sync ROADMAP.md and labels with GitHub state ([2265c91](https://github.com/rshade/ax-go/commit/2265c91be0ee3e403fa6d2a158dac4fbd5e131ff))
+* **spec:** add feature specification ([57cbd5c](https://github.com/rshade/ax-go/commit/57cbd5cc225cf4fa9254b1db37f1fec94a657f6b))
+* **spec:** add implementation plan ([5659dcc](https://github.com/rshade/ax-go/commit/5659dccf5d0236e0d991ca87f5b425faff6db69e))
+* **spec:** add task breakdown ([3bc83d3](https://github.com/rshade/ax-go/commit/3bc83d3c0318bed8a23edf5d9060ee94a5ae4d01))
+* **spec:** align spec 032 docs with the shipped audit scope and tests ([906d2b7](https://github.com/rshade/ax-go/commit/906d2b7e8e276e4bfe69de759ed9fc0425e89b22))
+* **spec:** complete the spec 032 emit-site survey ([354b0c9](https://github.com/rshade/ax-go/commit/354b0c944ecdafa82e32fae4204fa4e5ea5e3c93))
+
 ## [0.9.0](https://github.com/rshade/ax-go/compare/v0.8.0...v0.9.0) (2026-10-08)
 
 
