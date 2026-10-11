@@ -104,7 +104,7 @@ func (v *enumValue) rejection() error {
 	}
 	return contract.NewError(
 		context.Background(),
-		"validation_error",
+		contract.ErrorCodeValidationError,
 		"flag --"+name+": value is not one of the allowed values",
 		contract.WithErrorExitCode(contract.ExitValidation),
 		contract.WithErrorContext(map[string]any{"flag": name, "allowed": slices.Clone(v.allowed)}),

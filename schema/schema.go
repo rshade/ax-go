@@ -171,7 +171,7 @@ func NewSchemaCommand(root *cobra.Command, opts ...Option) *cobra.Command {
 			default:
 				return contract.NewError(
 					cmd.Context(),
-					"validation_error",
+					contract.ErrorCodeValidationError,
 					fmt.Sprintf("unknown schema format %q", as),
 					contract.WithErrorExitCode(contract.ExitValidation),
 				)

@@ -44,12 +44,12 @@ func assertDeclarationError(t *testing.T, err error, field, reason string) {
 	if !ok {
 		t.Fatalf("error = %T %v, want *contract.Error", err, err)
 	}
-	if contractErr.ErrorCode != invalidDeclarationCode || contractErr.ExitCode() != contract.ExitValidation {
+	if contractErr.ErrorCode != "invalid_schema_declaration" || contractErr.ExitCode() != contract.ExitValidation {
 		t.Fatalf(
 			"error = %q exit %d, want %s exit 2",
 			contractErr.ErrorCode,
 			contractErr.ExitCode(),
-			invalidDeclarationCode,
+			"invalid_schema_declaration",
 		)
 	}
 	want := map[string]any{"field": field, "reason": reason}

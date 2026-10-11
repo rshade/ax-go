@@ -3,6 +3,8 @@ package ax
 import (
 	"context"
 	"fmt"
+
+	"github.com/rshade/ax-go/contract"
 )
 
 // ConfirmationOutcome is the caller-visible result of a confirmation gate.
@@ -34,7 +36,7 @@ func Confirm(ctx context.Context, subject string) (ConfirmationOutcome, error) {
 	}
 	return ConfirmationBlocked, NewError(
 		ctx,
-		"confirmation_required",
+		contract.ErrorCodeConfirmationRequired,
 		fmt.Sprintf("confirmation required: %s", subject),
 		WithActionableFix("pass --yes to confirm this operation"),
 		WithErrorExitCode(ExitValidation),
