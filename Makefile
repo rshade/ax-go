@@ -1,4 +1,4 @@
-# Go, golangci-lint, actionlint, govulncheck, and deadcode versions are pinned once in
+# Go, golangci-lint, actionlint, govulncheck, deadcode, and NilAway versions are pinned once in
 # mise.toml (see the ensure-mise-tools target); these vars only override where
 # the resulting binaries are found. GOLANGCI_LINT_VERSION is read back out of
 # mise.toml rather than duplicated here, so the `lint` target's version guard
@@ -176,6 +176,21 @@ slop:
 		if [ $$status -eq 0 ] || [ $$status -eq 1 ]; then exit 0; fi; \
 		exit $$status
 
+# NilAway is a report, not a CI gate. Run the default build and the build with
+# both optional dependency trees declined. The pinned mise binary is used so a
+# PATH copy cannot change the finding set. singlechecker exits 3 for findings.
+.PHONY: nilaway-sweep
+nilaway-sweep:
+	@command -v mise >/dev/null 2>&1 || (echo "mise not found. Install: https://mise.jdx.dev/"; exit 1)
+	@for tags in none ax_no_grpc,ax_no_otlp; do \
+		echo "==> NilAway ($$tags)"; \
+		go_flags=""; \
+		if [ "$$tags" != "none" ]; then go_flags="-tags=$$tags"; fi; \
+		GOFLAGS="$$go_flags" mise exec -- nilaway -include-pkgs=github.com/rshade/ax-go ./...; \
+		status=$$?; \
+		if [ $$status -ne 0 ] && [ $$status -ne 3 ]; then exit $$status; fi; \
+	done
+
 # clone-report is not a member of ci. dupl is pinned in mise.toml and run
 # through mise exec so a PATH binary cannot win. -t 100 is where
 # table-driven similarity stops dominating. -plumbing prints each pair
@@ -288,7 +303,7 @@ security:
 ensure: ensure-mise-tools
 	@echo "All dev tools are ready."
 
-# Go, golangci-lint, actionlint, govulncheck, deadcode, dupl, go-apidiff, and
+# Go, golangci-lint, actionlint, govulncheck, deadcode, dupl, NilAway, go-apidiff, and
 # markdownlint-cli are all pinned in mise.toml;
 # `mise install` puts every one of them on PATH via shims at the exact
 # version CI uses (.github/workflows/*.yml via jdx/mise-action). Bumping a
@@ -296,7 +311,7 @@ ensure: ensure-mise-tools
 # and every workflow file.
 .PHONY: ensure-mise-tools
 ensure-mise-tools:
-	@echo "==> Go, golangci-lint, actionlint, govulncheck, deadcode, dupl, go-apidiff, markdownlint-cli (pinned in mise.toml)"
+	@echo "==> Go, golangci-lint, actionlint, govulncheck, deadcode, dupl, NilAway, go-apidiff, markdownlint-cli (pinned in mise.toml)"
 	@command -v mise >/dev/null 2>&1 || \
 		(echo "    mise not found. Install: https://mise.jdx.dev/installing-mise.html"; exit 1)
 	mise install
@@ -326,6 +341,7 @@ help:
 	@echo "  dead-check    - Gate unreachable unexported/internal functions across build tags (tests included)"
 	@echo "  slop-check    - Gate struct fields assigned in literals but never read across build tags (tests included)"
 	@echo "  slop          - Report assertion-free subtests (not part of ci; does not fail the build)"
+	@echo "  nilaway-sweep - Report interprocedural nil flows in default and minimal builds (not part of ci)"
 	@echo "  clone-report  - Report *_test.go clones at dupl -t 100 (not part of ci; does not fail the build)"
 	@echo "  lint          - Run golangci-lint per build-tag combination, markdownlint, actionlint"
 	@echo "  lint-actions  - Run actionlint on GitHub workflows"
