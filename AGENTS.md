@@ -230,6 +230,24 @@ pairs: root/subpackage facade tests, plus the array and map golden locator
 tests in `examples/integration/golden_test.go`. `.golangci.yml` still excludes
 `dupl` from test files; this target does not change that.
 
+### NilAway sweep
+
+Run `make nilaway-sweep` monthly. It uses the exact NilAway pseudo-version
+pinned as `go:go.uber.org/nilaway/cmd/nilaway` in [`mise.toml`](mise.toml),
+through `mise exec`, over the whole module in the default build and with both
+`ax_no_grpc` and `ax_no_otlp` set. Run `mise install` first on a clean clone.
+The command is a human-readable report, not a `make ci` gate; findings do not
+fail the target. Record complete output, wall time, and peak memory in the
+sweep issue, and triage each finding as a real bug, false positive with a
+reason, or unclear with the evidence needed to decide. File real bugs
+separately.
+
+To bump NilAway, change only its exact pseudo-version in `mise.toml`, run
+`mise install`, repeat the sweep, and compare the findings before accepting
+the new pin. Never use `@latest` in a checked-in command. A clean sweep only
+shows that NilAway found no modeled flows in these two build configurations;
+it does not prove exported APIs safe against nil input from downstream callers.
+
 ### Internal Reachability Gate
 
 Run `make dead-check` before handing work back. It is included in `make ci`
@@ -342,7 +360,7 @@ explicitly requested only one artifact or stage. `speckit-clarify` is
 conditional on material ambiguity; `speckit-analyze` is always required after
 task generation and before implementation.
 
-Go, golangci-lint, actionlint, govulncheck, deadcode, dupl, go-apidiff, and
+Go, golangci-lint, actionlint, govulncheck, deadcode, dupl, NilAway, go-apidiff, and
 markdownlint-cli are pinned once in [`mise.toml`](mise.toml) — the single
 source of truth CI reads via `mise install`. Do not repeat a version in a
 workflow, the Makefile, or prose; read it from `mise.toml`. Run `make ensure` (requires [mise](https://mise.jdx.dev/))
