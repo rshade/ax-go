@@ -9,4 +9,4 @@ actionlint = "1.7.12"
 "pipx:specify-cli" = "1.2.1"
 node = "24"
 # Installed through node's npm backend. `make lint-markdown` and CI both run it.
-"npm:markdownlint-cli" = "0.49.1"
+"npm:markdownlint-cli" = "0.50.0"
