@@ -100,7 +100,9 @@ func serveOnListener(ctx context.Context, server *sdk.Server, listener net.Liste
 			// Serve returns and the engine stops.
 			_ = httpServer.Close()
 		}
-		<-serveErr
+		if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
+			return fmt.Errorf("mcp: http transport: %w", err)
+		}
 		return nil
 	case err := <-serveErr:
 		if errors.Is(err, http.ErrServerClosed) {
