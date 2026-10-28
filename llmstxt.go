@@ -46,9 +46,10 @@ type llmsConfig struct {
 	links    []LinkSection
 }
 
-// WithPreamble sets the curated opening. It must begin with a title line and
-// contain a later summary quote. A later WithPreamble or WithPreambleFile
-// replaces this value.
+// WithPreamble sets the curated opening. The first non-empty line must be a
+// Markdown title (`# ` followed by text) and a later line must be a summary
+// quote (`> ` followed by text). A marker with no text is a validation error.
+// A later WithPreamble or WithPreambleFile replaces this value.
 func WithPreamble(text string) LLMsTxtOption {
 	return func(cfg *llmsConfig) {
 		cfg.preamble = text
@@ -57,9 +58,11 @@ func WithPreamble(text string) LLMsTxtOption {
 	}
 }
 
-// WithPreambleFile reads the curated opening from path. The read is capped at
-// DefaultMaxConfigBytes (1 MiB). A larger file, a missing file, or a cancelled
-// context fails with validation_error (exit 2) and writes nothing. A later
+// WithPreambleFile reads the curated opening from path. The read stops after
+// DefaultMaxConfigBytes (1 MiB) plus one byte, so a file that grows past the
+// cap is rejected instead of published as a prefix. A larger file, a missing
+// file, or a cancelled context fails with validation_error (exit 2) and writes
+// nothing. An unreadable file keeps the underlying error as the cause. A later
 // opening option replaces this value.
 func WithPreambleFile(path string) LLMsTxtOption {
 	return func(cfg *llmsConfig) {
@@ -178,19 +181,18 @@ func readPreamble(ctx context.Context, path string) (string, error) {
 	}
 	file, err := os.Open(path)
 	if err != nil {
-		return "", llmsValidation(ctx, "curated opening file is not readable")
+		return "", llmsValidation(ctx, "curated opening file is not readable", contract.WithErrorCause(err))
 	}
 	defer file.Close()
-	info, err := file.Stat()
+
+	// Count bytes actually read. A size check before the read would publish a
+	// prefix when the file grows past the cap between the two calls.
+	buf, err := io.ReadAll(io.LimitReader(file, DefaultMaxConfigBytes+1))
 	if err != nil {
-		return "", llmsValidation(ctx, "curated opening file is not readable")
+		return "", llmsValidation(ctx, "curated opening file is not readable", contract.WithErrorCause(err))
 	}
-	if info.Size() > DefaultMaxConfigBytes {
+	if int64(len(buf)) > DefaultMaxConfigBytes {
 		return "", llmsValidation(ctx, "curated opening file exceeds 1 MiB")
-	}
-	buf := make([]byte, info.Size())
-	if _, readErr := io.ReadFull(file, buf); readErr != nil {
-		return "", llmsValidation(ctx, "curated opening file is not readable")
 	}
 	return string(buf), nil
 }
@@ -203,13 +205,15 @@ func validOpening(text string) bool {
 			continue
 		}
 		if !sawTitle {
-			if !strings.HasPrefix(line, "# ") {
+			title, ok := strings.CutPrefix(line, "# ")
+			if !ok || strings.TrimSpace(title) == "" {
 				return false
 			}
 			sawTitle = true
 			continue
 		}
-		if strings.HasPrefix(line, "> ") {
+		summary, ok := strings.CutPrefix(line, "> ")
+		if ok && strings.TrimSpace(summary) != "" {
 			return true
 		}
 	}
@@ -284,16 +288,16 @@ func writeFlag(doc *strings.Builder, flag schema.Flag) {
 		writef(doc, ": %s", usage)
 	}
 	if flag.Default != "" {
-		writef(doc, ". Default: `%s`", oneLine(flag.Default))
+		writef(doc, ". Default: `%s`", literalLine(flag.Default))
 	}
 	if len(flag.Enum) > 0 {
 		quoted := make([]string, len(flag.Enum))
 		for i, value := range flag.Enum {
-			quoted[i] = "`" + oneLine(value) + "`"
+			quoted[i] = "`" + literalLine(value) + "`"
 		}
 		writef(doc, ". Values: %s", strings.Join(quoted, ", "))
 	}
-	if example := oneLine(flag.Example); example != "" {
+	if example := literalLine(flag.Example); example != "" {
 		writef(doc, ". Example: `%s`", example)
 	}
 	doc.WriteString(".\n")
@@ -317,7 +321,14 @@ func oneLine(text string) string {
 	return strings.Join(strings.Fields(text), " ")
 }
 
-func llmsValidation(ctx context.Context, message string) error {
-	return contract.NewError(ctx, contract.ErrorCodeValidationError, message,
-		contract.WithErrorExitCode(contract.ExitValidation))
+// literalLine keeps a flag default, enum member, or example exact apart from
+// line breaks. A string enum matches the declared text, including internal
+// spaces, and a line break cannot sit inside one list item.
+func literalLine(text string) string {
+	return strings.NewReplacer("\r\n", " ", "\n", " ", "\r", " ").Replace(text)
+}
+
+func llmsValidation(ctx context.Context, message string, opts ...contract.ErrorOption) error {
+	opts = append([]contract.ErrorOption{contract.WithErrorExitCode(contract.ExitValidation)}, opts...)
+	return contract.NewError(ctx, contract.ErrorCodeValidationError, message, opts...)
 }

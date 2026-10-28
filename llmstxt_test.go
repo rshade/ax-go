@@ -67,11 +67,12 @@ func TestGenerateLLMsTxtValidation(t *testing.T) {
 	copy(exact, []byte("# Tool\n\n> Summary.\n"))
 
 	tests := []struct {
-		name    string
-		build   func(t *testing.T) (context.Context, io.Writer, *cobra.Command, []LLMsTxtOption)
-		wantLit string
-		wantIs  error
-		empty   bool
+		name      string
+		build     func(t *testing.T) (context.Context, io.Writer, *cobra.Command, []LLMsTxtOption)
+		wantLit   string
+		wantIs    error
+		wantCause error
+		empty     bool
 	}{
 		{
 			name:    "missing opening",
@@ -103,9 +104,30 @@ func TestGenerateLLMsTxtValidation(t *testing.T) {
 			},
 		},
 		{
-			name:    "missing file",
+			name:    "title marker without text",
 			wantLit: "validation_error",
 			empty:   true,
+			build: func(t *testing.T) (context.Context, io.Writer, *cobra.Command, []LLMsTxtOption) {
+				t.Helper()
+				return context.Background(), &bytes.Buffer{}, discoveryTree(t),
+					[]LLMsTxtOption{WithPreamble("# \n\n> Summary.\n")}
+			},
+		},
+		{
+			name:    "summary marker without text",
+			wantLit: "validation_error",
+			empty:   true,
+			build: func(t *testing.T) (context.Context, io.Writer, *cobra.Command, []LLMsTxtOption) {
+				t.Helper()
+				return context.Background(), &bytes.Buffer{}, discoveryTree(t),
+					[]LLMsTxtOption{WithPreamble("# Title\n\n> \t\n")}
+			},
+		},
+		{
+			name:      "missing file",
+			wantLit:   "validation_error",
+			wantCause: os.ErrNotExist,
+			empty:     true,
 			build: func(t *testing.T) (context.Context, io.Writer, *cobra.Command, []LLMsTxtOption) {
 				t.Helper()
 				return context.Background(), &bytes.Buffer{}, discoveryTree(t),
@@ -239,7 +261,37 @@ func TestGenerateLLMsTxtValidation(t *testing.T) {
 			if got.ExitCode() != 2 {
 				t.Fatalf("exit = %d, want 2", got.ExitCode())
 			}
+			if tc.wantCause != nil && !errors.Is(err, tc.wantCause) {
+				t.Fatalf("cause = %v, want %v", err, tc.wantCause)
+			}
 		})
+	}
+}
+
+func TestGenerateLLMsTxtPreservesLiteralWhitespace(t *testing.T) {
+	root := &cobra.Command{Use: "tool", Short: "short"}
+	root.Flags().String("mode", "a  b", "pick\ta mode")
+	if err := DeclareFlagEnum(root, "mode", "a  b", "keep\tme"); err != nil {
+		t.Fatalf("DeclareFlagEnum: %v", err)
+	}
+	if err := DeclareFlagExample(root, "mode", "a  b"); err != nil {
+		t.Fatalf("DeclareFlagExample: %v", err)
+	}
+
+	var buf bytes.Buffer
+	if err := GenerateLLMsTxt(context.Background(), &buf, root, WithPreamble("# Tool\n\n> Summary.\n")); err != nil {
+		t.Fatalf("GenerateLLMsTxt: %v", err)
+	}
+	got := buf.String()
+	for _, want := range []string{
+		"pick a mode",
+		"Default: `a  b`",
+		"Values: `a  b`, `keep\tme`",
+		"Example: `a  b`",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("document missing %q\n%s", want, got)
+		}
 	}
 }
 

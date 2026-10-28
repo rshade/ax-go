@@ -9,7 +9,7 @@ GenerateLLMsTxt(ctx, destination, commandTree, options...) error
 Options:
 
 - Opening text.
-- Opening file path. Read cap is 1 MiB. The later opening option replaces the earlier one.
+- Opening file path. The read counts at most 1 MiB plus one byte. The later opening option replaces the earlier one.
 - Link sections, in author order.
 
 `ctx` is checked before the file read and before the write. A cancelled context returns that error and writes nothing.
@@ -18,8 +18,8 @@ Validation failures return the shared validation error code and write nothing:
 
 - Missing destination or missing command tree.
 - No opening.
-- Opening whose first non-empty line is not a title, or that has no summary quote.
-- Opening file missing or larger than 1 MiB.
+- Opening whose title line or summary quote has no text.
+- Opening file missing, unreadable, or larger than 1 MiB. An unreadable file keeps the file error as the cause.
 - A link section with an empty heading or no links.
 
 Any other failure, including a destination write error, is returned as-is. The function does not panic.
@@ -29,35 +29,35 @@ Any other failure, including a destination write error, is returned as-is. The f
 1. The curated opening, unchanged.
 2. A blank line, then each link section:
 
-```text
-## Heading
+   ```text
+   ## Heading
 
-- [title](url): notes
-```
+   - [title](url): notes
+   ```
 
-The `: notes` suffix is omitted when notes are empty.
+   The `: notes` suffix is omitted when notes are empty.
 
 3. A blank line, then the generated reference:
 
-```text
-## Commands
+   ```text
+   ## Commands
 
-Generated from the live command tree.
+   Generated from the live command tree.
 
-### command path
+   ### command path
 
-short description
+   short description
 
-long description
+   long description
 
-Examples:
+   Examples:
 
-    example text
+       example text
 
-- `--name`, `-s` (type, required): usage. Default: `value`. Values: `a`, `b`. Example: `sample`.
-```
+   - `--name`, `-s` (type, required): usage. Default: `value`. Values: `a`, `b`. Example: `sample`.
+   ```
 
-Lines that do not apply are omitted. Reflected text has newlines collapsed to spaces. Command paths and flag names are lexicographic. Two calls with the same inputs return the same bytes.
+Lines that do not apply are omitted. Reflected prose has newlines folded to spaces. Flag defaults, enum members, and examples replace only line breaks. Command paths and flag names are lexicographic. Two calls with the same inputs return the same bytes.
 
 ## Non-contract
 

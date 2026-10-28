@@ -84,10 +84,18 @@ Generate the static discovery document and commit it with this example.
 `--idempotency-key` when the command runs, so `TestLLMsTxt` adds those flags
 before it calls `ax.GenerateLLMsTxt`. The generator does not see flags that
 are not on the tree it is given. `__schema` and `mcp-server` stay out of the
-document. Publication stays with the command that owns the tree:
+document. Publication stays with the command that owns the tree.
+
+Check the committed file:
 
 ```sh
 go test ./examples/integration -run TestLLMsTxt -count=1
+```
+
+Regenerate `llms.txt` after the command tree changes:
+
+```sh
+go test ./examples/integration -run TestLLMsTxt -update
 ```
 
 `llms.preamble.md` is the curated opening. `llms.txt` is the committed result.

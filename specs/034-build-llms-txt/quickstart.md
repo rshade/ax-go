@@ -30,8 +30,9 @@ More introduction, optional.
 
 In this repository the integration example is the consumer. From the module
 root, `go test ./examples/integration -run TestLLMsTxt -count=1` checks
-`examples/integration/llms.txt` against a fresh generation. Update the
-committed file in the same change as the command tree when that test fails.
+`examples/integration/llms.txt` against a fresh generation. Regenerate that
+file with `go test ./examples/integration -run TestLLMsTxt -update`, then
+commit it in the same change as the command tree.
 
 Do not add `__schema --as=llms-txt`. Agents that can execute the binary keep
 using `__schema`.

@@ -18,17 +18,17 @@
 
 ## R3: Missing opening is a validation error
 
-**Decision**: No opening, an opening that lacks a title line or a summary quote, a missing file, and a file larger than `config.DefaultMaxBytes` (1 MiB) return `*contract.Error` with `contract.ErrorCodeValidationError` and write zero bytes. An opening of exactly 1 MiB is accepted. The last preamble option wins.
+**Decision**: No opening, an opening whose title line or summary quote has no text, a missing or unreadable file, and a file larger than `config.DefaultMaxBytes` (1 MiB) return `*contract.Error` with `contract.ErrorCodeValidationError` and write zero bytes. The size check counts bytes read, up to the cap plus one, so a file that grows during the read is still rejected. An unreadable file keeps that error as the cause. An opening of exactly 1 MiB is accepted. The last preamble option wins.
 
-**Rationale**: The issue says not to emit a degenerate file. A warning that still wrote bytes would be that failure. Reusing `validation_error` avoids a new `known_codes` entry and the golden churn that comes with one. `contract.NewError` keeps the code registry's source walk happy.
+**Rationale**: The issue says not to emit a degenerate file. A warning that still wrote bytes would be that failure. Reusing `validation_error` avoids a new `known_codes` entry and the golden churn that comes with one. `contract.NewError` keeps the code registry's source walk happy. The cause stays off the JSON envelope and lets the caller use `errors.Is`.
 
 **Alternatives considered**: A new `llms_txt_invalid` code. Rejected. It would change every `known_codes` golden for a build-time authoring mistake. A stderr warning plus a written file. Rejected by FR-008.
 
 ## R4: Document shape
 
-**Decision**: The opening is inserted unchanged after validation. Each `LinkSection` becomes an H2 and a list of `- [title](url): notes`, notes omitted when empty, author order preserved. The generated section is `## Commands`, introduced by one fixed sentence, then an H3 per command path. Flags are one list item each. Newlines and carriage returns in reflected text are replaced with a single space.
+**Decision**: The opening is inserted unchanged after validation. Each `LinkSection` becomes an H2 and a list of `- [title](url): notes`, notes omitted when empty, author order preserved. The generated section is `## Commands`, introduced by one fixed sentence, then an H3 per command path. Flags are one list item each. Newlines and carriage returns in reflected prose are folded into a single space. A flag default, an enum member, and a flag example replace only line breaks, so spaces and tabs inside those literals stay exact.
 
-**Rationale**: The llms.txt shape needs the title and the blockquote from the author, then H2 link groups. Collapsing newlines keeps one flag on one line so a usage string cannot break the list. The fixed sentence tells a reader the following section is generated.
+**Rationale**: The llms.txt shape needs the title and the blockquote from the author, then H2 link groups. Folding newlines keeps one flag on one line so a usage string cannot break the list. A string enum matches the declared text exactly, so folding spaces inside a member would document a value the flag rejects. The fixed sentence tells a reader the following section is generated.
 
 **Alternatives considered**: Sorting curated links. Rejected. FR-010 keeps author order. Emitting `llms-full.txt`. Rejected. FR-014.
 
