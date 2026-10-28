@@ -230,6 +230,29 @@ pairs: root/subpackage facade tests, plus the array and map golden locator
 tests in `examples/integration/golden_test.go`. `.golangci.yml` still excludes
 `dupl` from test files; this target does not change that.
 
+### Mutation sweep
+
+Run `make mutation-sweep` monthly, alongside the NilAway sweep. It runs
+`gremlins` (pinned in [`mise.toml`](mise.toml), run through `mise exec`) with
+every mutator enabled over `internal/logcore`, `internal/mcp`, and
+`internal/cli` — the high-floor packages — in the default build, without
+`-race`, one worker, `--timeout-coefficient 30`. It is a report, never a
+`make ci` gate: findings do not fail the target.
+
+Coverage counts execution, not assertion; a surviving mutant is the only
+direct measurement of the difference. Triage every survivor as a real
+assertion gap, an equivalent mutant, or tool noise, and never report a bare
+score. File each real gap as its own issue with `file:line`; do not fix it in
+the sweep issue, and do not lower a coverage floor because of what the sweep
+finds. A `TIMED OUT` result means the host was loaded, not that the mutant was
+caught: rerun it before counting it.
+
+Baseline 2026-10-27, `internal/logcore` only: 14 of 16 mutants killed, 0 real
+gaps. Both survivors were equivalent (`logcore.go:161:30` `> 0` to `>= 0`,
+`logcore.go:143:46` `&&` to `||`). The run took about 6 s. The tool reports its
+version as `dev` and is lightly maintained; if it stops building on a new Go,
+drop it rather than carry a fork.
+
 ### NilAway sweep
 
 Run `make nilaway-sweep` monthly. It uses the exact NilAway pseudo-version

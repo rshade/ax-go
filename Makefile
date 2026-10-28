@@ -191,6 +191,24 @@ nilaway-sweep:
 		if [ $$status -ne 0 ] && [ $$status -ne 3 ]; then exit $$status; fi; \
 	done
 
+# Mutation testing is a report, not a CI gate: runtime scales with suite time
+# times mutant count and gremlins is lightly maintained. The pinned mise binary
+# is used so a PATH copy cannot change the result. One worker and a large
+# timeout coefficient are deliberate: parallel workers on a loaded host turn
+# killed mutants into false TIMED OUT results. Default build, no -race, no tag
+# matrix. Override the package list with MUTATION_PKGS="./internal/logcore".
+MUTATION_PKGS?=./internal/logcore ./internal/mcp ./internal/cli
+.PHONY: mutation-sweep
+mutation-sweep:
+	@command -v mise >/dev/null 2>&1 || (echo "mise not found. Install: https://mise.jdx.dev/"; exit 1)
+	@for pkg in $(MUTATION_PKGS); do \
+		echo "==> gremlins $$pkg"; \
+		mise exec -- gremlins unleash --workers 1 --timeout-coefficient 30 \
+			--invert-assignments --invert-bitwise --invert-bwassign \
+			--invert-logical --invert-loopctrl --remove-self-assignments \
+			"$$pkg" || exit $$?; \
+	done
+
 # clone-report is not a member of ci. dupl is pinned in mise.toml and run
 # through mise exec so a PATH binary cannot win. -t 100 is where
 # table-driven similarity stops dominating. -plumbing prints each pair
