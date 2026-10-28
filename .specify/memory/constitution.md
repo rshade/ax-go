@@ -6,8 +6,9 @@ Bump rationale: Materially expanded Principle III. No principle was added,
 removed, or redefined, so MINOR (materially expanded guidance) matches the
 1.1.0 precedent. Issue #29 asked for an ADR choosing whether ax-go emits a
 static llms.txt or delegates it. New ADRs are forbidden. The decision is
-recorded here instead: runtime discovery stays __schema JSON and
-__schema --as=mcp; a static llms.txt is a documentation artifact the library
+recorded here instead: the __schema command stays JSON and
+__schema --as=mcp, while live mcp-server discovery (tools/list, prompts/list,
+resources/list) remains; a static llms.txt is a documentation artifact the library
 may generate at build time from the same reflection; the adopting CLI
 publishes the file. The generator itself remains issue #32 and is not shipped
 by this amendment.
@@ -170,9 +171,12 @@ flows.
 - A `__schema --as=mcp` adapter MUST emit MCP-tool-compatible output.
 - `__schema` output and the `ax.Error` envelope are public API and MUST be guarded
   by golden-file tests.
-- Runtime machine discovery is those two projections only. ax-go MUST NOT add a
+- Those two projections are the whole `__schema` command. ax-go MUST NOT add a
   runtime `__schema --as=llms-txt` adapter, a `__llms` command, or any other path
-  that writes a static discovery document onto the `__schema` stdout lane.
+  that writes a static discovery document onto the `__schema` stdout lane. Live
+  MCP discovery through `mcp-server` (`tools/list`, `prompts/list`,
+  `resources/list`) remains a supported runtime surface and is not a third
+  `__schema` projection.
 - A static `llms.txt` file (the llmstxt.org fetch-before-run document), when
   ax-go produces one, MUST be produced by a build-time library function over the
   same command reflection as `__schema`. That output MUST be byte-identical for
@@ -180,8 +184,10 @@ flows.
   contract. Publishing and serving the file belongs to the adopting CLI.
 
 **Rationale**: Agents that can execute the binary ground themselves on
-`__schema` JSON, which is stricter than prose, and an ax-go CLI can be wrapped
-as an MCP server with no per-tool work. Agents that only fetch a repository
+`__schema` JSON, which is stricter than prose. An ax-go CLI can also be wrapped
+as a live MCP server, whose `tools/list`, `prompts/list`, and `resources/list`
+responses are discovery in their own right and are not a third `__schema`
+projection. Agents that only fetch a repository
 still need a static document, and a hand-maintained copy drifts from the
 command tree. Keeping generation in the library and publication in the
 adopting CLI serves both without turning markdown into a second runtime

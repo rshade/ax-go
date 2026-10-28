@@ -20,8 +20,8 @@ adopting tool inherits them for free:
 
 - Stream separation (machine payload on `stdout`, everything else on `stderr`).
 - Deterministic exit codes and a uniform `ax.Error` envelope.
-- Machine discoverability via `__schema` (ax-native JSON and MCP). A static
-  `llms.txt` is not a third runtime format.
+- Machine discoverability via `__schema` (ax-native JSON and MCP) and via the
+  live `mcp-server` lists. A static `llms.txt` is not another `__schema` format.
 - Agent-safety primitives: `--idempotency-key`, `--dry-run`, output-mode
   resolution.
 - Observability wiring (OpenTelemetry trace context, structured logging) that
