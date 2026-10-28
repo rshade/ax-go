@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.0](https://github.com/rshade/ax-go/compare/v0.10.0...v0.11.0) (2026-10-28)
+
+
+### Added
+
+* generate a build-time llms.txt document ([#321](https://github.com/rshade/ax-go/issues/321)) ([7ab4f4f](https://github.com/rshade/ax-go/commit/7ab4f4f079ad0505bc375c705a7ffffd1ffe084e)), closes [#32](https://github.com/rshade/ax-go/issues/32)
+
 ## [0.10.0](https://github.com/rshade/ax-go/compare/v0.9.0...v0.10.0) (2026-10-28)
 
 
