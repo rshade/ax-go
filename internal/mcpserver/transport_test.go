@@ -2,8 +2,10 @@ package mcpserver
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
+	"net/http"
 	"os"
 	"testing"
 	"time"
@@ -191,5 +193,37 @@ func TestServedSurfacesNeverWriteProcessStdout(t *testing.T) {
 	}
 	if len(leaked) != 0 {
 		t.Fatalf("process stdout received %d bytes: %.200s", len(leaked), leaked)
+	}
+}
+
+func TestAwaitServeExit(t *testing.T) {
+	errBoom := errors.New("boom")
+	tests := []struct {
+		name    string
+		sent    error
+		wantNil bool
+		wantIs  error
+	}{
+		{name: "nil is clean shutdown", sent: nil, wantNil: true},
+		{name: "ErrServerClosed is clean shutdown", sent: http.ErrServerClosed, wantNil: true},
+		{name: "unexpected error propagates", sent: errBoom, wantIs: errBoom},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			serveErr := make(chan error)
+			go func() { serveErr <- tc.sent }()
+
+			got := awaitServeExit(serveErr)
+
+			if tc.wantNil {
+				if got != nil {
+					t.Fatalf("awaitServeExit() = %v, want nil", got)
+				}
+				return
+			}
+			if !errors.Is(got, tc.wantIs) {
+				t.Fatalf("awaitServeExit() = %v, want errors.Is %v", got, tc.wantIs)
+			}
+		})
 	}
 }

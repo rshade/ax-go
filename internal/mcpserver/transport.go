@@ -100,16 +100,25 @@ func serveOnListener(ctx context.Context, server *sdk.Server, listener net.Liste
 			// Serve returns and the engine stops.
 			_ = httpServer.Close()
 		}
-		if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("mcp: http transport: %w", err)
-		}
-		return nil
+		return awaitServeExit(serveErr)
 	case err := <-serveErr:
 		if errors.Is(err, http.ErrServerClosed) {
 			return nil
 		}
 		return fmt.Errorf("mcp: http transport: %w", err)
 	}
+}
+
+// awaitServeExit blocks for the Serve goroutine's result after shutdown. A
+// clean http.ErrServerClosed is success; any other error is returned wrapped
+// with %w so errors.Is still reaches it. It is a separate function because
+// http.Server.Serve reports ErrServerClosed for every accept failure once
+// Shutdown has begun, so this branch cannot be reached through a live server.
+func awaitServeExit(serveErr <-chan error) error {
+	if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return fmt.Errorf("mcp: http transport: %w", err)
+	}
+	return nil
 }
 
 // isLoopbackHost reports whether host is a loopback bind target. An empty host
