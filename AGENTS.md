@@ -90,6 +90,16 @@ conflicts with the constitution, the constitution wins.
   per-flag `enum`/`example` and a per-command `capability` class once, with
   `DeclareFlagEnum`, `DeclareFlagExample`, and `DeclareCapability`; a declared enum is
   enforced in the flag's `Set` at parse time (exit 2, before `--dry-run`).
+- Static `llms.txt` is a documentation artifact, not a `__schema` projection
+  (Constitution Principle III, v1.3.0). Do not add `__schema --as=llms-txt`, a
+  `__llms` command, or any writer that puts that document on the `__schema`
+  stdout lane. That limit covers the `__schema` command only; `mcp-server`
+  still serves `tools/list`, `prompts/list`, and `resources/list`. When ax-go
+  generates the file, generation is a build-time
+  library function over the same reflection as `__schema`, byte-identical for
+  identical inputs. The adopting CLI publishes the file. The generator is
+  issue #32 and stays trigger-gated until a downstream consumer needs a
+  published file.
 - The `non_deterministic_fields` enumeration in `__schema` output is the
   authoritative source of truth for fields an agent may safely ignore when
   diffing two runs. Agents must not infer or maintain a separate mask list.

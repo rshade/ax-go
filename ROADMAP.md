@@ -119,8 +119,6 @@ issue-121-shipped` field is stale. Clear it before treating #137 as ready.
 ([`docs/src/content/docs/sources.md`](./docs/src/content/docs/sources.md)) —
 in-scope gaps that deepen the machine-contract half of AX.*
 
-- [ ] #29 Static agent-discovery artifact (`llms.txt`) — emit vs delegate [M] —
-  ADR decision on fetch-before-invoke discovery derived from `__schema`.
 - [ ] #32 Build-time `llms.txt` generation [L] — an exported
   `ax.GenerateLLMsTxt(...)` plus a `cmd/` docs tool that merge the reflected
   command/flag skeleton (the same reflection that powers `__schema`) with an
@@ -128,7 +126,9 @@ in-scope gaps that deepen the machine-contract half of AX.*
   not a new runtime machine format —
   `__schema` JSON + `--as=mcp` stay unchanged. Consensus of a `/decide` debate;
   deferred until the first real downstream consumer needs a published `llms.txt`.
-  Pairs with #29 (the emit-vs-delegate decision it implements).
+  Implements the emit-vs-delegate decision recorded by #29 in Constitution
+  Principle III (v1.3.0): the library owns generation, the adopting CLI owns
+  publication, and there is no runtime adapter.
 - [ ] #30 Envelope runtime trust signals [M] — `side_effects_performed`,
   `idempotency_replayed`, `requires_confirmation` (human handoff). Extends the
   now-shipped #13 `--dry-run` guards.
@@ -215,6 +215,11 @@ a runtime contract.*
 
 ### 2026-Q4
 
+- [x] #29 Static agent-discovery artifact (`llms.txt`) — emit vs delegate.
+  Decision recorded in Constitution Principle III (v1.3.0): build-time
+  generation stays in the library, publication stays with the adopting CLI,
+  and no runtime adapter is added. No ADR. The generator remains #32.
+  Recorded 2026-10-27. [M]
 - [x] #232 `slopcheck` gate for struct fields assigned but never read. Closed 2026-10-09. [M]
 - [x] #270 Live `mcp-server` serves declared prompts, resources, instructions. Closed 2026-10-08. [L]
 - [x] #28 Per-flag `__schema` enums, examples, and capability classes. Closed 2026-10-08. [M]

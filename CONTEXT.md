@@ -20,7 +20,8 @@ adopting tool inherits them for free:
 
 - Stream separation (machine payload on `stdout`, everything else on `stderr`).
 - Deterministic exit codes and a uniform `ax.Error` envelope.
-- Machine discoverability via `__schema` (ax-native and MCP variants).
+- Machine discoverability via `__schema` (ax-native JSON and MCP) and via the
+  live `mcp-server` lists. A static `llms.txt` is not another `__schema` format.
 - Agent-safety primitives: `--idempotency-key`, `--dry-run`, output-mode
   resolution.
 - Observability wiring (OpenTelemetry trace context, structured logging) that
@@ -127,6 +128,11 @@ omissions are decisions, not oversights:
 - **Preference learning / inference.** Stateful and domain-specific; delegated.
 - **Natural-language intent parsing.** The agent forms intent; `ax-go` is the
   deterministic, typed tool the agent *calls* after intent is formed.
+- **Publishing a static `llms.txt`.** Fetch-before-run prose (llmstxt.org) is a
+  documentation artifact. Constitution Principle III assigns generation, when
+  a generator exists, to a build-time library function over the `__schema`
+  reflection. The adopting CLI owns committing, publishing, and serving the
+  file. ax-go does not project that file through `__schema`.
 
 `ax-go` is the **brake, not the engine**: the layer that makes an autonomous
 agent's actions safe, reversible, and auditable — not the layer that makes them
