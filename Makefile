@@ -194,8 +194,9 @@ nilaway-sweep:
 # Mutation testing is a report, not a CI gate: runtime scales with suite time
 # times mutant count and gremlins is lightly maintained. The pinned mise binary
 # is used so a PATH copy cannot change the result. One worker and a large
-# timeout coefficient are deliberate: parallel workers on a loaded host turn
-# killed mutants into false TIMED OUT results. Default build, no -race, no tag
+# timeout coefficient are deliberate: parallel workers on a loaded host turned
+# killed mutants into TIMED OUT results. A TIMED OUT that persists at one worker
+# is a hang to inspect, not noise. Default build, no -race, no tag
 # matrix. Override the package list with MUTATION_PKGS="./internal/logcore".
 MUTATION_PKGS?=./internal/logcore ./internal/mcp ./internal/cli
 .PHONY: mutation-sweep

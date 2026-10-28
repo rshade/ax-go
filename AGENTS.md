@@ -244,8 +244,10 @@ direct measurement of the difference. Triage every survivor as a real
 assertion gap, an equivalent mutant, or tool noise, and never report a bare
 score. File each real gap as its own issue with `file:line`; do not fix it in
 the sweep issue, and do not lower a coverage floor because of what the sweep
-finds. A `TIMED OUT` result means the host was loaded, not that the mutant was
-caught: rerun it before counting it.
+finds. A `TIMED OUT` result is not a verdict: host load can cause it, and so
+can a mutant that makes the tests hang. Rerun it alone with one worker. If it
+becomes `KILLED`, count it as killed. If it still times out, inspect the
+mutation before classifying it; do not write it off as noise.
 
 Baseline 2026-10-27, `internal/logcore` only: 14 of 16 mutants killed, 0 real
 gaps. Both survivors were equivalent (`logcore.go:161:30` `> 0` to `>= 0`,
