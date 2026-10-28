@@ -1,0 +1,166 @@
+# ax-integration
+
+> Exercise the ax-go public API from a real Cobra command.
+
+The command reference below is generated from the live command tree.
+Commit the result with the CLI that owns the tree. ax-go does not serve it.
+
+## Docs
+
+- [ax-go](https://github.com/rshade/ax-go): library that generated this file
+
+## Commands
+
+Generated from the live command tree.
+
+### ax-integration
+
+Exercise ax-go primitives from a real Cobra command
+
+Examples:
+
+      ax-integration --format=json --name Ada
+      OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 ax-integration --format=json
+      AX_OTEL_DEBUG=1 ax-integration --format=json
+      ax-integration --config=config.hujson
+      ax-integration stream --count=3
+      ax-integration patch-config --config=config.hujson --patch='[{"op":"replace","path":"/count","value":5}]'
+      ax-integration fail
+      ax-integration fetch
+      ax-integration authz
+      ax-integration crash
+      ax-integration confirm --format=json --yes
+      ax-integration warn --format=json
+      ax-integration warn --format=json --strict
+      ax-integration __schema
+
+- `--config` (string): optional Hujson config file path, or - for stdin.
+- `--dry-run` (bool): emit the envelope without side effects. Default: `false`.
+- `--format` (string): output format: json or human.
+- `--idempotency-key` (string): opaque key used to prevent duplicate-create retries.
+- `--name` (string): name to include in the JSON payload. Default: `agent`.
+- `--strict` (bool): escalate warnings to a validation error. Default: `false`.
+- `--yes` (bool): confirm a confirmation-gated operation. Default: `false`.
+
+### ax-integration authz
+
+Model an authentication/permission failure (exit 4)
+
+Examples:
+
+      ax-integration authz --format=json
+      ax-integration authz --idempotency-key=demo-key
+
+- `--dry-run` (bool): emit the envelope without side effects. Default: `false`.
+- `--format` (string): output format: json or human.
+- `--idempotency-key` (string): opaque key used to prevent duplicate-create retries.
+- `--strict` (bool): escalate warnings to a validation error. Default: `false`.
+- `--yes` (bool): confirm a confirmation-gated operation. Default: `false`.
+
+### ax-integration confirm
+
+Run a confirmation-gated operation
+
+Examples:
+
+      ax-integration confirm --format=json --yes
+      ax-integration confirm --format=json
+
+- `--dry-run` (bool): emit the envelope without side effects. Default: `false`.
+- `--format` (string): output format: json or human.
+- `--idempotency-key` (string): opaque key used to prevent duplicate-create retries.
+- `--strict` (bool): escalate warnings to a validation error. Default: `false`.
+- `--yes` (bool): confirm a confirmation-gated operation. Default: `false`.
+
+### ax-integration crash
+
+Return an unexpected non-ax error to demonstrate the internal_error mapping (exit 1)
+
+Examples:
+
+      ax-integration crash --format=json
+
+- `--dry-run` (bool): emit the envelope without side effects. Default: `false`.
+- `--format` (string): output format: json or human.
+- `--idempotency-key` (string): opaque key used to prevent duplicate-create retries.
+- `--strict` (bool): escalate warnings to a validation error. Default: `false`.
+- `--yes` (bool): confirm a confirmation-gated operation. Default: `false`.
+
+### ax-integration fail
+
+Return an intentional ax.Error envelope
+
+Examples:
+
+      ax-integration fail --format=json
+      ax-integration fail --idempotency-key=demo-key
+
+- `--dry-run` (bool): emit the envelope without side effects. Default: `false`.
+- `--format` (string): output format: json or human.
+- `--idempotency-key` (string): opaque key used to prevent duplicate-create retries.
+- `--strict` (bool): escalate warnings to a validation error. Default: `false`.
+- `--yes` (bool): confirm a confirmation-gated operation. Default: `false`.
+
+### ax-integration fetch
+
+Model a network/timeout failure with retry recovery fields (exit 3)
+
+Examples:
+
+      ax-integration fetch --format=json
+      ax-integration fetch --idempotency-key=demo-key
+
+- `--dry-run` (bool): emit the envelope without side effects. Default: `false`.
+- `--format` (string): output format: json or human.
+- `--idempotency-key` (string): opaque key used to prevent duplicate-create retries.
+- `--strict` (bool): escalate warnings to a validation error. Default: `false`.
+- `--yes` (bool): confirm a confirmation-gated operation. Default: `false`.
+
+### ax-integration patch-config
+
+Apply an RFC 6902 patch to a Hujson config file, preserving comments
+
+Examples:
+
+      ax-integration patch-config --config=config.hujson --patch='[{"op":"replace","path":"/count","value":5}]'
+      ax-integration patch-config --format=json --config=config.hujson --patch='[{"op":"add","path":"/name","value":"Ada"}]'
+
+- `--config` (string): Hujson config file path to patch in place.
+- `--dry-run` (bool): emit the envelope without side effects. Default: `false`.
+- `--format` (string): output format: json or human.
+- `--idempotency-key` (string): opaque key used to prevent duplicate-create retries.
+- `--patch` (string): RFC 6902 JSON patch array to apply. Example: `[{"op":"replace","path":"/name","value":"Ada"}]`.
+- `--strict` (bool): escalate warnings to a validation error. Default: `false`.
+- `--yes` (bool): confirm a confirmation-gated operation. Default: `false`.
+
+### ax-integration stream
+
+Emit NDJSON envelopes
+
+Examples:
+
+      ax-integration stream --format=json --count=3
+      ax-integration stream --count=3 --idempotency-key=demo-key
+
+- `--count` (int): number of NDJSON items to emit. Default: `3`. Values: `1`, `2`, `3`, `5`, `10`.
+- `--dry-run` (bool): emit the envelope without side effects. Default: `false`.
+- `--format` (string): output format: json or human.
+- `--idempotency-key` (string): opaque key used to prevent duplicate-create retries.
+- `--name` (string): name to include in each streamed item. Default: `agent`.
+- `--strict` (bool): escalate warnings to a validation error. Default: `false`.
+- `--yes` (bool): confirm a confirmation-gated operation. Default: `false`.
+
+### ax-integration warn
+
+Succeed with a structured warning
+
+Examples:
+
+      ax-integration warn --format=json
+      ax-integration warn --format=json --strict
+
+- `--dry-run` (bool): emit the envelope without side effects. Default: `false`.
+- `--format` (string): output format: json or human.
+- `--idempotency-key` (string): opaque key used to prevent duplicate-create retries.
+- `--strict` (bool): escalate warnings to a validation error. Default: `false`.
+- `--yes` (bool): confirm a confirmation-gated operation. Default: `false`.

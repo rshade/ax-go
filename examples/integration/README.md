@@ -79,6 +79,27 @@ go run ./examples/integration __schema
 go run ./examples/integration __schema --as=mcp
 ```
 
+Generate the static discovery document and commit it with this example.
+`ax.Execute` installs `--format`, `--dry-run`, `--yes`, `--strict`, and
+`--idempotency-key` when the command runs, so `TestLLMsTxt` adds those flags
+before it calls `ax.GenerateLLMsTxt`. The generator does not see flags that
+are not on the tree it is given. `__schema` and `mcp-server` stay out of the
+document. Publication stays with the command that owns the tree.
+
+Check the committed file:
+
+```sh
+go test ./examples/integration -run TestLLMsTxt -count=1
+```
+
+Regenerate `llms.txt` after the command tree changes:
+
+```sh
+go test ./examples/integration -run TestLLMsTxt -update
+```
+
+`llms.preamble.md` is the curated opening. `llms.txt` is the committed result.
+
 The root command declares one MCP prompt (`greet-then-stream`) and one static
 resource (`ax-integration://docs/exit-codes`) in `declareAgentContext`. They
 appear under `command.prompts` / `command.resources` in the ax-native schema

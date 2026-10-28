@@ -268,9 +268,10 @@ contract is now owned by the `schema` package and the absorbed decisions in
 Static `llms.txt` is not part of that contract. The `__schema` projections stay
 ax-native JSON and `__schema --as=mcp`. Live discovery through `mcp-server`
 (`tools/list`, `prompts/list`, and `resources/list`) is a separate surface and
-is unchanged. A build-time generator, owned by the library and published by the
-adopting CLI, is future work (issue #32). Constitution Principle III records
-that split.
+is unchanged. `ax.GenerateLLMsTxt` writes the static document at build time
+from the same command reflection plus a curated opening and link list. The
+adopting CLI commits and publishes the file. Constitution Principle III records
+that split. See [examples/integration/llms.txt](examples/integration/llms.txt).
 
 Each command declares an explicit `non_deterministic_fields` list. Commands
 that emit `ax.Envelope[T]` register their payload type once; varying payload

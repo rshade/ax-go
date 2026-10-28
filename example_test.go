@@ -547,6 +547,71 @@ func ExampleBuildSchema() {
 	// Output: {"schema_version":"1.0.0","tool":"app","version":"v0.1.0","mode_detection":"--format flag \u003e AGENT_MODE env \u003e TTY detection","command":{"use":"app","short":"test app","example":"app run","flags":[{"name":"config","type":"string","usage":"config file"}],"non_deterministic_fields":[]},"error_envelope":{"schema_version":"1.0.0","required":["error_code","message","trace_id","tool","version","schema_version"],"optional":["actionable_fix","context","suggestions"],"known_codes":["config_invalid","config_max_bytes_invalid","config_option_invalid","config_patch_invalid","config_too_large","confirmation_required","internal_error","validation_error","warnings_as_errors"],"non_deterministic_fields":["trace_id"]}}
 }
 
+// ExampleGenerateLLMsTxt writes a static llms.txt discovery document from a
+// command tree plus a curated opening and link list. WithPreambleFile replaces
+// an earlier WithPreamble. The command reference is reflected from the tree.
+// The same inputs produce the same bytes, and the document is not a __schema
+// projection.
+func ExampleGenerateLLMsTxt() {
+	root := &cobra.Command{
+		Use:   "app",
+		Short: "demo tool",
+	}
+	root.Flags().String("name", "ada", "who to greet")
+
+	file, err := os.CreateTemp("", "llms-preamble-*.md")
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	defer os.Remove(file.Name())
+	if _, err := file.WriteString("# App\n\n> Demo tool.\n"); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	if err := file.Close(); err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+
+	var buf bytes.Buffer
+	err = ax.GenerateLLMsTxt(context.Background(), &buf, root,
+		ax.WithPreamble("# Ignored\n\n> Replaced by the file.\n"),
+		ax.WithPreambleFile(file.Name()),
+		ax.WithLinks([]ax.LinkSection{{
+			Heading: "Docs",
+			Links: []ax.Link{{
+				Title: "Reference",
+				URL:   "https://example.test/app",
+				Notes: "human docs",
+			}},
+		}}),
+	)
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Print(buf.String())
+	// Output:
+	// # App
+	//
+	// > Demo tool.
+	//
+	// ## Docs
+	//
+	// - [Reference](https://example.test/app): human docs
+	//
+	// ## Commands
+	//
+	// Generated from the live command tree.
+	//
+	// ### app
+	//
+	// demo tool
+	//
+	// - `--name` (string): who to greet. Default: `ada`.
+}
+
 // ExampleBuildMCPSchema adapts the command tree to the MCP tools-list shape
 // emitted by __schema --as=mcp: each callable command becomes a tool whose
 // inputSchema describes its flags as a JSON Schema object.

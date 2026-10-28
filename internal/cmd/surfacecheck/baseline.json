@@ -407,6 +407,36 @@
           "profiles": "all"
         },
         {
+          "id": "field:Link.Notes",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Link.Title",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:Link.URL",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:LinkSection.Heading",
+          "signature": "string",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "field:LinkSection.Links",
+          "signature": "[]Link",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "field:MCPPrompt.Arguments",
           "signature": "[]github.com/rshade/ax-go/schema.MCPPromptArgument",
           "configurations": "all",
@@ -824,6 +854,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:GenerateLLMsTxt",
+          "signature": "func(context.Context, io.Writer, *github.com/spf13/cobra.Command, ...LLMsTxtOption) error",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:Guard",
           "signature": "func(context.Context, func(context.Context) error) (bool, error)",
           "configurations": "all",
@@ -1052,6 +1088,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:WithLinks",
+          "signature": "func([]LinkSection) LLMsTxtOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:WithLoggerLabels",
           "signature": "func(Labels) LoggerOption",
           "configurations": "all",
@@ -1090,6 +1132,18 @@
         {
           "id": "func:WithNonDeterministicFields",
           "signature": "func[T any](*github.com/spf13/cobra.Command)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithPreamble",
+          "signature": "func(string) LLMsTxtOption",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "func:WithPreambleFile",
+          "signature": "func(string) LLMsTxtOption",
           "configurations": "all",
           "profiles": "all"
         },
@@ -1340,8 +1394,26 @@
           "profiles": "all"
         },
         {
+          "id": "type:LLMsTxtOption",
+          "signature": "func(*llmsConfig)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "type:Labels",
           "signature": "= github.com/rshade/ax-go/internal/logcore.Labels",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:Link",
+          "signature": "struct{Title string; URL string; Notes string}",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
+          "id": "type:LinkSection",
+          "signature": "struct{Heading string; Links []Link}",
           "configurations": "all",
           "profiles": "all"
         },
