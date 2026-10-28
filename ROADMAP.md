@@ -119,16 +119,6 @@ issue-121-shipped` field is stale. Clear it before treating #137 as ready.
 ([`docs/src/content/docs/sources.md`](./docs/src/content/docs/sources.md)) —
 in-scope gaps that deepen the machine-contract half of AX.*
 
-- [ ] #32 Build-time `llms.txt` generation [L] — an exported
-  `ax.GenerateLLMsTxt(...)` plus a `cmd/` docs tool that merge the reflected
-  command/flag skeleton (the same reflection that powers `__schema`) with an
-  author-supplied curated preamble and link graph. A *documentation artifact*,
-  not a new runtime machine format —
-  `__schema` JSON + `--as=mcp` stay unchanged. Consensus of a `/decide` debate;
-  deferred until the first real downstream consumer needs a published `llms.txt`.
-  Implements the emit-vs-delegate decision recorded by #29 in Constitution
-  Principle III (v1.3.0): the library owns generation, the adopting CLI owns
-  publication, and there is no runtime adapter.
 - [ ] #30 Envelope runtime trust signals [M] — `side_effects_performed`,
   `idempotency_replayed`, `requires_confirmation` (human handoff). Extends the
   now-shipped #13 `--dry-run` guards.
@@ -215,10 +205,15 @@ a runtime contract.*
 
 ### 2026-Q4
 
+- [x] #32 Build-time `llms.txt` generation. `ax.GenerateLLMsTxt` writes the
+  document from the reflected command tree plus a curated opening and link
+  list. `examples/integration` commits the file. There is no `cmd/` binary:
+  a module-level tool cannot see an adopter's command tree. No runtime
+  adapter. Recorded 2026-10-28. [L]
 - [x] #29 Static agent-discovery artifact (`llms.txt`) — emit vs delegate.
   Decision recorded in Constitution Principle III (v1.3.0): build-time
   generation stays in the library, publication stays with the adopting CLI,
-  and no runtime adapter is added. No ADR. The generator remains #32.
+  and no runtime adapter is added. No ADR. The generator shipped as #32.
   Recorded 2026-10-27. [M]
 - [x] #232 `slopcheck` gate for struct fields assigned but never read. Closed 2026-10-09. [M]
 - [x] #270 Live `mcp-server` serves declared prompts, resources, instructions. Closed 2026-10-08. [L]

@@ -1,0 +1,45 @@
+# Zeta
+
+> A sorted command reference.
+
+Extra prose stays.
+
+## Zed
+
+- [Later](https://example.test/later): second
+- [Earlier](https://example.test/earlier)
+
+## Alpha
+
+- [Home](https://example.test): first section
+
+## Commands
+
+Generated from the live command tree.
+
+### zeta-cli
+
+root short with a break
+
+root long stays distinct
+
+Examples:
+
+    zeta-cli alpha
+    zeta-cli zeta
+
+- `--config` (string, required): config file. Example: `app.hujson`.
+- `--region`, `-r` (string): region to use. Default: `us`.
+
+### zeta-cli alpha
+
+first child
+
+- `--name` (string): who to greet. Default: `ada`. Values: `ada`, `grace`.
+- `--region`, `-r` (string): region to use. Default: `us`.
+
+### zeta-cli zeta
+
+later child
+
+- `--region`, `-r` (string): region to use. Default: `us`.

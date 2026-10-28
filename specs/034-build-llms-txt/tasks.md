@@ -16,9 +16,9 @@
 
 **Independent Test**: `go test -run TestGenerateLLMsTxt -count=1`
 
-- [ ] T001 [US1] Add a failing golden test in `llmstxt_test.go` and `testdata/llms.golden.txt` for a nested tree, unsorted registration, inherited flags, and curated links.
-- [ ] T002 [US1] Add `ExampleGenerateLLMsTxt` in `example_test.go` with a checked `// Output:` block.
-- [ ] T003 [US1] Implement `GenerateLLMsTxt`, `WithPreamble`, `WithLinks`, `Link`, and `LinkSection` in `llmstxt.go` so T001 and T002 pass. Sort names, skip hidden commands, collapse newlines in reflected text.
+- [x] T001 [US1] Add a failing golden test in `llmstxt_test.go` and `testdata/llms.golden.txt` for a nested tree, unsorted registration, inherited flags, and curated links.
+- [x] T002 [US1] Add `ExampleGenerateLLMsTxt` in `example_test.go` with a checked `// Output:` block.
+- [x] T003 [US1] Implement `GenerateLLMsTxt`, `WithPreamble`, `WithLinks`, `Link`, and `LinkSection` in `llmstxt.go` so T001 and T002 pass. Sort names, skip hidden commands, collapse newlines in reflected text.
 
 **Checkpoint**: Identical inputs match the golden file.
 
@@ -28,8 +28,8 @@
 
 **Independent Test**: `go test -run TestGenerateLLMsTxtValidation -count=1`
 
-- [ ] T004 [US2] Add failing table tests in `llmstxt_test.go` for a missing opening, a title-less opening, a missing file, a file of exactly 1 MiB, a file of 1 MiB plus one byte, a nil destination, a nil command, a cancelled context, and an empty link section.
-- [ ] T005 [US2] Implement `WithPreambleFile` and the validation paths in `llmstxt.go`. Use `contract.ErrorCodeValidationError`. Write zero bytes on every validation failure.
+- [x] T004 [US2] Add failing table tests in `llmstxt_test.go` for a missing opening, a title-less opening, a missing file, a file of exactly 1 MiB, a file of 1 MiB plus one byte, a nil destination, a nil command, a cancelled context, and an empty link section.
+- [x] T005 [US2] Implement `WithPreambleFile` and the validation paths in `llmstxt.go`. Use `contract.ErrorCodeValidationError`. Write zero bytes on every validation failure.
 
 **Checkpoint**: Each validation case reads back an empty buffer.
 
@@ -39,8 +39,8 @@
 
 **Independent Test**: existing schema golden tests, plus `go test -run TestGenerateLLMsTxtDoesNotTouchSchema -count=1`
 
-- [ ] T006 [US3] Add a test that a command tree which can generate a document still emits the same `__schema` payload shape with no llms.txt field, and that no `__llms` command is registered by the generator.
-- [ ] T007 [US3] Confirm `schema.go` gains no `--as=llms-txt` branch. The existing golden tests are the gate.
+- [x] T006 [US3] Add a test that a command tree which can generate a document still emits the same `__schema` payload before and after generation, that the generator registers no `__llms` command, and that the document is not an `llms-full.txt` body (FR-007, FR-014).
+- [x] T007 [US3] Confirm `schema.go` gains no `--as=llms-txt` branch. The existing golden tests are the gate.
 
 **Checkpoint**: Schema goldens pass without regeneration.
 
@@ -50,16 +50,16 @@
 
 **Independent Test**: `go test ./examples/integration -run TestLLMsTxt -count=1`
 
-- [ ] T008 [US4] Add `examples/integration/llms.preamble.md`, a failing `examples/integration/llms_test.go`, and the committed `examples/integration/llms.txt`.
-- [ ] T009 [P] [US4] Document the generate-and-commit workflow in `README.md` and `examples/integration/README.md`.
+- [x] T008 [US4] Add `examples/integration/llms.preamble.md`, a failing `examples/integration/llms_test.go`, and the committed `examples/integration/llms.txt`.
+- [x] T009 [P] [US4] Document the generate-and-commit workflow in `README.md` and `examples/integration/README.md`.
 
 **Checkpoint**: The example test passes and tells an adopter that publication is theirs.
 
 ## Phase 5: Polish
 
-- [ ] T010 Add `ax.GenerateLLMsTxt` to `requiredSymbols` in `internal/cmd/doccover/main.go` and the matching `baseline.txt` entry.
-- [ ] T011 Regenerate `internal/cmd/surfacecheck/baseline.json` and append `supported` audit rows for the new root exports in `specs/023-internalize-helpers/public-surface-audit.json`.
-- [ ] T012 Run `gofmt` and the repository gates named in `AGENTS.md` for this change.
+- [x] T010 Add `ax.GenerateLLMsTxt` to `requiredSymbols` in `internal/cmd/doccover/main.go` and the matching `baseline.txt` entry.
+- [x] T011 Regenerate `internal/cmd/surfacecheck/baseline.json` and append `supported` audit rows for the new root exports in `specs/023-internalize-helpers/public-surface-audit.json`.
+- [x] T012 Run `gofmt` and the repository gates named in `AGENTS.md` for this change.
 
 ## Dependencies
 

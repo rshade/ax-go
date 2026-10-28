@@ -93,6 +93,7 @@ func requiredSymbols() []string {
 		"ax.BuildSchema",
 		"ax.Execute",
 		"ax.Flush",
+		"ax.GenerateLLMsTxt",
 		"ax.NewEntityID",
 		"ax.NewEnvelope",
 		"ax.NewError",
