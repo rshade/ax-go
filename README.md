@@ -265,6 +265,10 @@ without guessing. The primary format is ax-native JSON, with
 `__schema --as=mcp` available as an MCP-compatible adapter. The discoverability
 contract is now owned by the `schema` package and the absorbed decisions in
 [`specs/010-import-isolated-contracts/research.md`](specs/010-import-isolated-contracts/research.md).
+Static `llms.txt` is not part of that contract. Runtime discovery stays
+`__schema` JSON and `__schema --as=mcp`. A build-time generator, owned by the
+library and published by the adopting CLI, is future work (issue #32).
+Constitution Principle III records that split.
 
 Each command declares an explicit `non_deterministic_fields` list. Commands
 that emit `ax.Envelope[T]` register their payload type once; varying payload
