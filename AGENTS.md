@@ -1034,5 +1034,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/033-register-error-codes/plan.md
+at specs/034-build-llms-txt/plan.md
 <!-- SPECKIT END -->
