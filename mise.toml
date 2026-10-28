@@ -9,6 +9,6 @@ actionlint = "1.7.12"
 "go:github.com/joelanford/go-apidiff" = "0.8.3"
 "go:github.com/go-gremlins/gremlins/cmd/gremlins" = "0.6.0"
 "pipx:specify-cli" = "1.2.4"
-node = "24"
+node = "26"
 # Installed through node's npm backend. `make lint-markdown` and CI both run it.
 "npm:markdownlint-cli" = "0.50.0"
