@@ -443,8 +443,9 @@ mycli mcp-server --transport=http --addr=0.0.0.0:8080 --allow-non-loopback
   with an `@` mention, and a prompt is a `/mcp__<server>__<prompt>` slash command
   the user runs. Use instructions as the pointer and resource content as the body.
 - **Execution**: `tools/call` runs the command in machine/JSON mode and returns
-  its verbatim `stdout` payload; a non-zero exit returns the `ax.Error` envelope
-  with `IsError` set, and the server keeps serving.
+  its verbatim `stdout` payload; a non-zero exit returns `IsError` set with the
+  `ax.Error` envelope in `content[0]` (and the command's verbatim `stdout` in
+  `content[1]` when non-empty), and the server keeps serving.
 - **Safety**: HTTP binds **loopback by default** and fails closed (exit 2) on a
   non-loopback bind without `--allow-non-loopback`; ax-go holds no credentials
   and runs no auth flow, so put authn/authz in front of an exposed endpoint.
@@ -878,7 +879,7 @@ every open item filed as a labeled GitHub issue.
 
 | ax-go version   | Minimum Go version | Notes                                                         |
 | --------------- | ------------------ | ------------------------------------------------------------- |
-| v0.x (current)  | 1.27.3             | Pre-v1.0; `0.x.PATCH` is always safe; `0.MINOR.0` may break |
+| v0.x (current)  | 1.27.4             | Pre-v1.0; `0.x.PATCH` is always safe; `0.MINOR.0` may break |
 | v1.x            | TBD                | Stable API; targeted via the Spec Kit stability workflow      |
 
 The minimum Go version is the `go` directive in [`go.mod`](go.mod). Patch

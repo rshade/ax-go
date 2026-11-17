@@ -9,7 +9,8 @@
 // diverge), answers the initialize handshake and tools/list, and dispatches
 // each tools/call into an isolated, machine-mode invocation of the command
 // tree. Command stdout is captured verbatim into the tool result; a non-zero
-// exit is mapped to the ax.Error envelope with IsError set, never crashing the
-// server. It serves over stdio and a loopback-default streamable HTTP
-// transport.
+// exit is mapped to the ax.Error envelope with IsError set (followed by the
+// command's verbatim stdout as a second text content item when non-empty and
+// not panicked), never crashing the server. It serves over stdio and a
+// loopback-default streamable HTTP transport.
 package mcpserver

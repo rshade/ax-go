@@ -140,7 +140,31 @@ func dispatchTestRoot() *cobra.Command {
 	)
 
 	root.AddCommand(
-		&cobra.Command{Use: "boom", Short: "boom", RunE: func(*cobra.Command, []string) error {
+		&cobra.Command{
+			Use:   "verdict",
+			Short: "fail with stdout verdict",
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				fmt.Fprintln(cmd.ErrOrStderr(), echoStderrMarker)
+				mode, _ := contract.ModeFromContext(cmd.Context())
+				if err := contract.WriteJSON(
+					cmd.OutOrStdout(),
+					contract.NewEnvelope(cmd.Context(), dispatchPayload{
+						Name: "unreachable",
+						Mode: mode.String(),
+					}),
+				); err != nil {
+					return err
+				}
+				return contract.NewError(cmd.Context(), "demo_failure", "verdict: unreachable",
+					contract.WithErrorExitCode(contract.ExitInternal))
+			},
+		},
+	)
+
+	root.AddCommand(
+		&cobra.Command{Use: "boom", Short: "boom", RunE: func(cmd *cobra.Command, _ []string) error {
+			fmt.Fprintln(cmd.ErrOrStderr(), echoStderrMarker)
+			_, _ = cmd.OutOrStdout().Write([]byte(`{"partial":`))
 			panic("kaboom")
 		}},
 	)
@@ -431,15 +455,19 @@ func TestDispatchValidationErrorsContinueTraceContext(t *testing.T) {
 	}
 }
 
-// TestDispatchFailureKeepsServing asserts a non-zero-exit command returns the
-// ax.Error envelope with IsError, and the dispatcher keeps serving subsequent
-// calls (FR-009/FR-010, C-7, INV-4).
+// TestDispatchFailureKeepsServing asserts a non-zero-exit command with empty
+// stdout returns a single-item result carrying the ax.Error envelope with
+// IsError, and the dispatcher keeps serving subsequent calls (FR-009/FR-010,
+// C-7, INV-4, spec 035 FR-002).
 func TestDispatchFailureKeepsServing(t *testing.T) {
 	d := newTestDispatcher(dispatchTestRoot())
 
 	failRes := mustCall(t, d, "demo-fail", nil)
 	if !failRes.IsError {
 		t.Fatalf("expected IsError for failing command")
+	}
+	if len(failRes.Content) != 1 {
+		t.Fatalf("len(Content) = %d, want 1 for empty stdout failure", len(failRes.Content))
 	}
 	if envelope := decodeErrorEnvelope(t, resultText(t, failRes)); envelope.ErrorCode != "demo_failure" {
 		t.Errorf("error_code = %q, want %q", envelope.ErrorCode, "demo_failure")
@@ -454,17 +482,111 @@ func TestDispatchFailureKeepsServing(t *testing.T) {
 	}
 }
 
-// TestDispatchRecoversPanic asserts a panicking command is recovered into an
-// internal_error result and never crashes the server (FR-010, C-9).
+// TestDispatchNonZeroExitPreservesStdout asserts a command that writes to
+// stdout and exits non-zero returns IsError with the ax.Error envelope first
+// and the verbatim stdout bytes second, forwards stderr only to the server's
+// stderr writer, produces byte-identical stdout across repeated deterministic
+// calls, and keeps serving subsequent calls (spec 035 FR-001, FR-005, FR-006,
+// SC-001).
+func TestDispatchNonZeroExitPreservesStdout(t *testing.T) {
+	var stderr bytes.Buffer
+	root := dispatchTestRoot()
+	const ndjsonStream = "{\"line\":1}\n{\"line\":2}\n"
+	root.AddCommand(&cobra.Command{
+		Use:   "verdict-raw",
+		Short: "fail with raw multi-line stdout",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			fmt.Fprintln(cmd.ErrOrStderr(), echoStderrMarker)
+			_, _ = cmd.OutOrStdout().Write([]byte(ndjsonStream))
+			return contract.NewError(cmd.Context(), "demo_failure", "verdict with stream",
+				contract.WithErrorExitCode(contract.ExitValidation))
+		},
+	})
+	d := newDispatcher(context.Background(), root, Config{
+		Version:    testServerVersion,
+		ServerName: root.Name(),
+		Stderr:     &stderr,
+	})
+
+	res1 := mustCall(t, d, "demo-verdict", map[string]any{"idempotency-key": "fixed-key"})
+	if !res1.IsError {
+		t.Fatalf("expected IsError for verdict command")
+	}
+	if len(res1.Content) != 2 {
+		t.Fatalf("len(Content) = %d, want 2 (error envelope + verbatim stdout)", len(res1.Content))
+	}
+	errBlock, ok := res1.Content[0].(*sdk.TextContent)
+	if !ok {
+		t.Fatalf("Content[0] is %T, want *mcp.TextContent", res1.Content[0])
+	}
+	outBlock, ok := res1.Content[1].(*sdk.TextContent)
+	if !ok {
+		t.Fatalf("Content[1] is %T, want *mcp.TextContent", res1.Content[1])
+	}
+	if errEnv := decodeErrorEnvelope(t, errBlock.Text); errEnv.ErrorCode != "demo_failure" {
+		t.Errorf("Content[0] error_code = %q, want %q", errEnv.ErrorCode, "demo_failure")
+	}
+	outEnv := decodeEnvelope(t, outBlock.Text)
+	if outEnv.Data.Name != "unreachable" || outEnv.Data.Mode != string(contract.ModeJSON) {
+		t.Errorf("Content[1] data = %+v, want {Name:unreachable Mode:json}", outEnv.Data)
+	}
+	if strings.Contains(errBlock.Text, echoStderrMarker) || strings.Contains(outBlock.Text, echoStderrMarker) {
+		t.Errorf("command stderr leaked into tool result content: %q / %q", errBlock.Text, outBlock.Text)
+	}
+	if !strings.Contains(stderr.String(), echoStderrMarker) {
+		t.Errorf("command stderr not forwarded to server stderr; got %q", stderr.String())
+	}
+
+	// Verbatim preservation and determinism across repeated runs (FR-005, SC-001).
+	raw1 := mustCall(t, d, "demo-verdict-raw", nil)
+	raw2 := mustCall(t, d, "demo-verdict-raw", nil)
+	if len(raw1.Content) != 2 || len(raw2.Content) != 2 {
+		t.Fatalf("raw verdict Content lengths = %d, %d; want 2, 2", len(raw1.Content), len(raw2.Content))
+	}
+	rawText1 := raw1.Content[1].(*sdk.TextContent).Text
+	rawText2 := raw2.Content[1].(*sdk.TextContent).Text
+	if rawText1 != ndjsonStream {
+		t.Errorf("Content[1] = %q, want verbatim %q", rawText1, ndjsonStream)
+	}
+	if rawText1 != rawText2 {
+		t.Errorf("repeated calls differed: %q vs %q", rawText1, rawText2)
+	}
+
+	okRes := mustCall(t, d, "demo-echo", map[string]any{"name": "still-alive"})
+	if okRes.IsError {
+		t.Fatalf("server stopped serving after verdict failure: %s", resultText(t, okRes))
+	}
+}
+
+// TestDispatchRecoversPanic asserts a panicking command is recovered into a
+// single-item internal_error result, discards any partial stdout written before
+// the panic, forwards captured stderr to the server's stderr stream, and never
+// crashes the server (FR-010, C-9, spec 035 FR-004, SC-003).
 func TestDispatchRecoversPanic(t *testing.T) {
-	d := newTestDispatcher(dispatchTestRoot())
+	var stderr bytes.Buffer
+	root := dispatchTestRoot()
+	d := newDispatcher(context.Background(), root, Config{
+		Version:    testServerVersion,
+		ServerName: root.Name(),
+		Stderr:     &stderr,
+	})
 
 	res := mustCall(t, d, "demo-boom", nil)
 	if !res.IsError {
 		t.Fatalf("expected IsError for panicking command")
 	}
-	if envelope := decodeErrorEnvelope(t, resultText(t, res)); envelope.ErrorCode != "internal_error" {
+	if len(res.Content) != 1 {
+		t.Fatalf("len(Content) = %d, want 1 (partial stdout must be discarded on panic)", len(res.Content))
+	}
+	text := resultText(t, res)
+	if strings.Contains(text, "partial") {
+		t.Errorf("partial stdout leaked into panic result: %s", text)
+	}
+	if envelope := decodeErrorEnvelope(t, text); envelope.ErrorCode != "internal_error" {
 		t.Errorf("error_code = %q, want %q", envelope.ErrorCode, "internal_error")
+	}
+	if !strings.Contains(stderr.String(), echoStderrMarker) {
+		t.Errorf("stderr written before panic was not forwarded; got %q", stderr.String())
 	}
 	if okRes := mustCall(t, d, "demo-echo", map[string]any{"name": "alive"}); okRes.IsError {
 		t.Fatalf("server did not survive a panic: %s", resultText(t, okRes))

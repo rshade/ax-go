@@ -18,8 +18,9 @@
 // cannot drift. Excluded commands remain in --help and "__schema --as=ax".
 //
 // A tools/call dispatches back into the command tree, returning the command's
-// verbatim stdout payload on success and the ax.Error envelope on failure,
-// while the server keeps serving.
+// verbatim stdout payload on success and the ax.Error envelope on failure
+// (followed by the command's verbatim stdout as a second text content item
+// when non-empty), while the server keeps serving.
 //
 // The server also serves the prompts and static resources declared with
 // schema.DeclarePrompt and schema.DeclareResource, registered from the same
