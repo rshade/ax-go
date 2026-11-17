@@ -48,6 +48,23 @@ func newDemoRoot() *cobra.Command {
 	}}
 	root.AddCommand(fail)
 
+	verdict := &cobra.Command{
+		Use:   "verdict",
+		Short: "fails with stdout verdict",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			mode, _ := ax.ModeFromContext(cmd.Context())
+			if err := ax.WriteJSON(cmd.OutOrStdout(), ax.NewEnvelope(cmd.Context(), echoPayload{
+				Name: "unreachable",
+				Mode: mode.String(),
+			})); err != nil {
+				return err
+			}
+			return ax.NewError(cmd.Context(), "demo_failure", "verdict: unreachable",
+				ax.WithErrorExitCode(ax.ExitInternal))
+		},
+	}
+	root.AddCommand(verdict)
+
 	return root
 }
 
@@ -195,6 +212,39 @@ func TestServeToolsCall(t *testing.T) {
 	mustUnmarshal(t, contentText(t, failed), &envelope)
 	if envelope.ErrorCode != "demo_failure" {
 		t.Errorf("error_code = %q, want %q", envelope.ErrorCode, "demo_failure")
+	}
+
+	verdictRes, err := session.CallTool(ctx, &sdk.CallToolParams{Name: "demo-verdict"})
+	if err != nil {
+		t.Fatalf("tools/call verdict: %v", err)
+	}
+	if !verdictRes.IsError {
+		t.Fatal("verdict did not return IsError")
+	}
+	if len(verdictRes.Content) != 2 {
+		t.Fatalf("verdict Content length = %d, want 2 (ax.Error + stdout)", len(verdictRes.Content))
+	}
+	verdictErrText, isText := verdictRes.Content[0].(*sdk.TextContent)
+	if !isText {
+		t.Fatalf("verdict Content[0] = %T, want *mcp.TextContent", verdictRes.Content[0])
+	}
+	verdictOutText, isText := verdictRes.Content[1].(*sdk.TextContent)
+	if !isText {
+		t.Fatalf("verdict Content[1] = %T, want *mcp.TextContent", verdictRes.Content[1])
+	}
+	var verdictErr struct {
+		ErrorCode string `json:"error_code"`
+	}
+	mustUnmarshal(t, verdictErrText.Text, &verdictErr)
+	if verdictErr.ErrorCode != "demo_failure" {
+		t.Errorf("verdict error_code = %q, want %q", verdictErr.ErrorCode, "demo_failure")
+	}
+	var verdictEnv struct {
+		Data echoPayload `json:"data"`
+	}
+	mustUnmarshal(t, verdictOutText.Text, &verdictEnv)
+	if verdictEnv.Data.Name != "unreachable" || verdictEnv.Data.Mode != "json" {
+		t.Errorf("verdict stdout data = %+v, want {Name:unreachable Mode:json}", verdictEnv.Data)
 	}
 
 	// The server keeps serving after a tool failure.

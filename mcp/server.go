@@ -18,9 +18,11 @@ import (
 // commands and the reserved __schema and mcp-server commands. A tools/call
 // dispatches into an isolated, machine-mode invocation of the command tree:
 // success returns the command's verbatim stdout payload and a non-zero exit
-// returns the ax.Error envelope with IsError set. Invalid options (for example
-// a non-loopback HTTP address without WithAllowNonLoopback, or an empty or
-// placeholder version) fail closed at startup with a validation error (exit 2).
+// returns the ax.Error envelope with IsError set (followed by the command's
+// verbatim stdout as a second text content item when non-empty). Invalid
+// options (for example a non-loopback HTTP address without
+// WithAllowNonLoopback, or an empty or placeholder version) fail closed at
+// startup with a validation error (exit 2).
 func Serve(ctx context.Context, root *cobra.Command, opts ...Option) error {
 	return mcpserver.Serve(ctx, root, resolveOptions(opts).config())
 }

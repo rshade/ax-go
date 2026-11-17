@@ -9,6 +9,9 @@ import (
 	"testing"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
+	"github.com/spf13/cobra"
+
+	"github.com/rshade/ax-go/contract"
 )
 
 // assertGolden compares got, as compact JSON plus a newline, against
@@ -71,4 +74,39 @@ func TestLiveServerResponsesGolden(t *testing.T) {
 		t.Fatalf("resources/read: %v", err)
 	}
 	assertGolden(t, "mcp_resources_read", read)
+}
+
+// TestToolsCallErrorStdoutGolden pins the live MCP tools/call wire shape when
+// a dispatched command exits non-zero after writing a verdict payload to
+// stdout (spec 035 FR-001, FR-008, SC-004).
+func TestToolsCallErrorStdoutGolden(t *testing.T) {
+	ctx := context.Background()
+	root := dispatchTestRoot()
+	root.AddCommand(&cobra.Command{
+		Use:   "check",
+		Short: "check reachability",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			mode, _ := contract.ModeFromContext(cmd.Context())
+			if err := contract.WriteJSON(cmd.OutOrStdout(), dispatchPayload{
+				Name: "unreachable",
+				Mode: mode.String(),
+			}); err != nil {
+				return err
+			}
+			return contract.NewError(cmd.Context(), "demo_failure", "verdict: unreachable",
+				contract.WithErrorExitCode(contract.ExitInternal))
+		},
+	})
+	session := newInMemorySession(t, newServerWithConfig(t, ctx, root, Config{}))
+
+	res, err := session.CallTool(ctx, &sdk.CallToolParams{
+		Meta: sdk.Meta{
+			traceParentKey: "00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01",
+		},
+		Name: "demo-check",
+	})
+	if err != nil {
+		t.Fatalf("tools/call demo-check: %v", err)
+	}
+	assertGolden(t, "mcp_tools_call_error_stdout", res)
 }

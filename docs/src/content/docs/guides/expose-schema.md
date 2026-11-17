@@ -93,7 +93,12 @@ Run it over stdio (the default transport):
 yourcli mcp-server
 ```
 
-Every visible, runnable command becomes a callable MCP tool. The rules are
+Every visible, runnable command becomes a callable MCP tool. On `tools/call`,
+the server runs the command in machine (`json`) mode: a zero exit returns the
+command's verbatim `stdout` payload, while a non-zero exit returns `isError:
+true` with the `ax.Error` envelope in `content[0]` and, when the command also
+wrote a verdict payload to `stdout`, those verbatim `stdout` bytes in
+`content[1]`. The discovery rules are
 covered in [Excluding commands](#excluding-commands) below. To serve over HTTP
 instead:
 

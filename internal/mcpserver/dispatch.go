@@ -154,20 +154,20 @@ func (d *dispatcher) handle(ctx context.Context, req *sdk.CallToolRequest) (*sdk
 	defer span.End()
 
 	if req == nil || req.Params == nil {
-		return d.errorResult(callCtx, d.validationError(callCtx, "malformed tool call request")), nil
+		return d.errorResult(callCtx, d.validationError(callCtx, "malformed tool call request"), nil), nil
 	}
 	if _, ok := d.toolNames[name]; !ok {
-		return d.errorResult(callCtx, d.validationError(callCtx, fmt.Sprintf("unknown tool %q", name))), nil
+		return d.errorResult(callCtx, d.validationError(callCtx, fmt.Sprintf("unknown tool %q", name)), nil), nil
 	}
 
 	args, err := decodeArguments(req.Params.Arguments)
 	if err != nil {
-		return d.errorResult(callCtx, d.validationError(callCtx, fmt.Sprintf("invalid arguments: %v", err))), nil
+		return d.errorResult(callCtx, d.validationError(callCtx, fmt.Sprintf("invalid arguments: %v", err)), nil), nil
 	}
 
 	stdout, runErr := d.dispatch(callCtx, name, args)
 	if runErr != nil {
-		return d.errorResult(callCtx, runErr), nil
+		return d.errorResult(callCtx, runErr, stdout), nil
 	}
 	return successResult(stdout), nil
 }
@@ -479,17 +479,23 @@ func successResult(stdout []byte) *sdk.CallToolResult {
 }
 
 // errorResult maps a dispatch/command error to CallToolResult{IsError:true}
-// carrying the ax.Error envelope JSON (FR-009, C-7).
-func (d *dispatcher) errorResult(ctx context.Context, err error) *sdk.CallToolResult {
+// carrying the ax.Error envelope JSON in Content[0] (FR-009, C-7) and, when
+// the command emitted non-empty stdout before returning the error, the
+// verbatim stdout bytes in Content[1] (spec 035 FR-001, FR-002, FR-005).
+func (d *dispatcher) errorResult(ctx context.Context, err error, stdout []byte) *sdk.CallToolResult {
 	axErr := d.toAxError(ctx, err)
 	payload, marshalErr := json.Marshal(axErr)
 	if marshalErr != nil {
 		payload = []byte(`{"error_code":"` + contract.ErrorCodeInternalError +
 			`","message":"failed to marshal error envelope"}`)
 	}
+	content := []sdk.Content{&sdk.TextContent{Text: string(payload)}}
+	if len(stdout) > 0 {
+		content = append(content, &sdk.TextContent{Text: string(stdout)})
+	}
 	return &sdk.CallToolResult{
 		IsError: true,
-		Content: []sdk.Content{&sdk.TextContent{Text: string(payload)}},
+		Content: content,
 	}
 }
 
