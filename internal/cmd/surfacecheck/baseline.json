@@ -2282,6 +2282,12 @@
           "profiles": "all"
         },
         {
+          "id": "func:ExcludeFlag",
+          "signature": "func(*github.com/spf13/cobra.Command, string)",
+          "configurations": "all",
+          "profiles": "all"
+        },
+        {
           "id": "func:NewCommand",
           "signature": "func(*github.com/spf13/cobra.Command, ...Option) *github.com/spf13/cobra.Command",
           "configurations": "all",

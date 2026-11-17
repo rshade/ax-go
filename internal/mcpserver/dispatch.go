@@ -22,6 +22,7 @@ import (
 	"github.com/rshade/ax-go/id"
 	"github.com/rshade/ax-go/internal/cli"
 	"github.com/rshade/ax-go/internal/diagwriter"
+	internalmcp "github.com/rshade/ax-go/internal/mcp"
 	internalschema "github.com/rshade/ax-go/internal/schema"
 	"github.com/rshade/ax-go/schema"
 )
@@ -573,11 +574,17 @@ func commandPathArgs(root, target *cobra.Command) []string {
 	return reversed
 }
 
-// acceptedFlags returns the flags accepted by cmd (local and inherited).
+// acceptedFlags returns the flags accepted by cmd (local and inherited),
+// omitting any flag excluded from MCP via internalmcp.IsFlagExcluded.
 func acceptedFlags(cmd *cobra.Command) map[string]*pflag.Flag {
+	seen := map[string]struct{}{}
 	flags := map[string]*pflag.Flag{}
 	add := func(flag *pflag.Flag) {
-		if _, ok := flags[flag.Name]; ok {
+		if _, ok := seen[flag.Name]; ok {
+			return
+		}
+		seen[flag.Name] = struct{}{}
+		if internalmcp.IsFlagExcluded(flag) {
 			return
 		}
 		flags[flag.Name] = flag

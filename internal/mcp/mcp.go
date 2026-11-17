@@ -176,6 +176,38 @@ func MarkExcluded(cmd *cobra.Command) {
 	cmd.Annotations[ExcludeAnnotationKey] = excludeAnnotationValue
 }
 
+// IsFlagExcluded reports whether flag carries ExcludeAnnotationKey with a
+// single-element slice equal to its canonical value. A nil flag is never
+// excluded.
+func IsFlagExcluded(flag *pflag.Flag) bool {
+	if flag == nil {
+		return false
+	}
+	vals := flag.Annotations[ExcludeAnnotationKey]
+	return len(vals) == 1 && vals[0] == excludeAnnotationValue
+}
+
+// MarkFlagExcluded sets ExcludeAnnotationKey on the named flag of cmd, looking
+// up cmd.Flags() and then cmd.PersistentFlags(), allocating the flag's
+// annotation map if needed and leaving other annotations intact. It is a no-op
+// when cmd is nil, name is empty, or the flag is not found.
+func MarkFlagExcluded(cmd *cobra.Command, name string) {
+	if cmd == nil || name == "" {
+		return
+	}
+	flag := cmd.Flags().Lookup(name)
+	if flag == nil {
+		flag = cmd.PersistentFlags().Lookup(name)
+	}
+	if flag == nil {
+		return
+	}
+	if flag.Annotations == nil {
+		flag.Annotations = make(map[string][]string)
+	}
+	flag.Annotations[ExcludeAnnotationKey] = []string{excludeAnnotationValue}
+}
+
 // isReservedCommand reports whether name is a reserved command that must never
 // surface as an MCP tool on either the static or live path.
 func isReservedCommand(name string) bool {
@@ -219,6 +251,9 @@ func collectFlags(cmd *cobra.Command) []*pflag.Flag {
 			return
 		}
 		seen[flag.Name] = struct{}{}
+		if IsFlagExcluded(flag) {
+			return
+		}
 		flags = append(flags, flag)
 	}
 

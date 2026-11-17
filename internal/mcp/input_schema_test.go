@@ -576,3 +576,92 @@ func TestInputSchemaExamples(t *testing.T) {
 		})
 	}
 }
+
+// TestInputSchemaExcludedFlags asserts that flags marked with MarkFlagExcluded
+// are omitted from both inputSchema.properties and inputSchema.required while
+// non-excluded flags remain intact.
+func TestInputSchemaExcludedFlags(t *testing.T) {
+	cmd := &cobra.Command{Use: "test", RunE: noopRunE}
+	cmd.Flags().Bool("watch", false, "watch mode")
+	cmd.Flags().String("interactive", "", "interactive mode")
+	cmd.Flags().String("filter", "", "filter pattern")
+	cmd.Flags().String("target", "", "required target")
+	for _, req := range []string{"interactive", "target"} {
+		if err := cmd.MarkFlagRequired(req); err != nil {
+			t.Fatalf("mark flag %q required: %v", req, err)
+		}
+	}
+
+	MarkFlagExcluded(cmd, "watch")
+	MarkFlagExcluded(cmd, "interactive")
+
+	tool := buildSingleTool(t, cmd)
+	props, ok := tool.InputSchema[jsonSchemaProperties].(map[string]any)
+	if !ok {
+		t.Fatalf("properties is %T, want map[string]any", tool.InputSchema[jsonSchemaProperties])
+	}
+	if _, present := props["watch"]; present {
+		t.Errorf("excluded flag \"watch\" still present in properties: %v", props)
+	}
+	if _, present := props["interactive"]; present {
+		t.Errorf("excluded required flag \"interactive\" still present in properties: %v", props)
+	}
+	if _, present := props["filter"]; !present {
+		t.Errorf("non-excluded flag \"filter\" missing from properties: %v", props)
+	}
+	if _, present := props["target"]; !present {
+		t.Errorf("non-excluded flag \"target\" missing from properties: %v", props)
+	}
+
+	required, ok := tool.InputSchema["required"].([]string)
+	if !ok {
+		t.Fatalf("required is %T, want []string", tool.InputSchema["required"])
+	}
+	if !slices.Equal(required, []string{"target"}) {
+		t.Errorf("required = %v, want [target] (excluded required flag omitted)", required)
+	}
+
+	t.Run("inherited and shadowed persistent flags", func(t *testing.T) {
+		root := &cobra.Command{Use: "demo", RunE: noopRunE}
+		root.PersistentFlags().Bool("global-watch", false, "excluded persistent flag")
+		root.PersistentFlags().String("mode", "fast", "unexcluded persistent flag")
+		root.PersistentFlags().String("region", "us", "excluded on root, unexcluded local shadow on child")
+		MarkFlagExcluded(root, "global-watch")
+		MarkFlagExcluded(root, "region")
+
+		child := &cobra.Command{Use: "child", RunE: noopRunE}
+		child.Flags().String("mode", "slow", "local shadow excluded on child")
+		child.Flags().String("region", "eu", "local shadow kept on child")
+		MarkFlagExcluded(child, "mode")
+		root.AddCommand(child)
+
+		built := Build(root)
+		rootTool := toolByName(built.Tools, "demo")
+		childTool := toolByName(built.Tools, "demo-child")
+		if rootTool == nil || childTool == nil {
+			t.Fatalf("tools = %v, want demo and demo-child", built.Tools)
+		}
+
+		rootProps := rootTool.InputSchema[jsonSchemaProperties].(map[string]any)
+		if _, present := rootProps["global-watch"]; present {
+			t.Errorf("root properties unexpectedly contain excluded global-watch: %v", rootProps)
+		}
+		if _, present := rootProps["region"]; present {
+			t.Errorf("root properties unexpectedly contain excluded region: %v", rootProps)
+		}
+		if _, present := rootProps["mode"]; !present {
+			t.Errorf("root properties missing unexcluded mode: %v", rootProps)
+		}
+
+		childProps := childTool.InputSchema[jsonSchemaProperties].(map[string]any)
+		if _, present := childProps["global-watch"]; present {
+			t.Errorf("child properties unexpectedly contain inherited excluded global-watch: %v", childProps)
+		}
+		if _, present := childProps["mode"]; present {
+			t.Errorf("child properties unexpectedly contain shadowed excluded mode: %v", childProps)
+		}
+		if _, present := childProps["region"]; !present {
+			t.Errorf("child properties missing unexcluded local shadow region: %v", childProps)
+		}
+	})
+}

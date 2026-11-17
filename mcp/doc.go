@@ -13,9 +13,12 @@
 // whole subtree, as do the reserved __schema, mcp-server, completion, and help
 // commands. A command that is not runnable (a pure group with neither Run nor
 // RunE) drops out on its own, and its children are still walked. A command
-// marked with Exclude also drops out on its own. Every rule lives on the
-// command tree, never in server options, so the static and live surfaces
-// cannot drift. Excluded commands remain in --help and "__schema --as=ax".
+// marked with Exclude also drops out on its own. ExcludeFlag marks a single
+// flag on a command so it is omitted from the tool's inputSchema and rejected
+// with a validation error (exit 2) on tools/call while keeping the command as a
+// tool. Every rule lives on the command tree, never in server options, so the
+// static and live surfaces cannot drift. Excluded commands and flags remain in
+// --help and "__schema --as=ax".
 //
 // A tools/call dispatches back into the command tree, returning the command's
 // verbatim stdout payload on success and the ax.Error envelope on failure

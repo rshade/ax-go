@@ -434,7 +434,11 @@ mycli mcp-server --transport=http --addr=0.0.0.0:8080 --allow-non-loopback
   group command (no `Run`/`RunE`) drops out on its own and its children stay
   tools. Call `mcp.Exclude(cmd)` to keep one command, such as a TUI root or a
   long-running `serve`, out of MCP while leaving its children callable and the
-  command itself in `--help`.
+  command itself in `--help`. Call `mcp.ExcludeFlag(cmd, "watch")` when a
+  command should stay a tool, but one flag (such as `--watch`) cannot return
+  over request/response: the flag is omitted from `tools/list` and
+  `__schema --as=mcp`, rejected with a `validation_error` (exit `2`) on
+  `tools/call`, and left untouched in `--help` and `__schema --as=ax`.
 - **Prompts, resources, instructions**: declared prompts and resources are
   served exactly as `__schema --as=mcp` lists them. `mcp.WithInstructions(text)`
   sends a short string (valid UTF-8, at most 8 KiB, else exit 2 at startup) in

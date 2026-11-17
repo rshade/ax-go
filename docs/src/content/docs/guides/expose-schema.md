@@ -148,6 +148,19 @@ annotation (`github.com/rshade/ax-go/mcp/exclude` set to `true`); any other
 value is ignored. To hide a command from humans too, set `Hidden: true`
 instead.
 
+When a command should remain a callable tool, but one of its flags cannot work
+over request/response (such as `--watch`, which never returns), exclude just the
+flag with `mcp.ExcludeFlag`:
+
+```go
+mcp.ExcludeFlag(testCmd, "watch")
+```
+
+The flag is omitted from `tools/list` and `__schema --as=mcp`, and a
+`tools/call` supplying `"watch"` fails with a `validation_error` envelope (exit
+`2`) before `testCmd` runs. The flag remains in `--help` and
+`__schema --as=ax`.
+
 ## Declare prompts and resources
 
 Tools tell an agent what it *can* call. A prompt tells it *how* to use your CLI
