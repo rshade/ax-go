@@ -161,6 +161,14 @@ The flag is omitted from `tools/list` and `__schema --as=mcp`, and a
 `2`) before `testCmd` runs. The flag remains in `--help` and
 `__schema --as=ax`.
 
+Exclude a flag on the command that declares it: a parent's persistent flag
+excluded on the parent is excluded on every child, while
+`mcp.ExcludeFlag(child, "watch")` on a flag the child only inherits does
+nothing. The agent-safety flags `--format`, `--dry-run`, `--yes`,
+`--idempotency-key`, and `--strict` cannot be excluded. Don't exclude a
+required flag: an MCP client can never supply it, so every call to that tool
+fails with a `validation_error`.
+
 ## Declare prompts and resources
 
 Tools tell an agent what it *can* call. A prompt tells it *how* to use your CLI

@@ -175,3 +175,74 @@ func TestMarkFlagExcludedOverwritesNonCanonicalValue(t *testing.T) {
 		t.Error("IsFlagExcluded after MarkFlagExcluded = false, want true")
 	}
 }
+
+// TestMarkFlagExcludedSkipsInheritedFlag pins that excluding a name the
+// command only inherits is a no-op whether or not Cobra has already merged
+// the ancestor's persistent flags into the child's flag set: the shared
+// *pflag.Flag must never be marked through a descendant, or the exclusion
+// would leak onto the ancestor and every sibling.
+func TestMarkFlagExcludedSkipsInheritedFlag(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		discover bool
+	}{
+		{name: "before flag discovery", discover: false},
+		{name: "after flag discovery", discover: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			root := &cobra.Command{Use: "demo"}
+			root.PersistentFlags().Bool("watch", false, "watch")
+			child := &cobra.Command{Use: "child"}
+			sibling := &cobra.Command{Use: "sibling"}
+			root.AddCommand(child, sibling)
+			if tc.discover {
+				_ = child.InheritedFlags()
+			}
+
+			MarkFlagExcluded(child, "watch")
+
+			if IsFlagExcluded(root.PersistentFlags().Lookup("watch")) {
+				t.Error("inherited watch flag was marked excluded through a child")
+			}
+		})
+	}
+}
+
+// TestMarkFlagExcludedOwnPersistentAfterDiscovery pins that a command's own
+// persistent flag is still excludable after Cobra merged it into Flags().
+func TestMarkFlagExcludedOwnPersistentAfterDiscovery(t *testing.T) {
+	root := &cobra.Command{Use: "demo"}
+	child := &cobra.Command{Use: "child"}
+	child.PersistentFlags().Bool("watch", false, "watch")
+	root.AddCommand(child)
+	_ = child.InheritedFlags()
+
+	MarkFlagExcluded(child, "watch")
+
+	if !IsFlagExcluded(child.PersistentFlags().Lookup("watch")) {
+		t.Error("child's own persistent watch flag was not marked excluded")
+	}
+}
+
+// TestReservedFlagsNeverExcluded pins that the ax agent-safety and output
+// flags stay available to MCP clients: MarkFlagExcluded ignores them, and a
+// hand-set canonical annotation does not exclude them either.
+func TestReservedFlagsNeverExcluded(t *testing.T) {
+	for _, name := range []string{"format", "dry-run", "yes", "idempotency-key", "strict"} {
+		t.Run(name, func(t *testing.T) {
+			cmd := &cobra.Command{Use: "demo"}
+			cmd.PersistentFlags().String(name, "", name)
+			flag := cmd.PersistentFlags().Lookup(name)
+
+			MarkFlagExcluded(cmd, name)
+			if _, ok := flag.Annotations[ExcludeAnnotationKey]; ok {
+				t.Errorf("MarkFlagExcluded set the exclusion annotation on reserved flag %q", name)
+			}
+
+			flag.Annotations = map[string][]string{ExcludeAnnotationKey: {"true"}}
+			if IsFlagExcluded(flag) {
+				t.Errorf("IsFlagExcluded(%q) = true for a reserved flag, want false", name)
+			}
+		})
+	}
+}

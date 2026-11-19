@@ -10,7 +10,7 @@ Add `mcp.ExcludeFlag(cmd *cobra.Command, name string)` so a CLI author can keep 
 
 ## Technical Context
 
-**Language/Version**: Go 1.27.4 (pinned in `mise.toml`; `go.mod` matches)
+**Language/Version**: Go, at the version pinned in `mise.toml` (`go.mod` must match)
 
 **Primary Dependencies**: `github.com/spf13/cobra` (existing), `github.com/spf13/pflag` (existing), `github.com/modelcontextprotocol/go-sdk` v1.8.0 (existing). Zero new dependencies.
 

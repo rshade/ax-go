@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -427,14 +428,16 @@ func TestExcludeFlagNoopAndPreservesAnnotations(t *testing.T) {
 // with a validation_error ax.Error envelope (exit 2) and never invokes RunE,
 // while calling the same tool without the excluded flag succeeds.
 func TestExcludeFlagRejectedOnToolsCallAndNeverRuns(t *testing.T) {
-	var calls int
+	// RunE runs on the HTTP server goroutine, so the count is shared across
+	// goroutines and must be synchronized explicitly.
+	var calls atomic.Int32
 	var filter string
 	root := &cobra.Command{Use: "tsacl", Short: "root"}
 	testCmd := &cobra.Command{
 		Use:   "test",
 		Short: "run policy tests",
 		RunE: func(cmd *cobra.Command, _ []string) error {
-			calls++
+			calls.Add(1)
 			_, err := cmd.OutOrStdout().Write([]byte(`{"filter":"` + filter + `"}`))
 			return err
 		},
@@ -474,8 +477,8 @@ func TestExcludeFlagRejectedOnToolsCallAndNeverRuns(t *testing.T) {
 	if want := `unknown argument "watch" for tool "tsacl-test"`; !strings.Contains(errEnv.Message, want) {
 		t.Errorf("message = %q, want it to contain %q", errEnv.Message, want)
 	}
-	if calls != 0 {
-		t.Fatalf("RunE ran %d times when excluded flag was supplied, want 0", calls)
+	if got := calls.Load(); got != 0 {
+		t.Fatalf("RunE ran %d times when excluded flag was supplied, want 0", got)
 	}
 
 	okRes, err := session.CallTool(context.Background(), &sdk.CallToolParams{
@@ -488,8 +491,8 @@ func TestExcludeFlagRejectedOnToolsCallAndNeverRuns(t *testing.T) {
 	if okRes.IsError {
 		t.Fatalf("tools/call without watch returned IsError=true: %+v", okRes.Content)
 	}
-	if calls != 1 {
-		t.Errorf("RunE ran %d times, want 1", calls)
+	if got := calls.Load(); got != 1 {
+		t.Errorf("RunE ran %d times, want 1", got)
 	}
 }
 

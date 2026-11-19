@@ -7,6 +7,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
+	"github.com/rshade/ax-go/internal/cli"
 	internalschema "github.com/rshade/ax-go/internal/schema"
 )
 
@@ -177,28 +178,43 @@ func MarkExcluded(cmd *cobra.Command) {
 }
 
 // IsFlagExcluded reports whether flag carries ExcludeAnnotationKey with a
-// single-element slice equal to its canonical value. A nil flag is never
-// excluded.
+// single-element slice equal to its canonical value. A nil flag or a reserved
+// agent-safety flag (see isReservedFlag) is never excluded, even when the
+// annotation was set by hand.
 func IsFlagExcluded(flag *pflag.Flag) bool {
-	if flag == nil {
+	if flag == nil || isReservedFlag(flag.Name) {
 		return false
 	}
 	vals := flag.Annotations[ExcludeAnnotationKey]
 	return len(vals) == 1 && vals[0] == excludeAnnotationValue
 }
 
-// MarkFlagExcluded sets ExcludeAnnotationKey on the named flag of cmd, looking
-// up cmd.Flags() and then cmd.PersistentFlags(), allocating the flag's
-// annotation map if needed and leaving other annotations intact. It is a no-op
-// when cmd is nil, name is empty, or the flag is not found.
+// isReservedFlag reports whether name is an ax agent-safety or output flag
+// that MCP exclusion never applies to. The dispatcher threads these as
+// per-call configuration; hiding one would leave clients unable to dry-run,
+// approve a confirmation, retry under a stable idempotency key, or opt into
+// strict warnings.
+func isReservedFlag(name string) bool {
+	switch name {
+	case cli.FlagFormat, cli.FlagDryRun, cli.FlagYes, cli.FlagIdempotencyKey, cli.FlagStrict:
+		return true
+	default:
+		return false
+	}
+}
+
+// MarkFlagExcluded sets ExcludeAnnotationKey on the named flag that cmd itself
+// declares, looking up cmd.Flags() and then cmd.PersistentFlags(), allocating
+// the flag's annotation map if needed and leaving other annotations intact. It
+// is a no-op when cmd is nil, name is empty or reserved (see isReservedFlag),
+// or cmd declares no such flag. A flag cmd only inherits is not marked: the
+// ancestor shares the same *pflag.Flag, so marking it here would exclude it
+// from the ancestor and every sibling too.
 func MarkFlagExcluded(cmd *cobra.Command, name string) {
-	if cmd == nil || name == "" {
+	if cmd == nil || name == "" || isReservedFlag(name) {
 		return
 	}
-	flag := cmd.Flags().Lookup(name)
-	if flag == nil {
-		flag = cmd.PersistentFlags().Lookup(name)
-	}
+	flag := ownedFlag(cmd, name)
 	if flag == nil {
 		return
 	}
@@ -206,6 +222,27 @@ func MarkFlagExcluded(cmd *cobra.Command, name string) {
 		flag.Annotations = make(map[string][]string)
 	}
 	flag.Annotations[ExcludeAnnotationKey] = []string{excludeAnnotationValue}
+}
+
+// ownedFlag returns the flag named name that cmd declares (local or
+// persistent), or nil. Once Cobra discovers flags it merges each ancestor's
+// persistent flags into cmd.Flags() by pointer, so a cmd.Flags() hit that is
+// an ancestor's persistent flag is rejected; otherwise the result would depend
+// on whether discovery had already run.
+func ownedFlag(cmd *cobra.Command, name string) *pflag.Flag {
+	if flag := cmd.Flags().Lookup(name); flag != nil && !inheritedFlag(cmd, flag) {
+		return flag
+	}
+	return cmd.PersistentFlags().Lookup(name)
+}
+
+func inheritedFlag(cmd *cobra.Command, flag *pflag.Flag) bool {
+	for parent := cmd.Parent(); parent != nil; parent = parent.Parent() {
+		if parent.PersistentFlags().Lookup(flag.Name) == flag {
+			return true
+		}
+	}
+	return false
 }
 
 // isReservedCommand reports whether name is a reserved command that must never

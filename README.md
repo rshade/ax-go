@@ -438,7 +438,9 @@ mycli mcp-server --transport=http --addr=0.0.0.0:8080 --allow-non-loopback
   command should stay a tool, but one flag (such as `--watch`) cannot return
   over request/response: the flag is omitted from `tools/list` and
   `__schema --as=mcp`, rejected with a `validation_error` (exit `2`) on
-  `tools/call`, and left untouched in `--help` and `__schema --as=ax`.
+  `tools/call`, and left untouched in `--help` and `__schema --as=ax`. The
+  agent-safety flags (`--format`, `--dry-run`, `--yes`, `--idempotency-key`,
+  `--strict`) cannot be excluded.
 - **Prompts, resources, instructions**: declared prompts and resources are
   served exactly as `__schema --as=mcp` lists them. `mcp.WithInstructions(text)`
   sends a short string (valid UTF-8, at most 8 KiB, else exit 2 at startup) in

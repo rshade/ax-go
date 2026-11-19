@@ -5,16 +5,35 @@
 ```go
 // ExcludeFlag marks the named flag on cmd so it is omitted from the MCP tool
 // input schema (tools/list and "__schema --as=mcp") and rejected with a
-// validation error (exit 2) on tools/call. The flag is looked up in
-// cmd.Flags(), then cmd.PersistentFlags(); a persistent flag excluded on a
-// parent command is also excluded on every descendant command that inherits it
-// without shadowing it. The flag stays visible in --help and in
-// "__schema --as=ax". The mark is the pflag annotation
-// "github.com/rshade/ax-go/mcp/exclude" set to []string{"true"}. Existing flag
+// validation error (exit 2) on tools/call. The flag is looked up among the
+// flags cmd itself declares, in cmd.Flags(), then cmd.PersistentFlags(); a
+// persistent flag excluded on a parent command is also excluded on every
+// descendant command that inherits it without shadowing it. A name cmd only
+// inherits is a no-op. A flag that is both required and excluded makes every
+// tools/call on the tool fail with a validation error (exit 2). The flag
+// stays visible in --help and in "__schema --as=ax". The mark is the pflag
+// annotation "github.com/rshade/ax-go/mcp/exclude" set to []string{"true"}.
+//
+// The ax agent-safety and output flags (format, dry-run, yes,
+// idempotency-key, strict) are reserved and never excluded. Existing flag
 // annotations are preserved, and a nil cmd, empty name, or unknown flag name
 // is a no-op.
 func ExcludeFlag(cmd *cobra.Command, name string)
 ```
+
+## Reserved Flags
+
+`format`, `dry-run`, `yes`, `idempotency-key`, and `strict` are never excluded.
+`mcp.ExcludeFlag` does not mark them, and `IsFlagExcluded` reports `false` for
+them even when the annotation is set by hand, so they remain in
+`tool.inputSchema.properties` and accepted on `tools/call`.
+
+## Wire Contract: `tools/call` on a Tool with an Excluded Required Flag
+
+When `watch` is both `MarkFlagRequired` and excluded, every `tools/call` on the
+tool returns `IsError: true` with a `validation_error` envelope (exit `2`) whose
+message is `required argument "watch" is excluded from MCP; tool "mycli-test"
+cannot be called`. `Run` / `RunE` MUST NOT execute.
 
 No other public package (`ax`, `contract`, `config`, `schema`, `id`, `logging`, `axtest`) gains or changes any exported symbol.
 

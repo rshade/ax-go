@@ -230,7 +230,7 @@ func (d *dispatcher) buildArgs(
 	name string,
 	args map[string]any,
 ) ([]string, []flagAssignment, callConfig, *contract.Error) {
-	allowed := acceptedFlags(target)
+	allowed, excluded := acceptedFlags(target)
 	cc := callConfig{mode: contract.ModeJSON}
 
 	keys := make([]string, 0, len(args))
@@ -279,6 +279,13 @@ func (d *dispatcher) buildArgs(
 	setFlags[formatFlagName] = struct{}{}
 	setFlags[dryRunFlagName] = struct{}{}
 	setFlags[idempotencyKeyFlagName] = struct{}{}
+	// A required flag excluded from MCP can never be supplied, so the call
+	// cannot satisfy the adopter's invariant; fail here rather than letting
+	// Cobra's own required check surface it as internal_error.
+	if missing := missingRequiredFlag(excluded, setFlags); missing != "" {
+		return nil, nil, cc, d.validationError(ctx,
+			fmt.Sprintf("required argument %q is excluded from MCP; tool %q cannot be called", missing, name))
+	}
 	if missing := missingRequiredFlag(allowed, setFlags); missing != "" {
 		return nil, nil, cc, d.validationError(ctx,
 			fmt.Sprintf("required argument %q not provided for tool %q", missing, name))
@@ -367,17 +374,17 @@ func (d *dispatcher) appendConvertedFlagArg(
 	return include, nil
 }
 
-// missingRequiredFlag returns the name of a required flag on the target command
-// that the call did not supply, or "" when every required flag is satisfied.
-// Flags are scanned in sorted order so the reported offender is deterministic.
-func missingRequiredFlag(allowed map[string]*pflag.Flag, setFlags map[string]struct{}) string {
-	names := make([]string, 0, len(allowed))
-	for name := range allowed {
+// missingRequiredFlag returns the name of a required flag in flags that the
+// call did not supply, or "" when every required flag is satisfied. Flags are
+// scanned in sorted order so the reported offender is deterministic.
+func missingRequiredFlag(flags map[string]*pflag.Flag, setFlags map[string]struct{}) string {
+	names := make([]string, 0, len(flags))
+	for name := range flags {
 		names = append(names, name)
 	}
 	sort.Strings(names)
 	for _, name := range names {
-		if !internalschema.IsRequiredFlag(allowed[name]) {
+		if !internalschema.IsRequiredFlag(flags[name]) {
 			continue
 		}
 		if _, ok := setFlags[name]; !ok {
@@ -574,24 +581,29 @@ func commandPathArgs(root, target *cobra.Command) []string {
 	return reversed
 }
 
-// acceptedFlags returns the flags accepted by cmd (local and inherited),
-// omitting any flag excluded from MCP via internalmcp.IsFlagExcluded.
-func acceptedFlags(cmd *cobra.Command) map[string]*pflag.Flag {
+// acceptedFlags splits cmd's effective flags (local first, so a local flag
+// shadows an inherited one of the same name) into those a tools/call may
+// supply and those excluded from MCP via internalmcp.IsFlagExcluded. The
+// excluded set is kept because Cobra still enforces their required
+// annotations when the command runs.
+func acceptedFlags(cmd *cobra.Command) (map[string]*pflag.Flag, map[string]*pflag.Flag) {
 	seen := map[string]struct{}{}
-	flags := map[string]*pflag.Flag{}
+	accepted := map[string]*pflag.Flag{}
+	excluded := map[string]*pflag.Flag{}
 	add := func(flag *pflag.Flag) {
 		if _, ok := seen[flag.Name]; ok {
 			return
 		}
 		seen[flag.Name] = struct{}{}
 		if internalmcp.IsFlagExcluded(flag) {
+			excluded[flag.Name] = flag
 			return
 		}
-		flags[flag.Name] = flag
+		accepted[flag.Name] = flag
 	}
 	cmd.NonInheritedFlags().VisitAll(add)
 	cmd.InheritedFlags().VisitAll(add)
-	return flags
+	return accepted, excluded
 }
 
 func snapshotSliceDefaults(root *cobra.Command) map[*pflag.Flag][]string {

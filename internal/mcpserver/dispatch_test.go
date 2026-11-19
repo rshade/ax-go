@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1174,4 +1175,75 @@ func TestDispatchExcludedFlagIsValidationError(t *testing.T) {
 			t.Errorf("child region = %q, want ap", got)
 		}
 	})
+}
+
+// TestDispatchExcludedRequiredFlagIsValidationError asserts that a flag both
+// required and excluded from MCP makes tools/call fail in buildArgs with a
+// validation_error naming the flag, rather than reaching Cobra's own
+// required-flag check and surfacing as internal_error. RunE never runs,
+// because the adopter's required invariant cannot be met over MCP.
+func TestDispatchExcludedRequiredFlagIsValidationError(t *testing.T) {
+	var runs int
+	root := &cobra.Command{Use: "demo", Short: "root", RunE: noopRunE}
+	testCmd := &cobra.Command{
+		Use:   "test",
+		Short: "run tests",
+		RunE: func(*cobra.Command, []string) error {
+			runs++
+			return nil
+		},
+	}
+	testCmd.Flags().Bool("watch", false, "watch mode")
+	testCmd.Flags().String("filter", "all", "filter")
+	if err := testCmd.MarkFlagRequired("watch"); err != nil {
+		t.Fatalf("MarkFlagRequired: %v", err)
+	}
+	internalmcp.MarkFlagExcluded(testCmd, "watch")
+	root.AddCommand(testCmd)
+
+	res := mustCall(t, newTestDispatcher(root), "demo-test", map[string]any{"filter": "unit"})
+	if !res.IsError {
+		t.Fatalf("expected IsError for excluded required flag, got success: %s", resultText(t, res))
+	}
+	env := decodeErrorEnvelope(t, resultText(t, res))
+	if env.ErrorCode != "validation_error" {
+		t.Errorf("error_code = %q, want validation_error", env.ErrorCode)
+	}
+	want := `required argument "watch" is excluded from MCP; tool "demo-test" cannot be called`
+	if env.Message != want {
+		t.Errorf("message = %q, want %q", env.Message, want)
+	}
+	if runs != 0 {
+		t.Errorf("RunE ran %d times, want 0", runs)
+	}
+}
+
+// TestDispatchReservedFlagIgnoresExclusionAnnotation asserts that a hand-set
+// exclusion annotation on an adopter-predeclared agent-safety flag does not
+// remove it from tools/call: dry-run stays accepted and reaches the command.
+func TestDispatchReservedFlagIgnoresExclusionAnnotation(t *testing.T) {
+	var dryRun bool
+	root := &cobra.Command{Use: "demo", Short: "root"}
+	root.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "adopter dry-run")
+	root.PersistentFlags().Lookup("dry-run").Annotations = map[string][]string{
+		internalmcp.ExcludeAnnotationKey: {"true"},
+	}
+	root.AddCommand(&cobra.Command{
+		Use:   "test",
+		Short: "run tests",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: strconv.FormatBool(dryRun)}),
+			)
+		},
+	})
+
+	res := mustCall(t, newTestDispatcher(root), "demo-test", map[string]any{"dry-run": true})
+	if res.IsError {
+		t.Fatalf("dry-run call failed: %s", resultText(t, res))
+	}
+	if got := decodeEnvelope(t, resultText(t, res)).Data.Name; got != "true" {
+		t.Errorf("dry-run seen by command = %q, want true", got)
+	}
 }
