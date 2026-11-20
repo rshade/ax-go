@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"slices"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -253,5 +254,341 @@ func TestNewCommandExampleUsesRootName(t *testing.T) {
 func TestNewCommandNilRootDoesNotPanic(t *testing.T) {
 	if cmd := mcp.NewCommand(nil); cmd == nil {
 		t.Fatal("NewCommand(nil) returned nil")
+	}
+}
+
+// TestExcludeFlagOmittedFromStaticAndLiveSchemas asserts a flag marked with
+// mcp.ExcludeFlag is absent from both "__schema --as=mcp" and live "tools/list"
+// inputSchema.properties and inputSchema.required while non-excluded flags stay.
+func TestExcludeFlagOmittedFromStaticAndLiveSchemas(t *testing.T) {
+	newTree := func() *cobra.Command {
+		root := &cobra.Command{Use: "tsacl", Short: "root"}
+		testCmd := &cobra.Command{
+			Use:   "test",
+			Short: "run policy tests",
+			RunE:  func(*cobra.Command, []string) error { return nil },
+		}
+		testCmd.Flags().Bool("watch", false, "watch for changes")
+		testCmd.Flags().String("prompt", "", "interactive prompt")
+		testCmd.Flags().String("filter", "", "filter tests")
+		testCmd.Flags().String("suite", "", "test suite")
+		_ = testCmd.MarkFlagRequired("prompt")
+		_ = testCmd.MarkFlagRequired("suite")
+
+		mcp.ExcludeFlag(testCmd, "watch")
+		mcp.ExcludeFlag(testCmd, "prompt")
+		root.AddCommand(testCmd)
+		return root
+	}
+
+	staticRoot := newTree()
+	staticSchema := schema.BuildMCPSchema(staticRoot)
+	if len(staticSchema.Tools) != 1 {
+		t.Fatalf("static tools count = %d, want 1", len(staticSchema.Tools))
+	}
+	staticProps, ok := staticSchema.Tools[0].InputSchema["properties"].(map[string]any)
+	if !ok {
+		t.Fatalf("static properties is %T, want map[string]any", staticSchema.Tools[0].InputSchema["properties"])
+	}
+	for _, excluded := range []string{"watch", "prompt"} {
+		if _, present := staticProps[excluded]; present {
+			t.Errorf("static inputSchema.properties unexpectedly contains excluded flag %q", excluded)
+		}
+	}
+	for _, kept := range []string{"filter", "suite"} {
+		if _, present := staticProps[kept]; !present {
+			t.Errorf("static inputSchema.properties missing non-excluded flag %q", kept)
+		}
+	}
+	staticReq, ok := staticSchema.Tools[0].InputSchema["required"].([]string)
+	if !ok || !slices.Equal(staticReq, []string{"suite"}) {
+		t.Errorf("static required = %v, want [suite]", staticSchema.Tools[0].InputSchema["required"])
+	}
+
+	session := serveTestHTTP(t, newTree())
+	res, err := session.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("tools/list: %v", err)
+	}
+	if len(res.Tools) != 1 {
+		t.Fatalf("live tools count = %d, want 1", len(res.Tools))
+	}
+	rawSchema, err := json.Marshal(res.Tools[0].InputSchema)
+	if err != nil {
+		t.Fatalf("marshal live InputSchema: %v", err)
+	}
+	var liveSchema struct {
+		Properties map[string]any `json:"properties"`
+		Required   []string       `json:"required"`
+	}
+	mustUnmarshal(t, string(rawSchema), &liveSchema)
+	for _, excluded := range []string{"watch", "prompt"} {
+		if _, present := liveSchema.Properties[excluded]; present {
+			t.Errorf("live inputSchema.properties unexpectedly contains excluded flag %q", excluded)
+		}
+	}
+	for _, kept := range []string{"filter", "suite"} {
+		if _, present := liveSchema.Properties[kept]; !present {
+			t.Errorf("live inputSchema.properties missing non-excluded flag %q", kept)
+		}
+	}
+	if !slices.Equal(liveSchema.Required, []string{"suite"}) {
+		t.Errorf("live required = %v, want [suite]", liveSchema.Required)
+	}
+}
+
+// TestExcludeFlagStaysInHelpAndAXSchema asserts that excluding a flag from MCP
+// leaves --help, direct CLI execution, and "__schema --as=ax" untouched, and
+// records the canonical annotation on the pflag.
+func TestExcludeFlagStaysInHelpAndAXSchema(t *testing.T) {
+	var watched bool
+	root := &cobra.Command{Use: "tsacl", Short: "root"}
+	testCmd := &cobra.Command{
+		Use:   "test",
+		Short: "run policy tests",
+		RunE:  func(*cobra.Command, []string) error { return nil },
+	}
+	testCmd.Flags().BoolVar(&watched, "watch", false, "watch for changes")
+	testCmd.Flags().String("filter", "", "filter tests")
+	mcp.ExcludeFlag(testCmd, "watch")
+	root.AddCommand(testCmd)
+	root.AddCommand(schema.NewSchemaCommand(root))
+
+	var help bytes.Buffer
+	root.SetOut(&help)
+	root.SetArgs([]string{"test", "--help"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("test --help: %v", err)
+	}
+	if !strings.Contains(help.String(), "--watch") {
+		t.Errorf("test --help omits --watch:\n%s", help.String())
+	}
+
+	var axOut bytes.Buffer
+	root.SetOut(&axOut)
+	root.SetArgs([]string{"__schema", "--as=ax"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("__schema --as=ax: %v", err)
+	}
+	var built schema.Schema
+	mustUnmarshal(t, axOut.String(), &built)
+	var flagNames []string
+	for _, child := range built.Command.Commands {
+		if child.Use == "test" {
+			for _, f := range child.Flags {
+				flagNames = append(flagNames, f.Name)
+			}
+		}
+	}
+	if !slices.Contains(flagNames, "watch") {
+		t.Errorf("__schema --as=ax test flags = %v, want watch present", flagNames)
+	}
+
+	flag := testCmd.Flags().Lookup("watch")
+	if got := flag.Annotations[excludeAnnotationKey]; !slices.Equal(got, []string{"true"}) {
+		t.Errorf("watch flag annotation %q = %v, want [true]", excludeAnnotationKey, got)
+	}
+
+	// Reset help flag set by "test --help" above and verify direct CLI execution accepts --watch.
+	_ = testCmd.Flags().Lookup("help").Value.Set("false")
+	root.SetArgs([]string{"test", "--watch"})
+	if err := root.Execute(); err != nil {
+		t.Fatalf("direct CLI execution with --watch: %v", err)
+	}
+	if !watched {
+		t.Error("direct CLI execution did not set --watch=true")
+	}
+}
+
+func TestExcludeFlagNoopAndPreservesAnnotations(t *testing.T) {
+	mcp.ExcludeFlag(nil, "watch")
+
+	cmd := &cobra.Command{Use: "test"}
+	cmd.Flags().Bool("watch", false, "watch")
+	mcp.ExcludeFlag(cmd, "")
+	mcp.ExcludeFlag(cmd, "no-such-flag")
+
+	flag := cmd.Flags().Lookup("watch")
+	if got := flag.Annotations[excludeAnnotationKey]; len(got) != 0 {
+		t.Errorf("unexpected annotation after no-op calls: %v", got)
+	}
+
+	flag.Annotations = map[string][]string{"keep": {"me"}}
+	mcp.ExcludeFlag(cmd, "watch")
+	if got := flag.Annotations["keep"]; !slices.Equal(got, []string{"me"}) {
+		t.Errorf("existing annotation = %v, want [me]", got)
+	}
+	if got := flag.Annotations[excludeAnnotationKey]; !slices.Equal(got, []string{"true"}) {
+		t.Errorf("exclude annotation = %v, want [true]", got)
+	}
+}
+
+// TestExcludeFlagRejectedOnToolsCallAndNeverRuns asserts that supplying a flag
+// excluded with mcp.ExcludeFlag over a live MCP session returns IsError=true
+// with a validation_error ax.Error envelope (exit 2) and never invokes RunE,
+// while calling the same tool without the excluded flag succeeds.
+func TestExcludeFlagRejectedOnToolsCallAndNeverRuns(t *testing.T) {
+	// RunE runs on the HTTP server goroutine, so the count is shared across
+	// goroutines and must be synchronized explicitly.
+	var calls atomic.Int32
+	var filter string
+	root := &cobra.Command{Use: "tsacl", Short: "root"}
+	testCmd := &cobra.Command{
+		Use:   "test",
+		Short: "run policy tests",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			calls.Add(1)
+			_, err := cmd.OutOrStdout().Write([]byte(`{"filter":"` + filter + `"}`))
+			return err
+		},
+	}
+	testCmd.Flags().Bool("watch", false, "watch for changes")
+	testCmd.Flags().StringVar(&filter, "filter", "default", "filter tests")
+	mcp.ExcludeFlag(testCmd, "watch")
+	root.AddCommand(testCmd)
+
+	session := serveTestHTTP(t, root)
+
+	res, err := session.CallTool(context.Background(), &sdk.CallToolParams{
+		Name:      "tsacl-test",
+		Arguments: map[string]any{"watch": true},
+	})
+	if err != nil {
+		t.Fatalf("tools/call protocol error: %v", err)
+	}
+	if !res.IsError {
+		t.Fatalf("tools/call with excluded flag watch=true succeeded, want IsError=true")
+	}
+	if len(res.Content) != 1 {
+		t.Fatalf("len(res.Content) = %d, want 1", len(res.Content))
+	}
+	text, ok := res.Content[0].(*sdk.TextContent)
+	if !ok {
+		t.Fatalf("Content[0] is %T, want *sdk.TextContent", res.Content[0])
+	}
+	var errEnv struct {
+		ErrorCode string `json:"error_code"`
+		Message   string `json:"message"`
+	}
+	mustUnmarshal(t, text.Text, &errEnv)
+	if errEnv.ErrorCode != "validation_error" {
+		t.Errorf("error_code = %q, want validation_error", errEnv.ErrorCode)
+	}
+	if want := `unknown argument "watch" for tool "tsacl-test"`; !strings.Contains(errEnv.Message, want) {
+		t.Errorf("message = %q, want it to contain %q", errEnv.Message, want)
+	}
+	if got := calls.Load(); got != 0 {
+		t.Fatalf("RunE ran %d times when excluded flag was supplied, want 0", got)
+	}
+
+	okRes, err := session.CallTool(context.Background(), &sdk.CallToolParams{
+		Name:      "tsacl-test",
+		Arguments: map[string]any{"filter": "dns"},
+	})
+	if err != nil {
+		t.Fatalf("tools/call without watch: %v", err)
+	}
+	if okRes.IsError {
+		t.Fatalf("tools/call without watch returned IsError=true: %+v", okRes.Content)
+	}
+	if got := calls.Load(); got != 1 {
+		t.Errorf("RunE ran %d times, want 1", got)
+	}
+}
+
+// TestExcludeFlagInheritanceAndShadowingParity asserts that static
+// "__schema --as=mcp" and live "mcp-server" agree on persistent flag exclusion
+// inheritance and local flag shadowing.
+func TestExcludeFlagInheritanceAndShadowingParity(t *testing.T) {
+	newTree := func() *cobra.Command {
+		noop := func(cmd *cobra.Command, _ []string) error {
+			_, err := cmd.OutOrStdout().Write([]byte(`{"ok":true}`))
+			return err
+		}
+		root := &cobra.Command{Use: "tsacl", Short: "root", RunE: noop}
+		root.PersistentFlags().Bool("global-watch", false, "excluded persistent")
+		root.PersistentFlags().String("mode", "fast", "unexcluded on root")
+		root.PersistentFlags().String("region", "us", "excluded on root")
+		mcp.ExcludeFlag(root, "global-watch")
+		mcp.ExcludeFlag(root, "region")
+
+		child := &cobra.Command{Use: "test", Short: "child", RunE: noop}
+		child.Flags().String("mode", "slow", "excluded local shadow on child")
+		child.Flags().String("region", "eu", "unexcluded local shadow on child")
+		mcp.ExcludeFlag(child, "mode")
+		root.AddCommand(child)
+		return root
+	}
+
+	staticSchema := schema.BuildMCPSchema(newTree())
+	session := serveTestHTTP(t, newTree())
+	liveList, err := session.ListTools(context.Background(), nil)
+	if err != nil {
+		t.Fatalf("tools/list: %v", err)
+	}
+	if len(staticSchema.Tools) != 2 || len(liveList.Tools) != 2 {
+		t.Fatalf("tools count: static=%d live=%d, want 2", len(staticSchema.Tools), len(liveList.Tools))
+	}
+
+	wantByTool := map[string]struct {
+		present []string
+		absent  []string
+	}{
+		"tsacl":      {present: []string{"mode"}, absent: []string{"global-watch", "region"}},
+		"tsacl-test": {present: []string{"region"}, absent: []string{"global-watch", "mode"}},
+	}
+
+	for i, staticTool := range staticSchema.Tools {
+		want, ok := wantByTool[staticTool.Name]
+		if !ok {
+			t.Fatalf("unexpected tool %q", staticTool.Name)
+		}
+		staticProps := staticTool.InputSchema["properties"].(map[string]any)
+		liveRaw, marshalErr := json.Marshal(liveList.Tools[i].InputSchema)
+		if marshalErr != nil {
+			t.Fatalf("marshal live InputSchema: %v", marshalErr)
+		}
+		var liveSchema struct {
+			Properties map[string]any `json:"properties"`
+		}
+		mustUnmarshal(t, string(liveRaw), &liveSchema)
+
+		for _, key := range want.present {
+			if _, ok := staticProps[key]; !ok {
+				t.Errorf("static %s missing expected property %q", staticTool.Name, key)
+			}
+			if _, ok := liveSchema.Properties[key]; !ok {
+				t.Errorf("live %s missing expected property %q", staticTool.Name, key)
+			}
+		}
+		for _, key := range want.absent {
+			if _, ok := staticProps[key]; ok {
+				t.Errorf("static %s unexpectedly contains excluded property %q", staticTool.Name, key)
+			}
+			if _, ok := liveSchema.Properties[key]; ok {
+				t.Errorf("live %s unexpectedly contains excluded property %q", staticTool.Name, key)
+			}
+		}
+	}
+
+	// Verify live dispatch matches the shadowed schema on tsacl-test.
+	for _, rejected := range []string{"global-watch", "mode"} {
+		res, callErr := session.CallTool(context.Background(), &sdk.CallToolParams{
+			Name:      "tsacl-test",
+			Arguments: map[string]any{rejected: "x"},
+		})
+		if callErr != nil {
+			t.Fatalf("tools/call %s protocol error: %v", rejected, callErr)
+		}
+		if !res.IsError {
+			t.Errorf("tools/call tsacl-test with %q succeeded, want IsError=true", rejected)
+		}
+	}
+	okRes, err := session.CallTool(context.Background(), &sdk.CallToolParams{
+		Name:      "tsacl-test",
+		Arguments: map[string]any{"region": "eu"},
+	})
+	if err != nil || okRes.IsError {
+		t.Errorf("tools/call tsacl-test with unexcluded shadowed region failed: err=%v res=%+v", err, okRes)
 	}
 }

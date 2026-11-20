@@ -83,3 +83,25 @@ func ExampleExclude() {
 	}
 	// Output: mycli-status
 }
+
+// ExampleExcludeFlag keeps a command as a callable MCP tool while omitting a
+// flag that cannot work over request/response (such as --watch). The excluded
+// flag is absent from the MCP tool's inputSchema and rejected with a
+// validation error on tools/call, while staying visible in --help and
+// "__schema --as=ax".
+func ExampleExcludeFlag() {
+	noop := func(*cobra.Command, []string) error { return nil }
+	root := &cobra.Command{Use: "mycli", Short: "a demo CLI"}
+	testCmd := &cobra.Command{Use: "test", Short: "run tests", RunE: noop}
+	testCmd.Flags().String("filter", "", "run matching tests")
+	testCmd.Flags().Bool("watch", false, "re-run tests on file changes")
+	root.AddCommand(testCmd)
+
+	mcp.ExcludeFlag(testCmd, "watch")
+
+	props := schema.BuildMCPSchema(root).Tools[0].InputSchema["properties"].(map[string]any)
+	_, hasFilter := props["filter"]
+	_, hasWatch := props["watch"]
+	fmt.Println("filter:", hasFilter, "watch:", hasWatch)
+	// Output: filter: true watch: false
+}

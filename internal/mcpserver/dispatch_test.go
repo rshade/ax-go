@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 
@@ -1038,5 +1039,211 @@ func TestDispatchRejectsOutOfSetEnum(t *testing.T) {
 	output, _ := properties["output"].(map[string]any)
 	if !reflect.DeepEqual(output["enum"], []any{"json", "table"}) {
 		t.Fatalf("advertised enum = %#v, want [json table]", output["enum"])
+	}
+}
+
+// TestDispatchExcludedFlagIsValidationError asserts that supplying a flag
+// marked with MarkFlagExcluded on tools/call is rejected in buildArgs with a
+// single-item validation_error envelope (exit 2) and never invokes RunE, while
+// calling the same tool without the excluded flag succeeds.
+func TestDispatchExcludedFlagIsValidationError(t *testing.T) {
+	var runs int
+	var filter string
+	root := &cobra.Command{Use: "demo", Short: "root", RunE: noopRunE}
+	testCmd := &cobra.Command{
+		Use:   "test",
+		Short: "run tests",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			runs++
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: filter}),
+			)
+		},
+	}
+	testCmd.Flags().Bool("watch", false, "watch mode")
+	testCmd.Flags().StringSlice("watch-dirs", nil, "watch directories")
+	testCmd.Flags().StringVar(&filter, "filter", "all", "filter")
+	internalmcp.MarkFlagExcluded(testCmd, "watch")
+	internalmcp.MarkFlagExcluded(testCmd, "watch-dirs")
+	root.AddCommand(testCmd)
+
+	d := newTestDispatcher(root)
+
+	for _, tc := range []struct {
+		name string
+		arg  string
+		val  any
+	}{
+		{name: "bool true", arg: "watch", val: true},
+		{name: "bool false", arg: "watch", val: false},
+		{name: "null value", arg: "watch", val: nil},
+		{name: "slice value", arg: "watch-dirs", val: []any{"a", "b"}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			res := mustCall(t, d, "demo-test", map[string]any{tc.arg: tc.val})
+			if !res.IsError {
+				t.Fatalf(
+					"expected IsError for excluded flag %s=%v, got success: %s",
+					tc.arg,
+					tc.val,
+					resultText(t, res),
+				)
+			}
+			if len(res.Content) != 1 {
+				t.Fatalf("len(res.Content) = %d, want 1", len(res.Content))
+			}
+			env := decodeErrorEnvelope(t, resultText(t, res))
+			if env.ErrorCode != "validation_error" {
+				t.Errorf("error_code = %q, want validation_error", env.ErrorCode)
+			}
+			want := fmt.Sprintf("unknown argument %q for tool \"demo-test\"", tc.arg)
+			if !strings.Contains(env.Message, want) {
+				t.Errorf("message = %q, want it to contain %q", env.Message, want)
+			}
+		})
+	}
+	if runs != 0 {
+		t.Fatalf("RunE ran %d times on rejected excluded flag calls, want 0", runs)
+	}
+
+	res := mustCall(t, d, "demo-test", map[string]any{"filter": "unit"})
+	if res.IsError {
+		t.Fatalf("call without excluded flag failed: %s", resultText(t, res))
+	}
+	if got := decodeEnvelope(t, resultText(t, res)).Data.Name; got != "unit" {
+		t.Errorf("filter = %q, want unit", got)
+	}
+	if runs != 1 {
+		t.Errorf("RunE ran %d times, want 1", runs)
+	}
+
+	t.Run("inherited and shadowed persistent flags", func(t *testing.T) {
+		var childRuns int
+		pRoot := &cobra.Command{
+			Use:   "demo",
+			Short: "root",
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				return contract.WriteJSON(
+					cmd.OutOrStdout(),
+					contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: "root"}),
+				)
+			},
+		}
+		pRoot.PersistentFlags().Bool("global-watch", false, "excluded persistent")
+		pRoot.PersistentFlags().String("mode", "fast", "unexcluded persistent on root")
+		pRoot.PersistentFlags().String("region", "us", "excluded on root, shadowed on child")
+		internalmcp.MarkFlagExcluded(pRoot, "global-watch")
+		internalmcp.MarkFlagExcluded(pRoot, "region")
+
+		var childRegion string
+		child := &cobra.Command{
+			Use:   "child",
+			Short: "child",
+			RunE: func(cmd *cobra.Command, _ []string) error {
+				childRuns++
+				return contract.WriteJSON(
+					cmd.OutOrStdout(),
+					contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: childRegion}),
+				)
+			},
+		}
+		child.Flags().String("mode", "slow", "excluded local shadow on child")
+		child.Flags().StringVar(&childRegion, "region", "eu", "unexcluded local shadow on child")
+		internalmcp.MarkFlagExcluded(child, "mode")
+		pRoot.AddCommand(child)
+
+		pd := newTestDispatcher(pRoot)
+
+		if res := mustCall(t, pd, "demo-child", map[string]any{"global-watch": true}); !res.IsError {
+			t.Errorf("expected IsError for inherited excluded global-watch on child")
+		}
+		if res := mustCall(t, pd, "demo-child", map[string]any{"mode": "slow"}); !res.IsError {
+			t.Errorf("expected IsError for shadowed excluded mode on child")
+		}
+		if childRuns != 0 {
+			t.Errorf("child RunE ran %d times on rejected calls, want 0", childRuns)
+		}
+		if res := mustCall(t, pd, "demo", map[string]any{"mode": "fast"}); res.IsError {
+			t.Errorf("parent call with unexcluded mode failed: %s", resultText(t, res))
+		}
+		childRes := mustCall(t, pd, "demo-child", map[string]any{"region": "ap"})
+		if childRes.IsError {
+			t.Fatalf("child call with unexcluded local shadow region failed: %s", resultText(t, childRes))
+		}
+		if got := decodeEnvelope(t, resultText(t, childRes)).Data.Name; got != "ap" {
+			t.Errorf("child region = %q, want ap", got)
+		}
+	})
+}
+
+// TestDispatchExcludedRequiredFlagIsValidationError asserts that a flag both
+// required and excluded from MCP makes tools/call fail in buildArgs with a
+// validation_error naming the flag, rather than reaching Cobra's own
+// required-flag check and surfacing as internal_error. RunE never runs,
+// because the adopter's required invariant cannot be met over MCP.
+func TestDispatchExcludedRequiredFlagIsValidationError(t *testing.T) {
+	var runs int
+	root := &cobra.Command{Use: "demo", Short: "root", RunE: noopRunE}
+	testCmd := &cobra.Command{
+		Use:   "test",
+		Short: "run tests",
+		RunE: func(*cobra.Command, []string) error {
+			runs++
+			return nil
+		},
+	}
+	testCmd.Flags().Bool("watch", false, "watch mode")
+	testCmd.Flags().String("filter", "all", "filter")
+	if err := testCmd.MarkFlagRequired("watch"); err != nil {
+		t.Fatalf("MarkFlagRequired: %v", err)
+	}
+	internalmcp.MarkFlagExcluded(testCmd, "watch")
+	root.AddCommand(testCmd)
+
+	res := mustCall(t, newTestDispatcher(root), "demo-test", map[string]any{"filter": "unit"})
+	if !res.IsError {
+		t.Fatalf("expected IsError for excluded required flag, got success: %s", resultText(t, res))
+	}
+	env := decodeErrorEnvelope(t, resultText(t, res))
+	if env.ErrorCode != "validation_error" {
+		t.Errorf("error_code = %q, want validation_error", env.ErrorCode)
+	}
+	want := `required argument "watch" is excluded from MCP; tool "demo-test" cannot be called`
+	if env.Message != want {
+		t.Errorf("message = %q, want %q", env.Message, want)
+	}
+	if runs != 0 {
+		t.Errorf("RunE ran %d times, want 0", runs)
+	}
+}
+
+// TestDispatchReservedFlagIgnoresExclusionAnnotation asserts that a hand-set
+// exclusion annotation on an adopter-predeclared agent-safety flag does not
+// remove it from tools/call: dry-run stays accepted and reaches the command.
+func TestDispatchReservedFlagIgnoresExclusionAnnotation(t *testing.T) {
+	var dryRun bool
+	root := &cobra.Command{Use: "demo", Short: "root"}
+	root.PersistentFlags().BoolVar(&dryRun, "dry-run", false, "adopter dry-run")
+	root.PersistentFlags().Lookup("dry-run").Annotations = map[string][]string{
+		internalmcp.ExcludeAnnotationKey: {"true"},
+	}
+	root.AddCommand(&cobra.Command{
+		Use:   "test",
+		Short: "run tests",
+		RunE: func(cmd *cobra.Command, _ []string) error {
+			return contract.WriteJSON(
+				cmd.OutOrStdout(),
+				contract.NewEnvelope(cmd.Context(), dispatchPayload{Name: strconv.FormatBool(dryRun)}),
+			)
+		},
+	})
+
+	res := mustCall(t, newTestDispatcher(root), "demo-test", map[string]any{"dry-run": true})
+	if res.IsError {
+		t.Fatalf("dry-run call failed: %s", resultText(t, res))
+	}
+	if got := decodeEnvelope(t, resultText(t, res)).Data.Name; got != "true" {
+		t.Errorf("dry-run seen by command = %q, want true", got)
 	}
 }

@@ -1032,5 +1032,5 @@ follows them.
 <!-- SPECKIT START -->
 For additional context about technologies to be used, project structure,
 shell commands, and other important information, read the current plan
-at specs/035-mcp-error-stdout/plan.md
+at specs/036-mcp-flag-exclusion/plan.md
 <!-- SPECKIT END -->
