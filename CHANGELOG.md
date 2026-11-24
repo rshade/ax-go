@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.11.0](https://github.com/rshade/ax-go/compare/v0.10.0...v0.11.0) (2026-11-24)
+
+
+### Added
+
+* generate a build-time llms.txt document ([#321](https://github.com/rshade/ax-go/issues/321)) ([7ab4f4f](https://github.com/rshade/ax-go/commit/7ab4f4f079ad0505bc375c705a7ffffd1ffe084e)), closes [#32](https://github.com/rshade/ax-go/issues/32)
+* **mcp:** add ExcludeFlag for per-flag MCP exclusion ([1d0fac9](https://github.com/rshade/ax-go/commit/1d0fac9be5b64cee5ab19deb586cffef74af31ab)), closes [#332](https://github.com/rshade/ax-go/issues/332)
+* **mcp:** add ExcludeFlag for per-flag MCP exclusion ([#341](https://github.com/rshade/ax-go/issues/341)) ([1d0fac9](https://github.com/rshade/ax-go/commit/1d0fac9be5b64cee5ab19deb586cffef74af31ab))
+* **mcp:** preserve command stdout on non-zero exit ([#340](https://github.com/rshade/ax-go/issues/340)) ([daddcef](https://github.com/rshade/ax-go/commit/daddcef65ad9a540c5f0d63fc9bdc5b82acaa9aa)), closes [#333](https://github.com/rshade/ax-go/issues/333)
+
+
+### Fixed
+
+* **deps:** update dependency @astrojs/starlight to ^0.43.0 ([#336](https://github.com/rshade/ax-go/issues/336)) ([115175e](https://github.com/rshade/ax-go/commit/115175e9b9bd46045a3e3ddfd93d1a55067f391e))
+* **deps:** update golang.org/x/perf digest to 4febdb0 ([#342](https://github.com/rshade/ax-go/issues/342)) ([c9388c4](https://github.com/rshade/ax-go/commit/c9388c4185b19167976d09a9d164e31bbfa33909))
+* **deps:** update module golang.org/x/tools to v0.53.0 ([#346](https://github.com/rshade/ax-go/issues/346)) ([6828727](https://github.com/rshade/ax-go/commit/682872791b7d2c9c9926eb0f0b7d506750f08536))
+
 ## [0.10.0](https://github.com/rshade/ax-go/compare/v0.9.0...v0.10.0) (2026-10-28)
 
 
